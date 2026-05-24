@@ -1,81 +1,29 @@
-insert into rank (rank_name)
-values
-    ('Manager'),
-    ('Member');
+drop table if exists trade cascade;
+drop table if exists stock cascade;
 
-insert into division (division_name)
-values
-    ('Finance'),
-    ('AI'),
-    ('Cloud');
+create table stock (
+                       ticker varchar(4) primary key,
+                       name varchar(255) not null,
+                       exchange_market varchar(30) not null,
+                       shares_issued bigint not null
+);
 
-insert into project (project_name, project_content, division_id)
-values
-    ('Trading System', 'Core trading platform development', 1),
-    ('Demand Forecast AI', 'Machine learning demand forecasting', 2),
-    ('AWS Migration', 'Migration from on-premise to AWS', 3);
+create table trade (
+                       id bigserial primary key,
+                       trade_datetime timestamp not null,
+                       ticker varchar(4) not null references stock(ticker),
+                       side varchar(10) not null,
+                       quantity bigint not null,
+                       traded_price numeric(15, 2) not null
+);
 
-insert into users (is_manager)
-values
-    (true),
-    (false),
-    (false);
+insert into stock(ticker, name, exchange_market, shares_issued) values
+('7203', 'Toyota Motor', 'PRIME', 16000000000),
+('6758', 'Sony Group', 'PRIME', 1200000000),
+('9984', 'SoftBank Group', 'PRIME', 1400000000)
+on conflict (ticker) do nothing;
 
-insert into profile (
-    hrid,
-    name,
-    mail_address,
-    free,
-    rank_id,
-    user_id
-)
-values
-    ('A001', 'Taro Yamada', 'taro@example.com', 'Backend engineer', 1, 1),
-    ('A002', 'Hanako Sato', 'hanako@example.com', 'Machine learning engineer', 2, 2),
-    ('A003', 'Ichiro Suzuki', 'ichiro@example.com', 'Cloud infrastructure engineer', 2, 3);
-
-insert into skill (skill_name)
-values
-    ('Java'),
-    ('Spring Boot'),
-    ('Python'),
-    ('AI'),
-    ('AWS'),
-    ('Terraform'),
-    ('React'),
-    ('PostgreSQL'),
-    ('Docker');
-
-insert into career (
-    start_time,
-    end_time,
-    profile_id,
-    project_id
-)
-values
-    ('2023-04-01', null, 'A001', 1),
-    ('2022-04-01', null, 'A002', 2),
-    ('2021-04-01', null, 'A003', 3),
-
-    ('2021-04-01', '2023-03-31', 'A001', 2);
-
-insert into career_skill (career_id, skill_id)
-values
-    -- A001 current
-    (1, 1),
-    (1, 2),
-
-    -- A002
-    (2, 3),
-    (2, 4),
-    (2, 1),
-
-    -- A003
-    (3, 5),
-    (3, 6),
-    (3, 9),
-
-    -- A001 past AI project
-    (4, 1),
-    (4, 3),
-    (4, 7);
+insert into trade(trade_datetime, ticker, side, quantity, traded_price) values
+('2026-05-20 10:00:00', '7203', 'BUY', 100, 3000.00),
+('2026-05-20 11:00:00', '6758', 'SELL', 200, 12500.00)
+on conflict do nothing;

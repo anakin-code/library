@@ -1,0 +1,9 @@
+// Menu.tsx
+
+// Link import が無ければ追加
+import { Link } from "react-router-dom";
+
+// menu-card 一覧へ追加
+<Link to="/positions" className="menu-card">
+  Position List
+</Link>

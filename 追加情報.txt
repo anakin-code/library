@@ -1,0 +1,197 @@
+
+##ProfileSearchResponse.java
+
+package server.dto.response;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProfileSearchResponse {
+
+    private String hrid;
+    private String name;
+    private String mailAddress;
+    private String rankName;
+    private String companyName;
+    private List<SkillExperienceResponse> skillExperiences = new ArrayList<>();
+
+    public ProfileSearchResponse(
+            String hrid,
+            String name,
+            String mailAddress,
+            String rankName,
+            String companyName
+    ) {
+        this.hrid = hrid;
+        this.name = name;
+        this.mailAddress = mailAddress;
+        this.rankName = rankName;
+        this.companyName = companyName;
+    }
+
+    public String getHrid() {
+        return hrid;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getMailAddress() {
+        return mailAddress;
+    }
+
+    public String getRankName() {
+        return rankName;
+    }
+
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public List<SkillExperienceResponse> getSkillExperiences() {
+        return skillExperiences;
+    }
+
+    public void setSkillExperiences(List<SkillExperienceResponse> skillExperiences) {
+        this.skillExperiences = skillExperiences;
+    }
+}
+
+
+
+##SearchRepository.java の考え方
+
+public List<ProfileSearchResponse> searchProfiles(SearchRequest request) {
+
+    SearchSqlBuilder builder = new SearchSqlBuilder();
+
+    builder.applyConditions(request);
+    builder.applyGroupByAndHaving(request);
+
+    List<ProfileSearchResponse> profiles = jdbcTemplate.query(
+            builder.getSql(),
+            (rs, rowNum) -> new ProfileSearchResponse(
+                    rs.getString("hrid"),
+                    rs.getString("name"),
+                    rs.getString("mail_address"),
+                    rs.getString("rank_name"),
+                    rs.getString("company_name")
+            ),
+            builder.getParams()
+    );
+
+    for (ProfileSearchResponse profile : profiles) {
+        List<SkillExperienceResponse> skills =
+                findSkillExperiencesByHrid(profile.getHrid());
+
+        profile.setSkillExperiences(skills);
+    }
+
+    return profiles;
+}
+
+##追加する private メソッド
+
+private List<SkillExperienceResponse> findSkillExperiencesByHrid(String hrid) {
+
+    String sql = """
+            SELECT
+                s.skill_name,
+                COALESCE(SUM(
+                    COALESCE(c.end_time, NOW()::date) - c.start_time
+                ), 0) AS total_days
+            FROM profile p
+            JOIN career c ON c.profile_id = p.hrid
+            JOIN career_skill cs ON cs.career_id = c.career_id
+            JOIN skill s ON s.skill_id = cs.skill_id
+            WHERE p.hrid = ?
+            GROUP BY s.skill_name
+            ORDER BY s.skill_name
+            """;
+
+    return jdbcTemplate.query(sql, (rs, rowNum) -> {
+        int totalDays = rs.getInt("total_days");
+
+        int years = totalDays / 365;
+        int months = (totalDays % 365) / 30;
+
+        return new SkillExperienceResponse(
+                rs.getString("skill_name"),
+                years,
+                months
+        );
+    }, hrid);
+}
+
+
+
+##SearchRequest.java に追加
+private List<String> skillNames;
+
+
+##空検索チェックも追加：
+public boolean isEmptySearch() {
+    return isBlank(keyword)
+            && isBlank(hrid)
+            && isBlank(name)
+            && isBlank(divisionName)
+            && isBlank(projectName)
+            && isBlank(companyName)
+            && isBlank(rankName)
+            && (skillNames == null || skillNames.stream().allMatch(this::isBlank))
+            && !currentProjectOnly
+            && minYears == null;
+}
+
+private boolean isBlank(String value) {
+    return value == null
+            || value.replace("　", "").trim().isEmpty();
+}
+
+※ currentProjectOnly が Boolean 型ならここはこっち。
+&& (currentProjectOnly == null || !currentProjectOnly)
+
+
+##SearchSqlBuilder.java に複数スキル条件を追加
+private void addSkillCondition(SearchRequest request) {
+    if (request.getSkillNames() == null) {
+        return;
+    }
+
+    List<String> skillNames = request.getSkillNames().stream()
+            .filter(skillName -> skillName != null)
+            .map(skillName -> skillName.replace("　", "").trim())
+            .filter(skillName -> !skillName.isEmpty())
+            .distinct()
+            .toList();
+
+    for (String skillName : skillNames) {
+        sql.append("""
+                AND EXISTS (
+                    SELECT 1
+                    FROM career c2
+                    JOIN career_skill cs2 ON cs2.career_id = c2.career_id
+                    JOIN skill s2 ON s2.skill_id = cs2.skill_id
+                    WHERE c2.profile_id = p.hrid
+                      AND s2.skill_name = ?
+                )
+                """);
+
+        params.add(skillName);
+    }
+}
+
+そして applyConditions の中に追加。
+public void applyConditions(SearchRequest request) {
+    addCurrentProjectCondition(request);
+    addSkillCondition(request);
+    addDivisionCondition(request);
+    addProjectCondition(request);
+    addKeywordCondition(request);
+}
+
+
+##SearchController.java で空検索を弾く
+SearchController.java で空検索を弾く
+

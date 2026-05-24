@@ -1,0 +1,7 @@
+// AppLayout.tsx
+
+// ① import追加
+import PositionList from "./positions/PositionList";
+
+// ② Routes に追加
+<Route path="/positions" element={<PositionList />} />
