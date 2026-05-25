@@ -1,29 +1,57 @@
-drop table if exists trade cascade;
-drop table if exists stock cascade;
+INSERT INTO app_user (hrid, email, division, is_admin) VALUES
+('A001', 'a001@example.com', '開発部', false),
+('A002', 'a002@example.com', '金融ソリューション部', false),
+('ADMIN01', 'admin@example.com', '管理部', true);
 
-create table stock (
-                       ticker varchar(4) primary key,
-                       name varchar(255) not null,
-                       exchange_market varchar(30) not null,
-                       shares_issued bigint not null
-);
+INSERT INTO category (id, number, name) VALUES
+                                            (1, 1, '開発技術'),
+                                            (2, 2, 'ソフトウェア工学'),
+                                            (4, 4, 'インフラ'),
+                                            (5, 5, 'ビジネススキル'),
+                                            (7, 7, '産業');
 
-create table trade (
-                       id bigserial primary key,
-                       trade_datetime timestamp not null,
-                       ticker varchar(4) not null references stock(ticker),
-                       side varchar(10) not null,
-                       quantity bigint not null,
-                       traded_price numeric(15, 2) not null
-);
+INSERT INTO sub_category (category_id, number, name) VALUES
+(1, 1, 'プログラミング一般'),
+(1, 2, 'Java'),
+(1, 3, 'JavaScript / TypeScript'),
+(1, 4, 'Web'),
+(1, 5, 'ツール'),
+(1, 6, '生成AI'),
+(2, 1, '設計 / アーキテクチャ'),
+(2, 2, 'テスト'),
+(2, 3, 'PM'),
+(2, 4, 'アジャイル'),
+(4, 1, 'ネットワーク'),
+(4, 2, 'OS'),
+(4, 3, 'AWS'),
+(4, 4, 'SQL / RDB'),
+(5, 2, 'コミュニケーション'),
+(7, 1, '金融');
 
-insert into stock(ticker, name, exchange_market, shares_issued) values
-('7203', 'Toyota Motor', 'PRIME', 16000000000),
-('6758', 'Sony Group', 'PRIME', 1200000000),
-('9984', 'SoftBank Group', 'PRIME', 1400000000)
-on conflict (ticker) do nothing;
+INSERT INTO book_title (sub_category_id, title) VALUES
+(2, 'スッキリわかるJava入門'),
+(4, 'Spring Boot実践入門'),
+(6, 'ReactとTypeScriptではじめるWeb開発'),
+(14, '達人に学ぶSQL徹底指南書'),
+(13, 'AWSの基本と仕組み'),
+(16, '金融システム入門');
 
-insert into trade(trade_datetime, ticker, side, quantity, traded_price) values
-('2026-05-20 10:00:00', '7203', 'BUY', 100, 3000.00),
-('2026-05-20 11:00:00', '6758', 'SELL', 200, 12500.00)
-on conflict do nothing;
+INSERT INTO book_collection (book_title_id, serial_number, state) VALUES
+(1, '1-02-0001', 'AVAILABLE'),
+(1, '1-02-0002', 'AVAILABLE'),
+(2, '1-04-0001', 'AVAILABLE'),
+(3, '1-06-0001', 'AVAILABLE'),
+(4, '4-04-0001', 'AVAILABLE'),
+(5, '4-03-0001', 'AVAILABLE'),
+(6, '7-01-0001', 'DEACCESSIONED');
+
+INSERT INTO tag (name) VALUES
+('Java'), ('Spring Boot'), ('React'), ('SQL'), ('AWS'), ('金融'), ('初心者向け');
+
+INSERT INTO book_title_tag (book_title_id, tag_id) VALUES
+(1, 1), (1, 7),
+(2, 1), (2, 2),
+(3, 3),
+(4, 4),
+(5, 5),
+(6, 6);

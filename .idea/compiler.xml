@@ -2,9 +2,15 @@
 <project version="4">
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="library" options="-parameters" />
+      <module name="library.main" options="-parameters" />
+      <module name="library.test" options="-parameters" />
       <module name="qna-app" options="-parameters" />
       <module name="qna-app.main" options="-parameters" />
       <module name="qna-app.test" options="-parameters" />
+      <module name="trading" options="-parameters" />
+      <module name="trading.main" options="-parameters" />
+      <module name="trading.test" options="-parameters" />
     </option>
   </component>
 </project>
