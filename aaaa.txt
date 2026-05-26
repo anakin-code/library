@@ -1,0 +1,170 @@
+1. CirculationRecordsController.java に追加
+POST /{circulationId}/return の上か下にこれを追加。
+
+
+
+@GetMapping("/{circulationId}")
+public ResponseEntity<CollectionItem> findOne(
+        @PathVariable Integer circulationId
+) {
+    return ResponseEntity.ok(
+            circulationRecordService.findOne(circulationId)
+    );
+}
+
+
+
+
+2. CirculationRecordService.java に追加
+returnCollection の上あたりに追加。
+
+public CollectionItem findOne(Integer circulationId) {
+    return circulationRecordRepository.findOne(circulationId)
+            .orElseThrow(() -> new ResourceNotFoundException("対象の貸出記録が存在しません。"));
+}
+
+
+
+
+
+3. CirculationRecordRepository.java に追加
+一番下に追加。
+
+
+
+
+public Optional<CollectionItem> findOne(Integer circulationId) {
+    List<CollectionItem> list = jdbcTemplate.query(
+            """
+            select
+                cr.id as circulation_id,
+                c.serial_number,
+                pt.title,
+                m.name as borrower_name,
+                case
+                    when cr.actual_return_date is null then true
+                    else false
+                end as is_on_loan
+            from circulation_record cr
+            join collection c on cr.collection_id = c.id
+            join published_title pt on c.published_title_id = pt.id
+            join member m on cr.member_id = m.id
+            where cr.id = ?
+            """,
+            (rs, rowNum) -> new CollectionItem(
+                    rs.getInt("circulation_id"),
+                    rs.getInt("serial_number"),
+                    rs.getString("title"),
+                    rs.getString("borrower_name"),
+                    rs.getBoolean("is_on_loan")
+            ),
+            circulationId
+    );
+
+    return list.stream().findFirst();
+}
+
+
+※ Optional と List の import がなければ追加。
+
+import java.util.List;
+import java.util.Optional;
+
+
+
+4. Return.tsx の loadData だけ変更
+
+今たぶんこう。
+
+return fetch(`${restBaseUrl}/collections`)
+
+これをこれに変更。
+
+return fetch(`${restBaseUrl}/circulations/${circulationId}`)
+
+その後の .then((data: Collection[]) => { ... find ... }) をこれに変更。
+
+.then((data: Collection): void => {
+  setCollection(data);
+  setErrorMessage(null);
+})
+
+
+
+
+ここは触らない
+
+これはそのまま。
+
+fetch(`${restBaseUrl}/circulations/${circulationId}/return`, {
+  method: "POST",
+
+これで、
+
+/return/3 → 返却済みならエラー表示＋ボタンdisable
+/return/101 → 貸出記録なしなら「対象の貸出記録が存在しません。」
+
+
+
+
+
+最低限の修正
+1. Repositoryに追加
+
+CirculationRecordRepository.java
+
+public boolean isAvailable(Integer collectionId) {
+    Boolean available = jdbcTemplate.queryForObject(
+            """
+            select not exists(
+                select 1
+                from circulation_record
+                where collection_id = ?
+                  and actual_return_date is null
+            )
+            """,
+            Boolean.class,
+            collectionId
+    );
+
+    return Boolean.TRUE.equals(available);
+}
+
+
+2. Serviceでinsert前チェック
+
+borrow(...)
+
+今：
+
+circulationRecordRepository.insert(
+    collectionId,
+    memberId,
+    sinceDate,
+    dueDate
+);
+
+の前にこれ追加。
+
+if (!circulationRecordRepository.isAvailable(collectionId)) {
+    throw new IllegalStateException("選択した書籍は貸出できません。");
+}
+
+
+3. Controller
+
+貸出POSTのところで catch。
+
+catch (IllegalStateException e) {
+    return ResponseEntity.status(HttpStatus.CONFLICT).build();
+}
+
+
+4. フロント
+
+貸出 submit の fetch の response にこれ。
+
+if (response.status === 409) {
+    setErrorMessage("選択した書籍は貸出できません。");
+    return;
+}
