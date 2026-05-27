@@ -26,39 +26,33 @@ export default function Return() {
   const [isDoubleReturnError, setIsDoubleReturnError] =
     useState(false);
 
-  async function loadData(
-    doubleReturnError: boolean
-  ): Promise<void> {
-    if (!circulationId) {
-      setCollection(null);
-      setErrorMessage('対象の貸出記録が存在しません。');
-      return;
-    }
-
-    const response = await fetch(
-      `${restBaseUrl}/circulations/${circulationId}`
-    );
-
-    if (!response.ok) {
-      setCollection(null);
-      setErrorMessage('対象の貸出記録が存在しません。');
-      return;
-    }
-
-    const data = await response.json() as Collection;
-
-    setCollection(data);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsDoubleReturnError(doubleReturnError);
-  }
-
   useEffect(() => {
-    async function fetchData(): Promise<void> {
-      await loadData(false);
+    async function loadData(): Promise<void> {
+      if (!circulationId) {
+        setCollection(null);
+        setErrorMessage('対象の貸出記録が存在しません。');
+        return;
+      }
+
+      const response = await fetch(
+        `${restBaseUrl}/circulations/${circulationId}`
+      );
+
+      if (!response.ok) {
+        setCollection(null);
+        setErrorMessage('対象の貸出記録が存在しません。');
+        return;
+      }
+
+      const data = await response.json() as Collection;
+
+      setCollection(data);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      setIsDoubleReturnError(false);
     }
 
-    void fetchData();
+    void loadData();
   }, [circulationId]);
 
   async function handleReturn(): Promise<void> {
@@ -68,13 +62,19 @@ export default function Return() {
 
     const response = await fetch(
       `${restBaseUrl}/circulations/${circulationId}/return`,
-      {
-        method: 'POST',
-      }
+      { method: 'POST' }
     );
 
     if (response.status === 409) {
-      await loadData(true);
+      setErrorMessage(
+        `No.${collection.serialNumber}:「${collection.title}」は、すでに返却されています。`
+      );
+      setSuccessMessage(null);
+      setIsDoubleReturnError(true);
+      setCollection({
+        ...collection,
+        isOnLend: false,
+      });
       return;
     }
 
@@ -96,11 +96,8 @@ export default function Return() {
   const isAlreadyReturned =
     collection !== null
     && !collection.isOnLend
-    && successMessage === null;
-
-  const isReturnedByOtherTab =
-    collection !== null
-    && isDoubleReturnError;
+    && successMessage === null
+    && !isDoubleReturnError;
 
   const isButtonDisabled =
     collection !== null
@@ -124,7 +121,7 @@ export default function Return() {
 
       {collection && (
         <>
-          {(isAlreadyReturned || isReturnedByOtherTab) && (
+          {isAlreadyReturned && (
             <p className="error-message">
               No.{collection.serialNumber}:「{collection.title}」は、
               すでに返却されています。
