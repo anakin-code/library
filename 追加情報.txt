@@ -12,26 +12,25 @@ type Collection = {
 const restBaseUrl = import.meta.env.VITE_REST_BASE_URL;
 
 export default function Return() {
-
   const { circulationId } = useParams();
 
-  const [collection, setCollection]
-    = useState<Collection | null>(null);
+  const [collection, setCollection] =
+    useState<Collection | null>(null);
 
-  const [errorMessage, setErrorMessage]
-    = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
 
-  const [isDoubleReturnError, setIsDoubleReturnError]
-    = useState(false);
+  const [successMessage, setSuccessMessage] =
+    useState<string | null>(null);
+
+  const [isDoubleReturnError, setIsDoubleReturnError] =
+    useState(false);
 
   async function loadData(
     doubleReturnError: boolean
   ): Promise<void> {
-
     if (!circulationId) {
-      setErrorMessage(
-        '対象の貸出記録が存在しません。'
-      );
+      setErrorMessage('対象の貸出記録が存在しません。');
       return;
     }
 
@@ -41,23 +40,114 @@ export default function Return() {
 
     if (!response.ok) {
       setCollection(null);
-      setErrorMessage(
-        '対象の貸出記録が存在しません。'
-      );
+      setErrorMessage('対象の貸出記録が存在しません。');
       return;
     }
 
-    const data: Collection
-      = await response.json();
+    const data: Collection = await response.json();
 
     setCollection(data);
-
     setErrorMessage(null);
-
-    setIsDoubleReturnError(
-      doubleReturnError
-    );
+    setSuccessMessage(null);
+    setIsDoubleReturnError(doubleReturnError);
   }
+
+  useEffect(() => {
+    async function fetchData(): Promise<void> {
+      await loadData(false);
+    }
+
+    fetchData();
+  }, [circulationId]);
+
+  async function handleReturn(): Promise<void> {
+    if (!circulationId || collection === null) {
+      return;
+    }
+
+    const response = await fetch(
+      `${restBaseUrl}/circulations/${circulationId}/return`,
+      {
+        method: 'POST',
+      }
+    );
+
+    if (response.status === 409) {
+      await loadData(true);
+      return;
+    }
+
+    if (!response.ok) {
+      setErrorMessage('返却処理に失敗しました。');
+      return;
+    }
+
+    setCollection({
+      ...collection,
+      isOnLoan: false,
+    });
+
+    setSuccessMessage('返却しました。');
+    setErrorMessage(null);
+    setIsDoubleReturnError(false);
+  }
+
+  const isAlreadyReturned =
+    collection !== null
+    && !collection.isOnLoan
+    && successMessage === null;
+
+  const isReturnedByOtherTab =
+    collection !== null
+    && isDoubleReturnError;
+
+  const isButtonDisabled =
+    collection !== null
+    && !collection.isOnLoan;
+
+  return (
+    <section className="return-page">
+      <h1>返却確認</h1>
+
+      {errorMessage && (
+        <p className="error-message">
+          {errorMessage}
+        </p>
+      )}
+
+      {successMessage && (
+        <p className="success-message">
+          {successMessage}
+        </p>
+      )}
+
+      {collection && (
+        <>
+          {(isAlreadyReturned || isReturnedByOtherTab) && (
+            <p className="error-message">
+              No.{collection.serialNumber}:「{collection.title}」は、
+              すでに返却されています。
+            </p>
+          )}
+
+          <div>
+            <p>蔵書番号: {collection.serialNumber}</p>
+            <p>書籍名: {collection.title}</p>
+            <p>借りた人: {collection.borrowerName}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleReturn}
+            disabled={isButtonDisabled}
+          >
+            返却
+          </button>
+        </>
+      )}
+    </section>
+  );
+}  }
 
   useEffect(() => {
 
