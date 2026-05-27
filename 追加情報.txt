@@ -6,7 +6,7 @@ type Collection = {
   serialNumber: number;
   title: string;
   borrowerName: string;
-  isOnLoan: boolean;
+  isOnLend: boolean;
 };
 
 const restBaseUrl = import.meta.env.VITE_REST_BASE_URL;
@@ -30,6 +30,7 @@ export default function Return() {
     doubleReturnError: boolean
   ): Promise<void> {
     if (!circulationId) {
+      setCollection(null);
       setErrorMessage('対象の貸出記録が存在しません。');
       return;
     }
@@ -44,7 +45,7 @@ export default function Return() {
       return;
     }
 
-    const data: Collection = await response.json();
+    const data = await response.json() as Collection;
 
     setCollection(data);
     setErrorMessage(null);
@@ -57,7 +58,7 @@ export default function Return() {
       await loadData(false);
     }
 
-    fetchData();
+    void fetchData();
   }, [circulationId]);
 
   async function handleReturn(): Promise<void> {
@@ -84,7 +85,7 @@ export default function Return() {
 
     setCollection({
       ...collection,
-      isOnLoan: false,
+      isOnLend: false,
     });
 
     setSuccessMessage('返却しました。');
@@ -94,7 +95,7 @@ export default function Return() {
 
   const isAlreadyReturned =
     collection !== null
-    && !collection.isOnLoan
+    && !collection.isOnLend
     && successMessage === null;
 
   const isReturnedByOtherTab =
@@ -103,7 +104,7 @@ export default function Return() {
 
   const isButtonDisabled =
     collection !== null
-    && !collection.isOnLoan;
+    && !collection.isOnLend;
 
   return (
     <section className="return-page">
