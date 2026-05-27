@@ -559,3 +559,118 @@ values
 
     (27, 5), (27, 9), (27, 15), (27, 20),
     (28, 5), (28, 6), (28, 9), (28, 14), (28, 15), (28, 20);
+
+
+
+
+
+
+1. ProfileService.java
+
+上に import 追加。
+
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+createSkillExperiences() を丸ごとこれに差し替え。
+
+private List<SkillExperienceResponse> createSkillExperiences(Profile profile) {
+
+    Map<String, Long> skillTotalMonthsMap = new HashMap<>();
+
+    if (profile.getCareers() != null) {
+
+        for (Career career : profile.getCareers()) {
+
+            LocalDate start = career.getStartTime();
+
+            if (start == null) {
+                continue;
+            }
+
+            LocalDate end = career.getEndTime() == null
+                    ? LocalDate.now()
+                    : career.getEndTime();
+
+            long months = ChronoUnit.MONTHS.between(start, end);
+
+            if (career.getCareerSkills() != null) {
+
+                for (CareerSkill careerSkill : career.getCareerSkills()) {
+
+                    if (careerSkill.getSkill() == null) {
+                        continue;
+                    }
+
+                    String skillName =
+                            careerSkill.getSkill().getSkillName();
+
+                    skillTotalMonthsMap.merge(
+                            skillName,
+                            months,
+                            Long::sum
+                    );
+                }
+            }
+        }
+    }
+
+    return skillTotalMonthsMap.entrySet()
+            .stream()
+            .map(entry -> {
+                String skillName = entry.getKey();
+                long totalMonths = entry.getValue();
+
+                int years = (int) (totalMonths / 12);
+                int months = (int) (totalMonths % 12);
+
+                return new SkillExperienceResponse(
+                        skillName,
+                        years,
+                        months
+                );
+            })
+            .toList();
+}
+2. SearchRepository.java
+
+findSkillExperiencesByHrid を丸ごとこれに差し替え。
+
+private List<SkillExperienceResponse> findSkillExperiencesByHrid(String hrid) {
+
+    String sql = """
+            SELECT
+                s.skill_name,
+                COALESCE(SUM(
+                    EXTRACT(YEAR FROM AGE(COALESCE(c.end_time, CURRENT_DATE), c.start_time)) * 12
+                    + EXTRACT(MONTH FROM AGE(COALESCE(c.end_time, CURRENT_DATE), c.start_time))
+                ), 0) AS total_months
+            FROM profile p
+            JOIN career c ON c.profile_id = p.hrid
+            JOIN career_skill cs ON cs.career_id = c.career_id
+            JOIN skill s ON s.skill_id = cs.skill_id
+            WHERE p.hrid = ?
+            GROUP BY s.skill_name
+            ORDER BY s.skill_name
+            """;
+
+    return jdbcTemplate.query(
+            sql,
+            (rs, rowNum) -> {
+                int totalMonths = rs.getInt("total_months");
+
+                int years = totalMonths / 12;
+                int months = totalMonths % 12;
+
+                return new SkillExperienceResponse(
+                        rs.getString("skill_name"),
+                        years,
+                        months
+                );
+            },
+            hrid
+    );
+}
