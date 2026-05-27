@@ -1,197 +1,176 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 
-##ProfileSearchResponse.java
+type Collection = {
+  circulationId: number;
+  serialNumber: number;
+  title: string;
+  borrowerName: string;
+  isOnLoan: boolean;
+};
 
-package server.dto.response;
+const restBaseUrl = import.meta.env.VITE_REST_BASE_URL;
 
-import java.util.ArrayList;
-import java.util.List;
+export default function Return() {
 
-public class ProfileSearchResponse {
+  const { circulationId } = useParams();
 
-    private String hrid;
-    private String name;
-    private String mailAddress;
-    private String rankName;
-    private String companyName;
-    private List<SkillExperienceResponse> skillExperiences = new ArrayList<>();
+  const [collection, setCollection]
+    = useState<Collection | null>(null);
 
-    public ProfileSearchResponse(
-            String hrid,
-            String name,
-            String mailAddress,
-            String rankName,
-            String companyName
-    ) {
-        this.hrid = hrid;
-        this.name = name;
-        this.mailAddress = mailAddress;
-        this.rankName = rankName;
-        this.companyName = companyName;
+  const [errorMessage, setErrorMessage]
+    = useState<string | null>(null);
+
+  const [isDoubleReturnError, setIsDoubleReturnError]
+    = useState(false);
+
+  async function loadData(
+    doubleReturnError: boolean
+  ): Promise<void> {
+
+    if (!circulationId) {
+      setErrorMessage(
+        '対象の貸出記録が存在しません。'
+      );
+      return;
     }
 
-    public String getHrid() {
-        return hrid;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getMailAddress() {
-        return mailAddress;
-    }
-
-    public String getRankName() {
-        return rankName;
-    }
-
-    public String getCompanyName() {
-        return companyName;
-    }
-
-    public List<SkillExperienceResponse> getSkillExperiences() {
-        return skillExperiences;
-    }
-
-    public void setSkillExperiences(List<SkillExperienceResponse> skillExperiences) {
-        this.skillExperiences = skillExperiences;
-    }
-}
-
-
-
-##SearchRepository.java の考え方
-
-public List<ProfileSearchResponse> searchProfiles(SearchRequest request) {
-
-    SearchSqlBuilder builder = new SearchSqlBuilder();
-
-    builder.applyConditions(request);
-    builder.applyGroupByAndHaving(request);
-
-    List<ProfileSearchResponse> profiles = jdbcTemplate.query(
-            builder.getSql(),
-            (rs, rowNum) -> new ProfileSearchResponse(
-                    rs.getString("hrid"),
-                    rs.getString("name"),
-                    rs.getString("mail_address"),
-                    rs.getString("rank_name"),
-                    rs.getString("company_name")
-            ),
-            builder.getParams()
+    const response = await fetch(
+      `${restBaseUrl}/circulations/${circulationId}`
     );
 
-    for (ProfileSearchResponse profile : profiles) {
-        List<SkillExperienceResponse> skills =
-                findSkillExperiencesByHrid(profile.getHrid());
-
-        profile.setSkillExperiences(skills);
+    if (!response.ok) {
+      setCollection(null);
+      setErrorMessage(
+        '対象の貸出記録が存在しません。'
+      );
+      return;
     }
 
-    return profiles;
-}
+    const data: Collection
+      = await response.json();
 
-##追加する private メソッド
+    setCollection(data);
 
-private List<SkillExperienceResponse> findSkillExperiencesByHrid(String hrid) {
+    setErrorMessage(null);
 
-    String sql = """
-            SELECT
-                s.skill_name,
-                COALESCE(SUM(
-                    COALESCE(c.end_time, NOW()::date) - c.start_time
-                ), 0) AS total_days
-            FROM profile p
-            JOIN career c ON c.profile_id = p.hrid
-            JOIN career_skill cs ON cs.career_id = c.career_id
-            JOIN skill s ON s.skill_id = cs.skill_id
-            WHERE p.hrid = ?
-            GROUP BY s.skill_name
-            ORDER BY s.skill_name
-            """;
+    setIsDoubleReturnError(
+      doubleReturnError
+    );
+  }
 
-    return jdbcTemplate.query(sql, (rs, rowNum) -> {
-        int totalDays = rs.getInt("total_days");
+  useEffect(() => {
 
-        int years = totalDays / 365;
-        int months = (totalDays % 365) / 30;
-
-        return new SkillExperienceResponse(
-                rs.getString("skill_name"),
-                years,
-                months
-        );
-    }, hrid);
-}
-
-
-
-##SearchRequest.java に追加
-private List<String> skillNames;
-
-
-##空検索チェックも追加：
-public boolean isEmptySearch() {
-    return isBlank(keyword)
-            && isBlank(hrid)
-            && isBlank(name)
-            && isBlank(divisionName)
-            && isBlank(projectName)
-            && isBlank(companyName)
-            && isBlank(rankName)
-            && (skillNames == null || skillNames.stream().allMatch(this::isBlank))
-            && !currentProjectOnly
-            && minYears == null;
-}
-
-private boolean isBlank(String value) {
-    return value == null
-            || value.replace("　", "").trim().isEmpty();
-}
-
-※ currentProjectOnly が Boolean 型ならここはこっち。
-&& (currentProjectOnly == null || !currentProjectOnly)
-
-
-##SearchSqlBuilder.java に複数スキル条件を追加
-private void addSkillCondition(SearchRequest request) {
-    if (request.getSkillNames() == null) {
-        return;
+    async function fetchData() {
+      await loadData(false);
     }
 
-    List<String> skillNames = request.getSkillNames().stream()
-            .filter(skillName -> skillName != null)
-            .map(skillName -> skillName.replace("　", "").trim())
-            .filter(skillName -> !skillName.isEmpty())
-            .distinct()
-            .toList();
+    fetchData();
 
-    for (String skillName : skillNames) {
-        sql.append("""
-                AND EXISTS (
-                    SELECT 1
-                    FROM career c2
-                    JOIN career_skill cs2 ON cs2.career_id = c2.career_id
-                    JOIN skill s2 ON s2.skill_id = cs2.skill_id
-                    WHERE c2.profile_id = p.hrid
-                      AND s2.skill_name = ?
-                )
-                """);
+  }, [circulationId]);
 
-        params.add(skillName);
+  async function handleReturn(): Promise<void> {
+
+    if (!circulationId) {
+      return;
     }
+
+    const response = await fetch(
+      `${restBaseUrl}/circulations/${circulationId}/return`,
+      {
+        method: 'POST',
+      }
+    );
+
+    if (response.status === 409) {
+
+      await loadData(true);
+
+      return;
+    }
+
+    if (!response.ok) {
+
+      setErrorMessage(
+        '返却処理に失敗しました。'
+      );
+
+      return;
+    }
+
+    await loadData(false);
+  }
+
+  const isReturned =
+    collection !== null
+    && (
+      !collection.isOnLoan
+      || isDoubleReturnError
+    );
+
+  return (
+
+    <section className="return-page">
+
+      <h1>
+        返却確認
+      </h1>
+
+      {errorMessage && (
+
+        <p className="error-message">
+          {errorMessage}
+        </p>
+
+      )}
+
+      {collection && (
+
+        <>
+
+          {isReturned && (
+
+            <p className="error-message">
+
+              No.{collection.serialNumber}
+              :「{collection.title}」は、
+              すでに返却されています。
+
+            </p>
+
+          )}
+
+          <div>
+
+            <p>
+              蔵書番号:
+              {collection.serialNumber}
+            </p>
+
+            <p>
+              書籍名:
+              {collection.title}
+            </p>
+
+            <p>
+              借りた人:
+              {collection.borrowerName}
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            onClick={handleReturn}
+            disabled={isReturned}
+          >
+            返却
+          </button>
+
+        </>
+
+      )}
+
+    </section>
+  );
 }
-
-そして applyConditions の中に追加。
-public void applyConditions(SearchRequest request) {
-    addCurrentProjectCondition(request);
-    addSkillCondition(request);
-    addDivisionCondition(request);
-    addProjectCondition(request);
-    addKeywordCondition(request);
-}
-
-
-##SearchController.java で空検索を弾く
-SearchController.java で空検索を弾く
-
