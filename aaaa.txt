@@ -1,676 +1,271 @@
-delete from career_skill;
-delete from career;
-delete from profile;
-delete from users;
-delete from project;
-delete from skill;
-delete from division;
-delete from company;
-delete from rank;
+1. CreateProjectRequest.java
+package server.dto.request;
 
-insert into company (company_name)
-values
-    ('A'),
-    ('B'),
-    ('C');
+public class CreateProjectRequest {
 
-insert into rank (rank_name)
-values
-    ('EP'),
-    ('PP'),
-    ('AP'),
-    ('LD'),
-    ('ST'),
-    ('AST'),
-    ('others');
+    private String projectName;
+    private String projectContent;
+    private Long divisionId;
 
-insert into division (division_name, company_id)
-values
-    ('A1', 1),
-    ('A2', 1),
-    ('A3', 1),
-    ('A', 2),
-    ('B', 2),
-    ('R&D', 3);
-
-insert into project (project_name, project_content, division_id)
-values
-    ('Trading System',
-     'Development of a stock trading system for securities companies. Responsible for order management, execution processing, risk control, and real-time data handling using Java, Spring Boot, and PostgreSQL.',
-     1),
-
-    ('Risk Analytics Platform',
-     'Development of a risk analytics platform for banks and securities firms. Implemented market risk calculation, exposure analysis, and SQL reporting functions.',
-     1),
-
-    ('Settlement Management System',
-     'Development of a settlement management system for financial institutions. Responsible for daily batch processing, system integration, report generation, and incident handling.',
-     1),
-
-    ('AI Demand Forecast',
-     'Development of an AI demand forecasting system for retail companies. Responsible for sales analysis, time-series forecasting, and machine learning model improvement.',
-     2),
-
-    ('Customer Churn Prediction',
-     'Development of a customer churn prediction system for subscription services. Performed behavior log analysis and dashboard development.',
-     2),
-
-    ('Data Lake Platform',
-     'Development of a company-wide analytics platform. Responsible for ETL pipelines and analytics infrastructure using AWS, Python, and SQL.',
-     2),
-
-    ('Cloud Migration',
-     'Cloud migration project from on-premise environments to AWS. Responsible for infrastructure automation using Terraform and Docker.',
-     3),
-
-    ('Security Monitoring',
-     'Development of an internal security monitoring platform. Responsible for anomaly detection, log analysis, and Kubernetes-based monitoring systems.',
-     3),
-
-    ('Internal Developer Platform',
-     'Development of a shared internal platform for developers. Responsible for CI/CD pipelines, automated deployment, and monitoring infrastructure.',
-     3),
-
-    ('DX Consulting Platform',
-     'Business analysis and requirement definition support for digital transformation projects. Responsible for client interviews, workflow analysis, and system planning.',
-     4),
-
-    ('Marketing Analytics',
-     'Marketing analytics support project. Responsible for KPI analysis, customer analytics, and BI dashboard development.',
-     4),
-
-    ('Business Process Reform',
-     'Business process consulting project. Responsible for workflow improvement, operational optimization, and proposal documentation.',
-     5),
-
-    ('Enterprise Dashboard',
-     'Enterprise dashboard development project. Responsible for KPI visualization and analytics features using React and TypeScript.',
-     5),
-
-    ('Research Prototype',
-     'Research and development project using AI, graph analytics, and machine learning. Responsible for proof-of-concept development and technology validation.',
-     6),
-
-    ('AI Knowledge Search',
-     'Research and development of a knowledge search system using natural language processing and vector search technologies.',
-     6);
-
-insert into skill (skill_name)
-values
-    ('Java'),
-    ('Spring Boot'),
-    ('Python'),
-    ('AI'),
-    ('AWS'),
-    ('Terraform'),
-    ('React'),
-    ('PostgreSQL'),
-    ('Docker'),
-    ('TypeScript'),
-    ('SQL'),
-    ('Machine Learning'),
-    ('Security'),
-    ('Linux'),
-    ('Kubernetes'),
-    ('Project Management'),
-    ('Business Analysis'),
-    ('Data Analysis'),
-    ('Batch Processing'),
-    ('CI/CD'),
-    ('NLP'),
-    ('Graph Analysis');
-
-insert into users (is_manager)
-values
-    (true),
-    (false),
-    (false),
-    (false),
-    (true),
-    (false),
-    (false),
-    (false),
-    (true),
-    (false),
-    (false),
-    (false);
-
-insert into profile (
-    hrid,
-    name,
-    mail_address,
-    free,
-    rank_id,
-    user_id
-)
-values
-    ('A001', 'Taro Yamada', 'taro@example.com',
-     'Financial systems engineer specializing in trading systems, Java, Spring Boot, SQL, and performance tuning',
-     3, 1),
-    ('A002', 'Hanako Sato', 'hanako@example.com',
-     'AI engineer specializing in Python, machine learning, forecasting models, and data analysis',
-     4, 2),
-    ('A003', 'Ichiro Suzuki', 'ichiro@example.com',
-     'Cloud infrastructure engineer experienced in AWS, Terraform, Docker, Linux, and Kubernetes',
-     4, 3),
-    ('A004', 'Yuki Tanaka', 'yuki@example.com',
-     'Frontend engineer using React, TypeScript, dashboard development, and UI design',
-     5, 4),
-    ('A005', 'Kenji Ito', 'kenji@example.com',
-     'Project manager with finance domain knowledge, Java, SQL, and delivery management experience',
-     2, 5),
-    ('A006', 'Mika Kobayashi', 'mika@example.com',
-     'Data engineer working on Python, SQL, PostgreSQL, data lake, and batch processing',
-     4, 6),
-    ('A007', 'Daichi Mori', 'daichi@example.com',
-     'Security engineer interested in AWS security, Linux, Docker, Kubernetes, and monitoring',
-     5, 7),
-    ('A008', 'Rina Kato', 'rina@example.com',
-     'Full-stack engineer using Java, Spring Boot, React, TypeScript, Python, and AI applications',
-     4, 8),
-    ('A009', 'Shota Nakamura', 'shota@example.com',
-     'Consultant engineer focusing on business analysis, DX planning, SQL, and project management',
-     3, 9),
-    ('A010', 'Mai Watanabe', 'mai@example.com',
-     'Marketing data analyst using SQL, Python, BI dashboards, and customer segmentation',
-     5, 10),
-    ('A011', 'Kenta Fujii', 'kenta@example.com',
-     'Research engineer working on AI prototypes, NLP, graph analysis, and machine learning',
-     4, 11),
-    ('A012', 'Saki Ogawa', 'saki@example.com',
-     'Platform engineer focusing on CI/CD, Docker, Kubernetes, AWS, and internal developer tools',
-     5, 12);
-
-insert into career (
-    start_time,
-    end_time,
-    profile_id,
-    project_id
-)
-values
-    ('2018-04-01', '2020-03-31', 'A001', 2),
-    ('2020-04-01', '2022-03-31', 'A001', 3),
-    ('2022-04-01', null,         'A001', 1),
-
-    ('2019-04-01', '2021-03-31', 'A002', 5),
-    ('2021-04-01', '2023-03-31', 'A002', 6),
-    ('2023-04-01', null,         'A002', 4),
-
-    ('2020-04-01', '2022-03-31', 'A003', 7),
-    ('2022-04-01', null,         'A003', 8),
-
-    ('2021-04-01', '2023-03-31', 'A004', 13),
-    ('2023-04-01', null,         'A004', 11),
-
-    ('2017-04-01', '2020-03-31', 'A005', 1),
-    ('2020-04-01', '2023-03-31', 'A005', 2),
-    ('2023-04-01', null,         'A005', 10),
-
-    ('2020-04-01', '2022-03-31', 'A006', 6),
-    ('2022-04-01', null,         'A006', 4),
-
-    ('2021-04-01', '2023-03-31', 'A007', 8),
-    ('2023-04-01', null,         'A007', 7),
-
-    ('2020-04-01', '2022-03-31', 'A008', 1),
-    ('2022-04-01', '2024-03-31', 'A008', 13),
-    ('2024-04-01', null,         'A008', 15),
-
-    ('2018-04-01', '2021-03-31', 'A009', 12),
-    ('2021-04-01', null,         'A009', 10),
-
-    ('2021-04-01', '2023-03-31', 'A010', 11),
-    ('2023-04-01', null,         'A010', 13),
-
-    ('2020-04-01', '2022-03-31', 'A011', 14),
-    ('2022-04-01', null,         'A011', 15),
-
-    ('2021-04-01', '2023-03-31', 'A012', 9),
-    ('2023-04-01', null,         'A012', 7);
-
-insert into career_skill (career_id, skill_id)
-values
-    (1, 11), (1, 18),
-    (2, 1), (2, 8), (2, 11), (2, 19),
-    (3, 1), (3, 2), (3, 8), (3, 11),
-
-    (4, 3), (4, 12), (4, 18),
-    (5, 3), (5, 8), (5, 11), (5, 18),
-    (6, 3), (6, 4), (6, 12), (6, 18),
-
-    (7, 5), (7, 6), (7, 9), (7, 14),
-    (8, 5), (8, 9), (8, 13), (8, 14), (8, 15),
-
-    (9, 7), (9, 10), (9, 11),
-    (10, 7), (10, 10), (10, 18),
-
-    (11, 1), (11, 2), (11, 8), (11, 11),
-    (12, 11), (12, 16), (12, 17), (12, 18),
-    (13, 16), (13, 17), (13, 18),
-
-    (14, 3), (14, 8), (14, 11), (14, 19),
-    (15, 3), (15, 4), (15, 12), (15, 18),
-
-    (16, 5), (16, 13), (16, 14), (16, 15),
-    (17, 5), (17, 6), (17, 9), (17, 14),
-
-    (18, 1), (18, 2), (18, 7), (18, 10),
-    (19, 7), (19, 10), (19, 11),
-    (20, 3), (20, 4), (20, 12), (20, 21),
-
-    (21, 16), (21, 17), (21, 18),
-    (22, 11), (22, 16), (22, 17), (22, 18),
-
-    (23, 3), (23, 11), (23, 18),
-    (24, 3), (24, 7), (24, 10), (24, 18),
-
-    (25, 3), (25, 4), (25, 12), (25, 22),
-    (26, 3), (26, 4), (26, 12), (26, 21), (26, 22),
-
-    (27, 5), (27, 9), (27, 15), (27, 20),
-    (28, 5), (28, 6), (28, 9), (28, 14), (28, 15), (28, 20);
-
-
-
-
-
-
-
-
-
-delete from career_skill;
-delete from career;
-delete from profile;
-delete from users;
-delete from project;
-delete from skill;
-delete from division;
-delete from company;
-delete from rank;
-
-insert into company (company_name)
-values
-    ('A'),
-    ('B'),
-    ('C');
-
-insert into rank (rank_name)
-values
-    ('EP'),
-    ('PP'),
-    ('AP'),
-    ('LD'),
-    ('ST'),
-    ('AST'),
-    ('others');
-
-insert into division (division_name, company_id)
-values
-    ('A1', 1),
-    ('A2', 1),
-    ('A3', 1),
-    ('A', 2),
-    ('B', 2),
-    ('R&D', 3);
-insert into project (project_name, project_content, division_id)
-values
-    ('Trading System',
-     '証券会社向け株式取引システム開発。注文管理、約定処理、リスク制御、リアルタイムデータ処理を担当。Java・Spring Boot・PostgreSQLを利用。',
-     1),
-
-    ('Risk Analytics Platform',
-     '銀行・証券会社向けリスク分析基盤開発。市場リスク計算、エクスポージャ分析、SQLレポート機能を実装。',
-     1),
-
-    ('Settlement Management System',
-     '金融機関向け決済管理システム開発。日次バッチ、データ連携、帳票出力、障害対応機能を担当。',
-     1),
-
-    ('AI Demand Forecast',
-     '小売業向け需要予測AI開発。売上分析、時系列予測、機械学習モデル改善を担当。',
-     2),
-
-    ('Customer Churn Prediction',
-     'サブスクリプションサービス向け顧客離脱予測システム開発。行動ログ分析、ダッシュボード構築を実施。',
-     2),
-
-    ('Data Lake Platform',
-     '全社データ活用向けデータ分析基盤構築。AWS・Python・SQLを利用したETLや分析基盤を担当。',
-     2),
-
-    ('Cloud Migration',
-     'オンプレミス環境からAWSへのクラウド移行案件。Terraform・Dockerを利用したインフラ自動化を担当。',
-     3),
-
-    ('Security Monitoring',
-     '社内セキュリティ監視基盤構築。不正アクセス検知、ログ分析、Kubernetes監視を担当。',
-     3),
-
-    ('Internal Developer Platform',
-     '社内開発者向け共通基盤開発。CI/CD、自動デプロイ、監視環境整備を担当。',
-     3),
-
-    ('DX Consulting Platform',
-     'DX推進案件における業務分析・要件整理支援。顧客ヒアリング、業務改善提案、システム企画を担当。',
-     4),
-
-    ('Marketing Analytics',
-     'マーケティング分析支援案件。KPI分析、顧客分析、BIダッシュボード構築を担当。',
-     4),
-
-    ('Business Process Reform',
-     '業務改革コンサルティング案件。業務フロー改善、資料作成、運用改善提案を実施。',
-     5),
-
-    ('Enterprise Dashboard',
-     '経営ダッシュボード開発案件。React・TypeScriptを利用したKPI可視化やデータ分析機能を担当。',
-     5),
-
-    ('Research Prototype',
-     'AI・グラフ分析・機械学習を利用した研究開発プロジェクト。PoC開発や新技術検証を担当。',
-     6),
-
-    ('AI Knowledge Search',
-     '自然言語処理を利用したナレッジ検索システム研究開発。ベクトル検索や検索精度改善を実施。',
-     6);
-
-insert into skill (skill_name)
-values
-    ('Java'),
-    ('Spring Boot'),
-    ('Python'),
-    ('AI'),
-    ('AWS'),
-    ('Terraform'),
-    ('React'),
-    ('PostgreSQL'),
-    ('Docker'),
-    ('TypeScript'),
-    ('SQL'),
-    ('Machine Learning'),
-    ('Security'),
-    ('Linux'),
-    ('Kubernetes'),
-    ('Project Management'),
-    ('Business Analysis'),
-    ('Data Analysis'),
-    ('Batch Processing'),
-    ('CI/CD'),
-    ('NLP'),
-    ('Graph Analysis');
-
-insert into users (is_manager)
-values
-    (true),
-    (false),
-    (false),
-    (false),
-    (true),
-    (false),
-    (false),
-    (false),
-    (true),
-    (false),
-    (false),
-    (false);
-
-insert into profile (
-    hrid,
-    name,
-    mail_address,
-    free,
-    rank_id,
-    user_id
-)
-values
-    ('A001', 'Taro Yamada', 'taro@example.com',
-     '金融システム開発を得意とするバックエンドエンジニア。JavaやSQLを利用した高速処理が得意。',
-     3, 1),
-
-    ('A002', 'Hanako Sato', 'hanako@example.com',
-     'Python・機械学習・データ分析に強みを持つAIエンジニア。',
-     4, 2),
-
-    ('A003', 'Ichiro Suzuki', 'ichiro@example.com',
-     'AWS・Terraform・Dockerを利用したクラウド基盤構築経験あり。',
-     4, 3),
-
-    ('A004', 'Yuki Tanaka', 'yuki@example.com',
-     'React・TypeScriptを利用したフロントエンド開発を担当。',
-     5, 4),
-
-    ('A005', 'Kenji Ito', 'kenji@example.com',
-     '金融業務知識とプロジェクト管理経験を持つマネージャー。',
-     2, 5),
-
-    ('A006', 'Mika Kobayashi', 'mika@example.com',
-     'データ基盤やバッチ処理を担当するデータエンジニア。',
-     4, 6),
-
-    ('A007', 'Daichi Mori', 'daichi@example.com',
-     'AWSセキュリティや監視基盤構築に興味を持つインフラエンジニア。',
-     5, 7),
-
-    ('A008', 'Rina Kato', 'rina@example.com',
-     'Java・React・Pythonを扱うフルスタックエンジニア。',
-     4, 8),
-
-    ('A009', 'Shota Nakamura', 'shota@example.com',
-     'DX推進や業務分析を担当するコンサルタント。',
-     3, 9),
-
-    ('A010', 'Mai Watanabe', 'mai@example.com',
-     'SQL・Pythonを利用したマーケティング分析を担当。',
-     5, 10),
-
-    ('A011', 'Kenta Fujii', 'kenta@example.com',
-     'AI研究や自然言語処理に関する研究開発を担当。',
-     4, 11),
-
-    ('A012', 'Saki Ogawa', 'saki@example.com',
-     'CI/CDやKubernetesを利用した社内基盤構築を担当。',
-     5, 12);
-
-insert into career (
-    start_time,
-    end_time,
-    profile_id,
-    project_id
-)
-values
-    ('2018-04-01', '2020-03-31', 'A001', 2),
-    ('2020-04-01', '2022-03-31', 'A001', 3),
-    ('2022-04-01', null,         'A001', 1),
-
-    ('2019-04-01', '2021-03-31', 'A002', 5),
-    ('2021-04-01', '2023-03-31', 'A002', 6),
-    ('2023-04-01', null,         'A002', 4),
-
-    ('2020-04-01', '2022-03-31', 'A003', 7),
-    ('2022-04-01', null,         'A003', 8),
-
-    ('2021-04-01', '2023-03-31', 'A004', 13),
-    ('2023-04-01', null,         'A004', 11),
-
-    ('2017-04-01', '2020-03-31', 'A005', 1),
-    ('2020-04-01', '2023-03-31', 'A005', 2),
-    ('2023-04-01', null,         'A005', 10),
-
-    ('2020-04-01', '2022-03-31', 'A006', 6),
-    ('2022-04-01', null,         'A006', 4),
-
-    ('2021-04-01', '2023-03-31', 'A007', 8),
-    ('2023-04-01', null,         'A007', 7),
-
-    ('2020-04-01', '2022-03-31', 'A008', 1),
-    ('2022-04-01', '2024-03-31', 'A008', 13),
-    ('2024-04-01', null,         'A008', 15),
-
-    ('2018-04-01', '2021-03-31', 'A009', 12),
-    ('2021-04-01', null,         'A009', 10),
-
-    ('2021-04-01', '2023-03-31', 'A010', 11),
-    ('2023-04-01', null,         'A010', 13),
-
-    ('2020-04-01', '2022-03-31', 'A011', 14),
-    ('2022-04-01', null,         'A011', 15),
-
-    ('2021-04-01', '2023-03-31', 'A012', 9),
-    ('2023-04-01', null,         'A012', 7);
-
-insert into career_skill (career_id, skill_id)
-values
-    (1, 11), (1, 18),
-    (2, 1), (2, 8), (2, 11), (2, 19),
-    (3, 1), (3, 2), (3, 8), (3, 11),
-
-    (4, 3), (4, 12), (4, 18),
-    (5, 3), (5, 8), (5, 11), (5, 18),
-    (6, 3), (6, 4), (6, 12), (6, 18),
-
-    (7, 5), (7, 6), (7, 9), (7, 14),
-    (8, 5), (8, 9), (8, 13), (8, 14), (8, 15),
-
-    (9, 7), (9, 10), (9, 11),
-    (10, 7), (10, 10), (10, 18),
-
-    (11, 1), (11, 2), (11, 8), (11, 11),
-    (12, 11), (12, 16), (12, 17), (12, 18),
-    (13, 16), (13, 17), (13, 18),
-
-    (14, 3), (14, 8), (14, 11), (14, 19),
-    (15, 3), (15, 4), (15, 12), (15, 18),
-
-    (16, 5), (16, 13), (16, 14), (16, 15),
-    (17, 5), (17, 6), (17, 9), (17, 14),
-
-    (18, 1), (18, 2), (18, 7), (18, 10),
-    (19, 7), (19, 10), (19, 11),
-    (20, 3), (20, 4), (20, 12), (20, 21),
-
-    (21, 16), (21, 17), (21, 18),
-    (22, 11), (22, 16), (22, 17), (22, 18),
-
-    (23, 3), (23, 11), (23, 18),
-    (24, 3), (24, 7), (24, 10), (24, 18),
-
-    (25, 3), (25, 4), (25, 12), (25, 22),
-    (26, 3), (26, 4), (26, 12), (26, 21), (26, 22),
-
-    (27, 5), (27, 9), (27, 15), (27, 20),
-    (28, 5), (28, 6), (28, 9), (28, 14), (28, 15), (28, 20);
-
-
-
-
-
-
-1. ProfileService.java
-
-上に import 追加。
-
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-createSkillExperiences() を丸ごとこれに差し替え。
-
-private List<SkillExperienceResponse> createSkillExperiences(Profile profile) {
-
-    Map<String, Long> skillTotalMonthsMap = new HashMap<>();
-
-    if (profile.getCareers() != null) {
-
-        for (Career career : profile.getCareers()) {
-
-            LocalDate start = career.getStartTime();
-
-            if (start == null) {
-                continue;
-            }
-
-            LocalDate end = career.getEndTime() == null
-                    ? LocalDate.now()
-                    : career.getEndTime();
-
-            long months = ChronoUnit.MONTHS.between(start, end);
-
-            if (career.getCareerSkills() != null) {
-
-                for (CareerSkill careerSkill : career.getCareerSkills()) {
-
-                    if (careerSkill.getSkill() == null) {
-                        continue;
-                    }
-
-                    String skillName =
-                            careerSkill.getSkill().getSkillName();
-
-                    skillTotalMonthsMap.merge(
-                            skillName,
-                            months,
-                            Long::sum
-                    );
-                }
-            }
-        }
+    public String getProjectName() {
+        return projectName;
     }
 
-    return skillTotalMonthsMap.entrySet()
-            .stream()
-            .map(entry -> {
-                String skillName = entry.getKey();
-                long totalMonths = entry.getValue();
+    public String getProjectContent() {
+        return projectContent;
+    }
 
-                int years = (int) (totalMonths / 12);
-                int months = (int) (totalMonths % 12);
-
-                return new SkillExperienceResponse(
-                        skillName,
-                        years,
-                        months
-                );
-            })
-            .toList();
+    public Long getDivisionId() {
+        return divisionId;
+    }
 }
-2. SearchRepository.java
+2. UpdateProjectRequest.java
+package server.dto.request;
 
-findSkillExperiencesByHrid を丸ごとこれに差し替え。
+public class UpdateProjectRequest {
 
-private List<SkillExperienceResponse> findSkillExperiencesByHrid(String hrid) {
+    private String projectName;
+    private String projectContent;
+    private Long divisionId;
 
-    String sql = """
-            SELECT
-                s.skill_name,
-                COALESCE(SUM(
-                    EXTRACT(YEAR FROM AGE(COALESCE(c.end_time, CURRENT_DATE), c.start_time)) * 12
-                    + EXTRACT(MONTH FROM AGE(COALESCE(c.end_time, CURRENT_DATE), c.start_time))
-                ), 0) AS total_months
-            FROM profile p
-            JOIN career c ON c.profile_id = p.hrid
-            JOIN career_skill cs ON cs.career_id = c.career_id
-            JOIN skill s ON s.skill_id = cs.skill_id
-            WHERE p.hrid = ?
-            GROUP BY s.skill_name
-            ORDER BY s.skill_name
-            """;
+    public String getProjectName() {
+        return projectName;
+    }
 
-    return jdbcTemplate.query(
-            sql,
-            (rs, rowNum) -> {
-                int totalMonths = rs.getInt("total_months");
+    public String getProjectContent() {
+        return projectContent;
+    }
 
-                int years = totalMonths / 12;
-                int months = totalMonths % 12;
+    public Long getDivisionId() {
+        return divisionId;
+    }
+}
+3. ProjectResponse.java
+package server.dto.response;
 
-                return new SkillExperienceResponse(
-                        rs.getString("skill_name"),
-                        years,
-                        months
-                );
-            },
-            hrid
+public class ProjectResponse {
+
+    private Long projectId;
+    private String projectName;
+    private String projectContent;
+    private Long divisionId;
+    private String divisionName;
+
+    public ProjectResponse(
+            Long projectId,
+            String projectName,
+            String projectContent,
+            Long divisionId,
+            String divisionName
+    ) {
+        this.projectId = projectId;
+        this.projectName = projectName;
+        this.projectContent = projectContent;
+        this.divisionId = divisionId;
+        this.divisionName = divisionName;
+    }
+
+    public Long getProjectId() {
+        return projectId;
+    }
+
+    public String getProjectName() {
+        return projectName;
+    }
+
+    public String getProjectContent() {
+        return projectContent;
+    }
+
+    public Long getDivisionId() {
+        return divisionId;
+    }
+
+    public String getDivisionName() {
+        return divisionName;
+    }
+}
+4. ProjectService.java
+package server.service;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.bn26.master.server.dto.request.CreateProjectRequest;
+import simplex.bn26.master.server.dto.request.UpdateProjectRequest;
+import simplex.bn26.master.server.dto.response.ProjectResponse;
+import simplex.bn26.master.server.entity.Division;
+import simplex.bn26.master.server.entity.Project;
+import simplex.bn26.master.server.repository.DivisionRepository;
+import simplex.bn26.master.server.repository.ProjectRepository;
+
+import java.util.List;
+
+@Service
+@Transactional
+public class ProjectService {
+
+    private final ProjectRepository projectRepository;
+    private final DivisionRepository divisionRepository;
+
+    public ProjectService(
+            ProjectRepository projectRepository,
+            DivisionRepository divisionRepository
+    ) {
+        this.projectRepository = projectRepository;
+        this.divisionRepository = divisionRepository;
+    }
+
+    public List<ProjectResponse> getAllProjects() {
+        return projectRepository.findAll()
+                .stream()
+                .map(this::convertToResponse)
+                .toList();
+    }
+
+    public ProjectResponse getProject(Long projectId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+
+        return convertToResponse(project);
+    }
+
+    public ProjectResponse createProject(CreateProjectRequest request) {
+        Division division = divisionRepository.findById(request.getDivisionId())
+                .orElseThrow(() -> new IllegalArgumentException("Division not found"));
+
+        Project project = new Project();
+        project.setProjectName(request.getProjectName());
+        project.setProjectContent(request.getProjectContent());
+        project.setDivision(division);
+
+        Project savedProject = projectRepository.save(project);
+
+        return convertToResponse(savedProject);
+    }
+
+    public ProjectResponse updateProject(
+            Long projectId,
+            UpdateProjectRequest request
+    ) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+
+        Division division = divisionRepository.findById(request.getDivisionId())
+                .orElseThrow(() -> new IllegalArgumentException("Division not found"));
+
+        project.setProjectName(request.getProjectName());
+        project.setProjectContent(request.getProjectContent());
+        project.setDivision(division);
+
+        return convertToResponse(project);
+    }
+
+    public void deleteProject(Long projectId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+
+        projectRepository.delete(project);
+    }
+
+    private ProjectResponse convertToResponse(Project project) {
+        Division division = project.getDivision();
+
+        return new ProjectResponse(
+                project.getProjectId(),
+                project.getProjectName(),
+                project.getProjectContent(),
+                division != null ? division.getDivisionId() : null,
+                division != null ? division.getDivisionName() : null
+        );
+    }
+}
+5. ProjectController.java
+package server.controller;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import simplex.bn26.master.server.dto.request.CreateProjectRequest;
+import simplex.bn26.master.server.dto.request.UpdateProjectRequest;
+import simplex.bn26.master.server.dto.response.ProjectResponse;
+import simplex.bn26.master.server.service.ProjectService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/projects")
+public class ProjectController {
+
+    private final ProjectService projectService;
+
+    public ProjectController(ProjectService projectService) {
+        this.projectService = projectService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<ProjectResponse>> getAllProjects() {
+        return ResponseEntity.ok(projectService.getAllProjects());
+    }
+
+    @GetMapping("/{projectId}")
+    public ResponseEntity<ProjectResponse> getProject(
+            @PathVariable Long projectId
+    ) {
+        return ResponseEntity.ok(projectService.getProject(projectId));
+    }
+
+    @PostMapping
+    public ResponseEntity<ProjectResponse> createProject(
+            @RequestBody CreateProjectRequest request
+    ) {
+        return ResponseEntity.ok(projectService.createProject(request));
+    }
+
+    @PutMapping("/{projectId}")
+    public ResponseEntity<ProjectResponse> updateProject(
+            @PathVariable Long projectId,
+            @RequestBody UpdateProjectRequest request
+    ) {
+        return ResponseEntity.ok(projectService.updateProject(projectId, request));
+    }
+
+    @DeleteMapping("/{projectId}")
+    public ResponseEntity<Void> deleteProject(
+            @PathVariable Long projectId
+    ) {
+        projectService.deleteProject(projectId);
+        return ResponseEntity.noContent().build();
+    }
+}
+
+Entity にはすでに projectContent があるので、足りなかったのは主に DTO・Service・画面側の通り道。
+
+どれが編集のａｐｉ？
+
+編集APIはこれ。
+
+@PutMapping("/{projectId}")
+public ResponseEntity<ProjectResponse> updateProject(
+        @PathVariable Long projectId,
+        @RequestBody UpdateProjectRequest request
+) {
+    return ResponseEntity.ok(
+            projectService.updateProject(projectId, request)
     );
+}
+
+URL
+
+PUT /api/projects/1
+
+例えば projectId=1 を編集するなら
+
+PUT /api/projects/1
+Content-Type: application/json
+
+Body
+
+{
+  "projectName": "Trading System",
+  "projectContent": "日経225先物取引システムの開発",
+  "divisionId": 1
 }
