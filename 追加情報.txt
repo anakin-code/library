@@ -1,1 +1,88 @@
+@startuml
+
+title 概念モデル図
+
+rectangle "社員" as Employee
+rectangle "役職" as Rank
+rectangle "経歴" as Career
+rectangle "スキル" as Skill
+rectangle "プロジェクト" as Project
+rectangle "部門" as Division
+rectangle "会社" as Company
+
+Employee -- Rank : 属する
+
+Employee -- Career : 持つ
+
+Career -- Skill : 使用する
+
+Career -- Project : 参加する
+
+Project -- Division : 所属する
+
+Division -- Company : 所属する
+
+@enduml
+
+@startuml
+' 概念モデル図：社員スキル・プロジェクト管理システム
+' PlantUML / .wsd
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam roundcorner 18
+skinparam defaultFontName "Meiryo"
+skinparam defaultFontSize 14
+
+skinparam rectangle {
+  BorderColor #333333
+  FontColor #111111
+}
+
+title 概念モデル図（社員スキル・プロジェクト管理システム）
+
+rectangle "社員\n(User)" as User #DDEEFF
+rectangle "プロフィール\n(Profile)" as Profile #E5F6DF
+rectangle "役職\n(Rank)" as Rank #FFE6CC
+rectangle "経歴\n(Career)" as Career #FFF2CC
+rectangle "スキル\n(Skill)" as Skill #EADCF8
+rectangle "プロジェクト\n(Project)" as Project #FCE4D6
+rectangle "部門\n(Division)" as Division #D9EAF7
+rectangle "会社\n(Company)" as Company #EADCF8
+
+' --- 関係 ---
+User "1" -- "1" Profile : 持つ
+Rank "1" -- "N" Profile : 所属する
+
+Profile "1" -- "N" Career : 登録する
+Career "N" -- "N" Skill : 使用する
+
+Career "N" -- "1" Project : 参加する
+Project "N" -- "1" Division : 担当する
+Division "N" -- "1" Company : 所属する
+
+note left of Profile
+社員の基本情報を表す。
+氏名、メール、自己紹介など。
+end note
+
+note bottom of Career
+社員がどのプロジェクトに参加し、
+どのスキルを使用したかを表す中心概念。
+end note
+
+note right of Project
+プロジェクト内容
+(projectContent) を持つ。
+end note
+
+legend bottom
+|= 記号 |= 意味 |
+| 1 | 1つ |
+| N | 複数 |
+| 1 -- N | 1対多 |
+| N -- N | 多対多 |
+endlegend
+
+@enduml
 
