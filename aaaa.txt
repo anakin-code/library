@@ -1,1 +1,356 @@
+###[
+@startuml
+!theme plain
+hide circle
+skinparam linetype ortho
+
+entity "User" as user {
+  * user_id : serial <<PK>>
+  --
+  * is_manager : boolean
+  sub : VARCHAR
+}
+
+entity "Profile" as profile {
+  * hrid : VARCHAR(6) <<PK>>
+  --
+  * name : VARCHAR(30) <<NOT NULL>>
+  * mail_address : VARCHAR(50) <<UK, NOT NULL>>
+  free : VARCHAR(200)
+  * user_id : INT <<FK>>
+  * rank_id : INT <<FK>>
+}
+
+entity "Rank" as rank {
+  * rank_id : serial <<PK>>
+  --
+  * rank_name : VARCHAR(255) <<UK, NOT NULL>>
+}
+
+entity "Company" as company {
+  * company_id : serial <<PK>>
+  --
+  * company_name : VARCHAR(255) <<UK, NOT NULL>>
+}
+
+entity "Division" as division {
+  * division_id : serial <<PK>>
+  --
+  * division_name : VARCHAR(255) <<UK, NOT NULL>>
+  * company_id : INT <<FK>>
+}
+
+entity "Project" as project {
+  * project_id : serial <<PK>>
+  --
+  * project_name : VARCHAR(255) <<UK, NOT NULL>>
+  project_content : TEXT
+  * division_id : INT <<FK>>
+}
+
+entity "Career" as career {
+  * career_id : serial <<PK>>
+  --
+  * profile_id : VARCHAR(6) <<FK>>
+  * project_id : INT <<FK>>
+  * start_time : DATE <<NOT NULL>>
+  end_time : DATE
+}
+
+entity "CareerSkill" as career_skill {
+  * career_skill_id : serial <<PK>>
+  --
+  * career_id : INT <<FK>>
+  * skill_id : INT <<FK>>
+}
+
+entity "Skill" as skill {
+  * skill_id : serial <<PK>>
+  --
+  * skill_name : VARCHAR(20) <<UK, NOT NULL>>
+}
+
+user ||--|| profile
+rank ||--o{ profile
+company ||--o{ division
+division ||--o{ project
+project ||--o{ career
+profile ||--o{ career
+career ||--o{ career_skill
+skill ||--o{ career_skill
+
+@enduml
+
+
+###
+スキルを追加している場所はここです。
+
+if (carReq.getSkillIds() != null && !carReq.getSkillIds().isEmpty()) {
+    for (Long skillId : carReq.getSkillIds()) {
+
+        Skill skill = skillRepository.findById(skillId)
+                .orElseThrow(() ->
+                        new RuntimeException("Skill not found: " + skillId));
+
+        CareerSkill careerSkill = new CareerSkill();
+        careerSkill.setCareer(savedCareer);
+        careerSkill.setSkill(skill);
+
+        careerSkillRepository.save(careerSkill);
+    }
+}
+
+つまり
+
+careerSkillRepository.save(careerSkill);
+
+ここでDBの career_skill テーブルに追加している。
+
+スキル未選択エラーを出したいなら
+
+この for の前でチェックする。
+
+if (carReq.getSkillIds() == null || carReq.getSkillIds().isEmpty()) {
+    throw new RuntimeException("スキルを1つ以上選択してください");
+}
+
+すると
+
+Career savedCareer = careerRepository.save(newCareer);
+
+if (carReq.getSkillIds() == null || carReq.getSkillIds().isEmpty()) {
+    throw new RuntimeException("スキルを1つ以上選択してください");
+}
+
+for (Long skillId : carReq.getSkillIds()) {
+    ...
+}
+
+ただしこれだと
+
+careerRepository.save(newCareer);
+
+した後にエラーになる。
+
+そのため本当は
+
+if (carReq.getSkillIds() == null || carReq.getSkillIds().isEmpty()) {
+    throw new RuntimeException("スキルを1つ以上選択してください");
+}
+
+Career savedCareer = careerRepository.save(newCareer);
+
+の順がよい。
+
+さらに綺麗にやるなら
+
+private void validateCareer(CareerRequest carReq) {
+
+    if (carReq.getSkillIds() == null ||
+        carReq.getSkillIds().isEmpty()) {
+
+        throw new RuntimeException(
+                "スキルを1つ以上選択してください");
+    }
+}
+
+作って、
+
+for (CareerRequest carReq : request.getCareers()) {
+
+    validateCareer(carReq);
+
+    Career newCareer = new Career();
+
+    ...
+}
+
+にする。
+
+
+
+
+###
+原因はたぶんここ。
+
+totalMonthsMap.merge(skillId, months(cs), Integer::sum);
+
+これだと、同じスキルを持つキャリア期間が被っていたら、普通に足し算される。
+だからネットワークだけ期間が変になる。
+
+getPersonalSkillNetwork() はこの形に直すのがいい。
+
+public PersonalSkillGraphResponse getPersonalSkillNetwork(String hrid) {
+    List<Career> careers = careerRepository.findByProfileHrid(hrid);
+
+    if (careers.isEmpty()) {
+        profileRepository.findById(hrid)
+                .orElseThrow(() -> new IllegalArgumentException("社員が見つかりません: " + hrid));
+    }
+
+    Map<Long, String> skillNameMap = new HashMap<>();
+    Map<Long, List<DateRange>> skillRangesMap = new HashMap<>();
+    Map<String, List<DateRange>> edgeRangesMap = new HashMap<>();
+
+    for (Career career : careers) {
+        LocalDate start = career.getStartTime();
+        LocalDate end = career.getEndTime() == null
+                ? LocalDate.now()
+                : career.getEndTime();
+
+        if (start == null || end.isBefore(start)) {
+            continue;
+        }
+
+        List<CareerSkill> careerSkills = career.getCareerSkills();
+        if (careerSkills == null) {
+            continue;
+        }
+
+        List<Long> skillIds = new ArrayList<>();
+
+        for (CareerSkill cs : careerSkills) {
+            if (cs.getSkill() == null) {
+                continue;
+            }
+
+            Long skillId = (long) cs.getSkill().getSkillId();
+            skillIds.add(skillId);
+            skillNameMap.put(skillId, cs.getSkill().getSkillName());
+
+            skillRangesMap
+                    .computeIfAbsent(skillId, k -> new ArrayList<>())
+                    .add(new DateRange(start, end));
+        }
+
+        for (int i = 0; i < skillIds.size(); i++) {
+            for (int j = i + 1; j < skillIds.size(); j++) {
+                Long a = skillIds.get(i);
+                Long b = skillIds.get(j);
+
+                if (a.equals(b)) {
+                    continue;
+                }
+
+                Long source = Math.min(a, b);
+                Long target = Math.max(a, b);
+                String key = source + "-" + target;
+
+                edgeRangesMap
+                        .computeIfAbsent(key, k -> new ArrayList<>())
+                        .add(new DateRange(start, end));
+            }
+        }
+    }
+
+    Map<Long, Integer> totalMonthsMap = new HashMap<>();
+    for (Map.Entry<Long, List<DateRange>> entry : skillRangesMap.entrySet()) {
+        totalMonthsMap.put(entry.getKey(), calcMergedMonths(entry.getValue()));
+    }
+
+    int maxMonths = totalMonthsMap.values()
+            .stream()
+            .max(Integer::compareTo)
+            .orElse(1);
+
+    List<PersonalSkillNodeResponse> nodes = totalMonthsMap.entrySet()
+            .stream()
+            .map(entry -> {
+                int totalMonths = entry.getValue();
+                int years = totalMonths / 12;
+                int months = totalMonths % 12;
+
+                return new PersonalSkillNodeResponse(
+                        entry.getKey(),
+                        skillNameMap.get(entry.getKey()),
+                        totalMonths,
+                        years,
+                        months,
+                        maxMonths == 0 ? 0.0 : (double) totalMonths / maxMonths
+                );
+            })
+            .toList();
+
+    List<PersonalSkillEdgeResponse> edges = edgeRangesMap.entrySet()
+            .stream()
+            .map(entry -> {
+                String[] ids = entry.getKey().split("-");
+                Long source = Long.valueOf(ids[0]);
+                Long target = Long.valueOf(ids[1]);
+
+                int totalMonths = calcMergedMonths(entry.getValue());
+                int years = totalMonths / 12;
+                int months = totalMonths % 12;
+
+                int denominator = Math.min(
+                        totalMonthsMap.getOrDefault(source, 0),
+                        totalMonthsMap.getOrDefault(target, 0)
+                );
+
+                double normalizedWeight = denominator == 0
+                        ? 0.0
+                        : (double) totalMonths / denominator;
+
+                return new PersonalSkillEdgeResponse(
+                        source,
+                        target,
+                        totalMonths,
+                        years,
+                        months,
+                        normalizedWeight
+                );
+            })
+            .toList();
+
+    return new PersonalSkillGraphResponse(nodes, edges);
+}
+
+同じ ProfileService の下に追加。
+
+private int calcMergedMonths(List<DateRange> ranges) {
+    if (ranges == null || ranges.isEmpty()) {
+        return 0;
+    }
+
+    List<DateRange> sorted = ranges.stream()
+            .sorted(Comparator.comparing(DateRange::start))
+            .toList();
+
+    List<DateRange> merged = new ArrayList<>();
+
+    for (DateRange range : sorted) {
+        if (merged.isEmpty()) {
+            merged.add(range);
+            continue;
+        }
+
+        DateRange last = merged.get(merged.size() - 1);
+
+        if (!range.start().isAfter(last.end())) {
+            LocalDate newEnd = range.end().isAfter(last.end())
+                    ? range.end()
+                    : last.end();
+
+            merged.set(
+                    merged.size() - 1,
+                    new DateRange(last.start(), newEnd)
+            );
+        } else {
+            merged.add(range);
+        }
+    }
+
+    int totalMonths = 0;
+
+    for (DateRange range : merged) {
+        Period period = Period.between(range.start(), range.end());
+        totalMonths += period.getYears() * 12 + period.getMonths();
+    }
+
+    return totalMonths;
+}
+
+private record DateRange(LocalDate start, LocalDate end) {
+}
+
 
