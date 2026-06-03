@@ -1,1 +1,108 @@
 
+@RequestMapping("api/user")
+@GetMapping("/{hrid}/skill-network")
+
+だから正しいURLはこれ。
+
+http://localhost:8080/api/user/102435/skill-network
+
+今フロントはこれを叩いてる：
+
+/api/skill-network/profile/A001
+
+だから404。
+
+PersonalSkillNetwork.tsx のAPIをこう直す。
+
+api.get(`/user/${hrid}/skill-network`)
+
+マイページなら渡すのはこれ。
+
+<PersonalSkillNetwork hrid={user.profile.hrid} />
+
+つまり A001 じゃなくて、画面上のHRIDなら 102435。
+
+あと map エラー対策で、PersonalSkillNetwork.tsx 側はこう。
+
+const nodes = graph?.nodes ?? [];
+const edges = graph?.edges ?? [];
+
+これで undefined.map は防げる。
+
+スキル二重計算は、今ここが原因。
+
+totalMonthsMap.merge(skillId, months(cs), Integer::sum);
+
+同じスキルで期間が被っても足してる。
+
+直す方針は、
+
+skillIdごとに CareerSkill をまとめる
+↓
+そのスキルのキャリア期間をマージ
+↓
+重複なし月数を totalMonthsMap に入れる
+
+この部分を置き換え。
+
+Map<Long, List<CareerSkill>> bySkillId =
+        careerSkills.stream()
+                .collect(Collectors.groupingBy(
+                        cs -> (long) cs.getSkill().getSkillId()
+                ));
+
+for (Map.Entry<Long, List<CareerSkill>> entry : bySkillId.entrySet()) {
+    Long skillId = entry.getKey();
+    List<CareerSkill> list = entry.getValue();
+
+    skillNameMap.put(
+            skillId,
+            list.get(0).getSkill().getSkillName()
+    );
+
+    totalMonthsMap.put(
+            skillId,
+            mergedMonths(list)
+    );
+}
+
+つまり今はまず URLを /user/${hrid}/skill-network に直す。これが先。
+
+どうしたらいい？
+
+まず URL修正 だけやって。
+
+PersonalSkillNetwork.tsx の中で、たぶん今こうなってる：
+
+api.get(`/skill-network/profile/${hrid}`)
+
+これをこう変更。
+
+api.get(`/user/${hrid}/skill-network`)
+
+理由はサーバーがこれだから。
+
+@RequestMapping("api/user")
+@GetMapping("/{hrid}/skill-network")
+
+つまりAPIはこれ。
+
+GET http://localhost:8080/api/user/102435/skill-network
+
+マイページ側はこれでOK。
+
+<PersonalSkillNetwork hrid={user.profile.hrid} />
+
+次に、PersonalSkillNetwork.tsx の map してるところを安全にする。
+
+const nodes = graph?.nodes ?? [];
+const edges = graph?.edges ?? [];
+
+その上で、
+
+nodes.map(...)
+edges.map(...)
+
+にする。
+
+まずこれで404と undefined.map は直る。
