@@ -1,1 +1,123 @@
 
+@startuml
+!theme plain
+hide circle
+skinparam linetype ortho
+
+entity "ユーザー" as user {
+  ユーザーID
+  管理者フラグ
+  SUB
+}
+
+entity "プロフィール" as profile {
+  HRID
+  氏名
+  メールアドレス
+  自由記述
+}
+
+entity "ランク" as rank {
+  ランク名
+}
+
+entity "会社" as company {
+  会社名
+}
+
+entity "部署" as division {
+  部署名
+}
+
+entity "プロジェクト" as project {
+  プロジェクト名
+  プロジェクト内容
+}
+
+entity "経歴" as career {
+  開始日
+  終了日
+}
+
+entity "スキル" as skill {
+  スキル名
+}
+
+entity "経歴スキル" as career_skill {
+}
+
+user "1" -- "1" profile : 持つ
+
+rank "1" -- "0..n" profile : 属する
+
+company "1" -- "0..n" division : 持つ
+
+division "1" -- "0..n" project : 管理する
+
+profile "1" -- "0..n" career : 経験する
+
+project "1" -- "0..n" career : 含まれる
+
+career "1" -- "0..n" career_skill : 使用する
+
+skill "1" -- "0..n" career_skill : 対象スキル
+
+@enduml
+
+ただ、見本みたいにするなら 経歴スキル は図に出さない方がきれい。
+中間テーブル感が強すぎて概念モデルっぽくない。
+
+概念モデルとしてはこっちの方が自然。
+
+@startuml
+!theme plain
+hide circle
+skinparam linetype ortho
+
+entity "ユーザー" as user {
+  管理者フラグ
+  SUB
+}
+
+entity "プロフィール" as profile {
+  HRID
+  氏名
+  メールアドレス
+  自由記述
+}
+
+entity "ランク" as rank {
+  ランク名
+}
+
+entity "会社" as company {
+  会社名
+}
+
+entity "部署" as division {
+  部署名
+}
+
+entity "プロジェクト" as project {
+  プロジェクト名
+  プロジェクト内容
+}
+
+entity "経歴" as career {
+  開始日
+  終了日
+}
+
+entity "スキル" as skill {
+  スキル名
+}
+
+user "1" -- "1" profile : 持つ
+rank "1" -- "0..n" profile : 設定される
+company "1" -- "0..n" division : 持つ
+division "1" -- "0..n" project : 管理する
+profile "1" -- "0..n" career : 保有する
+project "1" -- "0..n" career : 対象となる
+career "0..n" -- "0..n" skill : 使用する
+
+@enduml
