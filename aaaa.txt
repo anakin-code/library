@@ -1,341 +1,46 @@
-SearchSqlBuilder.java にこれを追加すればOK。
-minYears を スキル・プロジェクト・ディビジョン共通で使う版。
+applyConditions() に追加。
 
-まず applyConditions() の最後をこうする。
+addCompanyYearsCondition(request);
 
-// 既存の条件たちの後
-addSkillCondition(request);
-addProjectYearsCondition(request);
-addDivisionYearsCondition(request);
+そして下にこれを追加。
 
-そして下にこの2つを追加。
-
-private void addProjectYearsCondition(SearchRequest request) {
-    if (request.getProjectName() == null
-            || request.getProjectName().isBlank()
+private void addCompanyYearsCondition(SearchRequest request) {
+    if (request.getCompanyName() == null
+            || request.getCompanyName().isBlank()
             || request.getMinYears() == null) {
         return;
     }
 
     sql.append("""
-        AND EXISTS (
-            SELECT 1
-            FROM career c2
-            JOIN project pr2 ON pr2.project_id = c2.project_id
-            WHERE c2.profile_id = p.hrid
-              AND pr2.project_name = ?
-            GROUP BY pr2.project_name
-            HAVING COALESCE(SUM(
-                DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
-                + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
-            ), 0) >= ?
-        )
-    """);
-
-    params.add(request.getProjectName().trim());
-    params.add(request.getMinYears() * 12);
-}
-private void addDivisionYearsCondition(SearchRequest request) {
-    if (request.getDivisionName() == null
-            || request.getDivisionName().isBlank()
-            || request.getMinYears() == null) {
-        return;
-    }
-
-    sql.append("""
-        AND EXISTS (
-            SELECT 1
-            FROM career c2
-            JOIN project pr2 ON pr2.project_id = c2.project_id
-            JOIN division d2 ON d2.division_id = pr2.division_id
-            WHERE c2.profile_id = p.hrid
-              AND d2.division_name = ?
-            GROUP BY d2.division_name
-            HAVING COALESCE(SUM(
-                DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
-                + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
-            ), 0) >= ?
-        )
-    """);
-
-    params.add(request.getDivisionName().trim());
-    params.add(request.getMinYears() * 12);
-}
-
-注意：すでに projectName / divisionName の単純一致条件があるなら、そのままでも動くけど、条件が二重になる。まずはこのままでOK。
-
-完全版コード
-
-SearchSqlBuilder.java はこれで置き換え。
-
-package simplex.bn26.master.server.repository;
-
-import simplex.bn26.master.server.dto.request.SearchRequest;
-import simplex.bn26.master.server.dto.request.ProfileSearchField;
-
-import java.util.ArrayList;
-import java.util.List;
-
-public class SearchSqlBuilder {
-
-    private final StringBuilder sql;
-    private final List<Object> params;
-
-    public SearchSqlBuilder() {
-        this.sql = new StringBuilder("""
-                SELECT
-                    p.hrid,
-                    p.name,
-                    p.mail_address,
-                    r.rank_name,
-                    co.company_name
-                FROM profile p
-                LEFT JOIN rank r ON r.rank_id = p.rank_id
-                LEFT JOIN career c ON c.profile_id = p.hrid
-                LEFT JOIN project pr ON pr.project_id = c.project_id
-                LEFT JOIN division d ON d.division_id = pr.division_id
-                LEFT JOIN company co ON co.company_id = d.company_id
-                LEFT JOIN career_skill cs ON cs.career_id = c.career_id
-                LEFT JOIN skill s ON s.skill_id = cs.skill_id
-                WHERE 1 = 1
-                """);
-
-        this.params = new ArrayList<>();
-    }
-
-    public void applyConditions(SearchRequest request) {
-        addKeywordCondition(request);
-
-        if (request.getHrid() != null && !request.getHrid().isBlank()) {
-            sql.append(" AND p.hrid = ? ");
-            params.add(request.getHrid().trim());
-        }
-
-        if (request.getName() != null && !request.getName().isBlank()) {
-            sql.append(" AND p.name ILIKE ? ");
-            params.add("%" + request.getName().trim() + "%");
-        }
-
-        if (request.isCurrentProjectOnly()) {
-            sql.append(" AND c.end_time IS NULL ");
-        }
-
-        if (request.getSkillName() != null && !request.getSkillName().isBlank()) {
-            sql.append(" AND s.skill_name = ? ");
-            params.add(request.getSkillName().trim());
-        }
-
-        if (request.getDivisionName() != null && !request.getDivisionName().isBlank()) {
-            sql.append(" AND d.division_name = ? ");
-            params.add(request.getDivisionName().trim());
-        }
-
-        if (request.getProjectName() != null && !request.getProjectName().isBlank()) {
-            sql.append(" AND pr.project_name = ? ");
-            params.add(request.getProjectName().trim());
-        }
-
-        if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
-            sql.append(" AND co.company_name = ? ");
-            params.add(request.getCompanyName().trim());
-        }
-
-        if (request.getRankName() != null && !request.getRankName().isBlank()) {
-            sql.append(" AND r.rank_name = ? ");
-            params.add(request.getRankName().trim());
-        }
-
-        addSkillCondition(request);
-        addProjectYearsCondition(request);
-        addDivisionYearsCondition(request);
-    }
-
-    private void addKeywordCondition(SearchRequest request) {
-        String keyword = request.getKeyword();
-
-        if (keyword == null || keyword.isBlank()) {
-            return;
-        }
-
-        List<ProfileSearchField> targetFields = request.getFields();
-
-        if (targetFields == null || targetFields.isEmpty()) {
-            targetFields = List.of(ProfileSearchField.values());
-        }
-
-        String exactValue = keyword.trim().toLowerCase();
-        List<String> conditions = new ArrayList<>();
-
-        for (ProfileSearchField field : targetFields) {
-            switch (field) {
-                case HRID -> {
-                    conditions.add("LOWER(p.hrid) = ?");
-                    params.add(exactValue);
-                }
-                case NAME -> {
-                    conditions.add("LOWER(p.name) ILIKE ?");
-                    params.add("%" + exactValue + "%");
-                }
-                case MAIL_ADDRESS -> {
-                    conditions.add("LOWER(p.mail_address) = ?");
-                    params.add(exactValue);
-                }
-                case RANK_NAME -> {
-                    conditions.add("LOWER(COALESCE(r.rank_name, '')) = ?");
-                    params.add(exactValue);
-                }
-                case FREE -> {
-                    conditions.add("LOWER(COALESCE(p.free, '')) ILIKE ?");
-                    params.add("%" + exactValue + "%");
-                }
-                case PROJECT_NAME -> {
-                    conditions.add("LOWER(COALESCE(pr.project_name, '')) = ?");
-                    params.add(exactValue);
-                }
-                case SKILL_NAME -> {
-                    conditions.add("LOWER(COALESCE(s.skill_name, '')) = ?");
-                    params.add(exactValue);
-                }
-                case DIVISION_NAME -> {
-                    conditions.add("LOWER(COALESCE(d.division_name, '')) = ?");
-                    params.add(exactValue);
-                }
-                case COMPANY_NAME -> {
-                    conditions.add("LOWER(COALESCE(co.company_name, '')) = ?");
-                    params.add(exactValue);
-                }
-            }
-        }
-
-        if (!conditions.isEmpty()) {
-            sql.append(" AND (")
-                    .append(String.join(" OR ", conditions))
-                    .append(") ");
-        }
-    }
-
-    public void applyGroupByAndHaving(SearchRequest request) {
-        sql.append("""
-                GROUP BY
-                    p.hrid,
-                    p.name,
-                    p.mail_address,
-                    r.rank_name,
-                    co.company_name
-                """);
-
-        sql.append(" ORDER BY p.hrid ");
-    }
-
-    private void addSkillCondition(SearchRequest request) {
-        if (request.getSkillNames() == null) {
-            return;
-        }
-
-        List<String> skillNames = request.getSkillNames().stream()
-                .filter(skillName -> skillName != null)
-                .map(skillName -> skillName.replace("　", " ").trim())
-                .filter(skillName -> !skillName.isEmpty())
-                .distinct()
-                .toList();
-
-        for (String skillName : skillNames) {
-            sql.append("""
-                    AND EXISTS (
-                        SELECT 1
-                        FROM career c2
-                        JOIN career_skill cs2 ON cs2.career_id = c2.career_id
-                        JOIN skill s2 ON s2.skill_id = cs2.skill_id
-                        WHERE c2.profile_id = p.hrid
-                          AND s2.skill_name = ?
-                    """);
-
-            params.add(skillName);
-
-            if (request.getMinYears() != null) {
-                sql.append("""
-                        GROUP BY s2.skill_name
-                        HAVING COALESCE(SUM(
-                            DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
-                            + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
-                        ), 0) >= ?
-                        """);
-
-                params.add(request.getMinYears() * 12);
-            }
-
-            sql.append("""
+            AND EXISTS (
+                SELECT 1
+                FROM career c2
+                JOIN project pr2 ON pr2.project_id = c2.project_id
+                JOIN division d2 ON d2.division_id = pr2.division_id
+                JOIN company co2 ON co2.company_id = d2.company_id
+                WHERE c2.profile_id = p.hrid
+                  AND co2.company_name = ?
+                GROUP BY co2.company_name
+                HAVING COALESCE(SUM(
+                    DATE_PART(
+                        'year',
+                        AGE(
+                            COALESCE(c2.end_time, CURRENT_DATE),
+                            c2.start_time
+                        )
+                    ) * 12
+                    +
+                    DATE_PART(
+                        'month',
+                        AGE(
+                            COALESCE(c2.end_time, CURRENT_DATE),
+                            c2.start_time
+                        )
                     )
-                    """);
-        }
-    }
+                ), 0) >= ?
+            )
+            """);
 
-    private void addProjectYearsCondition(SearchRequest request) {
-        if (request.getProjectName() == null
-                || request.getProjectName().isBlank()
-                || request.getMinYears() == null) {
-            return;
-        }
-
-        sql.append("""
-                AND EXISTS (
-                    SELECT 1
-                    FROM career c2
-                    JOIN project pr2 ON pr2.project_id = c2.project_id
-                    WHERE c2.profile_id = p.hrid
-                      AND pr2.project_name = ?
-                    GROUP BY pr2.project_name
-                    HAVING COALESCE(SUM(
-                        DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
-                        + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
-                    ), 0) >= ?
-                )
-                """);
-
-        params.add(request.getProjectName().trim());
-        params.add(request.getMinYears() * 12);
-    }
-
-    private void addDivisionYearsCondition(SearchRequest request) {
-        if (request.getDivisionName() == null
-                || request.getDivisionName().isBlank()
-                || request.getMinYears() == null) {
-            return;
-        }
-
-        sql.append("""
-                AND EXISTS (
-                    SELECT 1
-                    FROM career c2
-                    JOIN project pr2 ON pr2.project_id = c2.project_id
-                    JOIN division d2 ON d2.division_id = pr2.division_id
-                    WHERE c2.profile_id = p.hrid
-                      AND d2.division_name = ?
-                    GROUP BY d2.division_name
-                    HAVING COALESCE(SUM(
-                        DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
-                        + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
-                    ), 0) >= ?
-                )
-                """);
-
-        params.add(request.getDivisionName().trim());
-        params.add(request.getMinYears() * 12);
-    }
-
-    public String getSql() {
-        return sql.toString();
-    }
-
-    public Object[] getParams() {
-        return params.toArray();
-    }
+    params.add(request.getCompanyName().trim());
+    params.add(request.getMinYears() * 12);
 }
-
-これで minYears は共通で使える。
-
-skillNames + minYears
-projectName + minYears
-divisionName + minYears
-
-全部対応。
