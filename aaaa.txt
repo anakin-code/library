@@ -1,1 +1,24 @@
 
+<div style={{ width: "100%", height: "720px", overflow: "hidden" }}>
+  <div
+    style={{
+      width: "100%",
+      height: "100%",
+      transform: "scale(0.85) translateY(-60px)",
+      transformOrigin: "center top",
+    }}
+  >
+    <ReactFlow
+      nodes={layouted.nodes}
+      edges={layouted.edges}
+      fitView
+      fitViewOptions={{ padding: 0.25 }}
+      minZoom={0.15}
+      maxZoom={2}
+      nodesDraggable={true}
+    >
+      <Background color="#e5e7eb" gap={24} />
+      <Controls />
+    </ReactFlow>
+  </div>
+</div>
