@@ -1,19 +1,242 @@
+import { useEffect, useMemo, useState } from "react";
+import ReactFlow, {
+  Background,
+  Controls,
+  Handle,
+  Position,
+  type Edge,
+  type Node,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
-<ReactFlow
-  nodes={layouted.nodes}
-  edges={layouted.edges}
-  minZoom={0.15}
-  maxZoom={2}
->
-  <style>
-    {`
-      .react-flow__handle {
-        opacity: 0;
-        pointer-events: none;
-      }
-    `}
-  </style>
+import { api } from "../api/client";
 
-  <Background />
-  <Controls />
-</ReactFlow>
+type SkillNode = {
+  id: number;
+  label: string;
+  years: number;
+  months: number;
+  normalizedSize: number;
+};
+
+type SkillEdge = {
+  source: number;
+  target: number;
+  years: number;
+  months: number;
+  normalizedWeight: number;
+};
+
+type SkillNetworkResponse = {
+  nodes: SkillNode[];
+  edges: SkillEdge[];
+};
+
+type Props = {
+  hrid: string;
+};
+
+function formatPeriod(years: number, months: number): string {
+  if (years > 0 && months > 0) {
+    return `${years}年${months}ヶ月`;
+  }
+  if (years > 0) {
+    return `${years}年`;
+  }
+  return `${months}ヶ月`;
+}
+
+function getNodeSize(skill: SkillNode): number {
+  return 64 + Math.sqrt(skill.normalizedSize) * 90;
+}
+
+/**
+ * エッジを円の中心から出すためのカスタムノード
+ */
+function SkillCircleNode({ data }: any) {
+  return (
+    <div style={data.style}>
+      <Handle
+        type="source"
+        position={Position.Top}
+        style={{
+          left: "50%",
+          top: "50%",
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{
+          left: "50%",
+          top: "50%",
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
+
+      {data.label}
+    </div>
+  );
+}
+
+const nodeTypes = {
+  skillCircle: SkillCircleNode,
+};
+
+function layoutNodesAndEdges(
+  nodes: Node[],
+  edges: Edge[]
+): {
+  nodes: Node[];
+  edges: Edge[];
+} {
+  const centerX = 360;
+  const centerY = 300;
+  const radius = 220;
+
+  const layoutedNodes = nodes.map((node, index) => {
+    const angle = (2 * Math.PI * index) / nodes.length;
+
+    const width =
+      typeof node.style?.width === "number" ? node.style.width : 120;
+
+    const height =
+      typeof node.style?.height === "number" ? node.style.height : 120;
+
+    return {
+      ...node,
+      position: {
+        x: centerX + radius * Math.cos(angle) - width / 2,
+        y: centerY + radius * Math.sin(angle) - height / 2,
+      },
+    };
+  });
+
+  return {
+    nodes: layoutedNodes,
+    edges,
+  };
+}
+
+export default function PersonalSkillNetwork({ hrid }: Props) {
+  const [data, setData] = useState<SkillNetworkResponse>({
+    nodes: [],
+    edges: [],
+  });
+
+  useEffect(() => {
+    if (!hrid) {
+      return;
+    }
+
+    api
+      .get<SkillNetworkResponse>(`/profiles/${hrid}/skill-network`)
+      .then((response) => {
+        setData(response.data);
+      })
+      .catch((error) => {
+        console.error(error);
+        setData({
+          nodes: [],
+          edges: [],
+        });
+      });
+  }, [hrid]);
+
+  const rawNodes: Node[] = useMemo(() => {
+    return data.nodes.map((skill) => {
+      const size = getNodeSize(skill);
+
+      return {
+        id: String(skill.id),
+        type: "skillCircle",
+        position: {
+          x: 0,
+          y: 0,
+        },
+        data: {
+          label: `${skill.label}\n${formatPeriod(
+            skill.years,
+            skill.months
+          )}`,
+          style: {
+            width: size,
+            height: size,
+            background: "#d7f3e3",
+            border: "2px solid #56b68b",
+            borderRadius: "50%",
+            color: "#222",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            fontSize: 13,
+            fontWeight: 700,
+            whiteSpace: "pre-line",
+            boxShadow: "0 3px 10px rgba(0, 0, 0, 0.18)",
+          },
+        },
+      };
+    });
+  }, [data.nodes]);
+
+  const rawEdges: Edge[] = useMemo(() => {
+    return data.edges.map((edge) => {
+      return {
+        id: `${edge.source}-${edge.target}`,
+        source: String(edge.source),
+        target: String(edge.target),
+        type: "straight",
+        label: formatPeriod(edge.years, edge.months),
+        style: {
+          stroke: "#334155",
+          strokeWidth: 0.5 + edge.normalizedWeight * 10,
+        },
+        labelStyle: {
+          fontSize: 11,
+          fontWeight: 600,
+          fill: "#222",
+        },
+      };
+    });
+  }, [data.edges]);
+
+  const layouted = useMemo(() => {
+    return layoutNodesAndEdges(rawNodes, rawEdges);
+  }, [rawNodes, rawEdges]);
+
+  return (
+    <div style={{ width: "100%", height: "720px", overflow: "hidden" }}>
+      <ReactFlow
+        nodes={layouted.nodes}
+        edges={layouted.edges}
+        nodeTypes={nodeTypes}
+        defaultViewport={{
+          x: 80,
+          y: -70,
+          zoom: 0.75,
+        }}
+        minZoom={0.15}
+        maxZoom={2}
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={false}
+      >
+        <Background color="#e5e7eb" gap={24} />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
+
+もし api の場所が違うならここだけ戻して。
+
+import { api } from "../api/client";
+
+前のコードで ../../api/client なら、そこだけこう。
+
+import { api } from "../../api/client";
