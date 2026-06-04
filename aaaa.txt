@@ -1,1 +1,494 @@
+＃＃
+原因は今のコードだと dagre側のノードサイズが固定 120x120 だから、実際の大きいノードとズレて、はみ出しや線の違和感が出てる。
 
+PersonalSkillNetwork.tsx をこれに差し替えて。
+
+import { useEffect, useMemo, useState } from "react";
+import dagre from "dagre";
+import {
+  Background,
+  Controls,
+  Edge,
+  Node,
+  Position,
+  ReactFlow,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import api from "../../api/api";
+
+type SkillNode = {
+  id: number;
+  label: string;
+  years: number;
+  months: number;
+  totalMonths: number;
+  normalizedSize: number;
+};
+
+type SkillEdge = {
+  source: number;
+  target: number;
+  years: number;
+  months: number;
+  totalMonths: number;
+  normalizedWeight: number;
+};
+
+type SkillNetworkResponse = {
+  nodes: SkillNode[];
+  edges: SkillEdge[];
+};
+
+type Props = {
+  hrid: string;
+};
+
+function formatPeriod(years: number, months: number): string {
+  if (years > 0 && months > 0) {
+    return `${years}年${months}ヶ月`;
+  }
+
+  if (years > 0) {
+    return `${years}年`;
+  }
+
+  return `${months}ヶ月`;
+}
+
+function getNodeSize(skill: SkillNode): number {
+  return 64 + Math.sqrt(skill.normalizedSize) * 90;
+}
+
+function getEdgeWidth(edge: SkillEdge): number {
+  return 2 + Math.sqrt(edge.normalizedWeight) * 14;
+}
+
+function layoutNodesAndEdges(nodes: Node[], edges: Edge[]): {
+  nodes: Node[];
+  edges: Edge[];
+} {
+  const graph = new dagre.graphlib.Graph();
+
+  graph.setDefaultEdgeLabel(() => ({}));
+
+  graph.setGraph({
+    rankdir: "LR",
+    ranksep: 180,
+    nodesep: 120,
+    marginx: 60,
+    marginy: 60,
+  });
+
+  nodes.forEach((node) => {
+    const width =
+      typeof node.style?.width === "number"
+        ? node.style.width
+        : 120;
+
+    const height =
+      typeof node.style?.height === "number"
+        ? node.style.height
+        : 120;
+
+    graph.setNode(node.id, {
+      width,
+      height,
+    });
+  });
+
+  edges.forEach((edge) => {
+    graph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(graph);
+
+  const layoutedNodes = nodes.map((node) => {
+    const position = graph.node(node.id);
+
+    const width =
+      typeof node.style?.width === "number"
+        ? node.style.width
+        : 120;
+
+    const height =
+      typeof node.style?.height === "number"
+        ? node.style.height
+        : 120;
+
+    return {
+      ...node,
+      position: {
+        x: position.x - width / 2,
+        y: position.y - height / 2,
+      },
+      targetPosition: Position.Left,
+      sourcePosition: Position.Right,
+    };
+  });
+
+  return {
+    nodes: layoutedNodes,
+    edges,
+  };
+}
+
+export default function PersonalSkillNetwork({ hrid }: Props): JSX.Element {
+  const [data, setData] = useState<SkillNetworkResponse>({
+    nodes: [],
+    edges: [],
+  });
+
+  useEffect(() => {
+    if (!hrid) {
+      return;
+    }
+
+    api
+      .get<SkillNetworkResponse>(`/user/${hrid}/skill-network`)
+      .then((response) => {
+        setData(response.data);
+      })
+      .catch((error) => {
+        console.error(error);
+        setData({
+          nodes: [],
+          edges: [],
+        });
+      });
+  }, [hrid]);
+
+  const rawNodes: Node[] = useMemo(() => {
+    return data.nodes.map((skill) => {
+      const size = getNodeSize(skill);
+
+      return {
+        id: String(skill.id),
+        position: {
+          x: 0,
+          y: 0,
+        },
+        data: {
+          label: `${skill.label}\n${formatPeriod(
+            skill.years,
+            skill.months
+          )}`,
+        },
+        style: {
+          width: size,
+          height: size,
+          background: "#d7f3e3",
+          border: "2px solid #56b68b",
+          borderRadius: "50%",
+          color: "#222",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          fontSize: 13,
+          fontWeight: 700,
+          whiteSpace: "pre-line",
+          boxShadow: "0 3px 10px rgba(0, 0, 0, 0.18)",
+        },
+      };
+    });
+  }, [data]);
+
+  const rawEdges: Edge[] = useMemo(() => {
+    return data.edges.map((edge) => {
+      const width = getEdgeWidth(edge);
+
+      return {
+        id: `${edge.source}-${edge.target}`,
+        source: String(edge.source),
+        target: String(edge.target),
+        type: "straight",
+        label: formatPeriod(edge.years, edge.months),
+        style: {
+          stroke: "#172033",
+          strokeWidth: width,
+        },
+        labelStyle: {
+          fontSize: 13,
+          fontWeight: 700,
+          fill: "#111",
+        },
+        labelBgStyle: {
+          fill: "#ffffff",
+          fillOpacity: 0.85,
+        },
+      };
+    });
+  }, [data]);
+
+  const layouted = useMemo(() => {
+    return layoutNodesAndEdges(rawNodes, rawEdges);
+  }, [rawNodes, rawEdges]);
+
+  return (
+    <div style={{ width: "100%", height: "720px" }}>
+      <ReactFlow
+        nodes={layouted.nodes}
+        edges={layouted.edges}
+        fitView
+        fitViewOptions={{
+          padding: 0.35,
+        }}
+        minZoom={0.15}
+        maxZoom={2}
+        nodesDraggable={true}
+      >
+        <Background color="#e5e7eb" gap={24} />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
+
+ポイントはここ。
+
+graph.setNode(node.id, {
+  width,
+  height,
+});
+
+これで 実際のノードサイズを dagre に渡す から、はみ出しにくくなる。
+あと線はこれで強弱が出る。
+
+return 2 + Math.sqrt(edge.normalizedWeight) * 14;
+
+
+＃＃＃
+
+getPersonalSkillNetwork() は入口だけにして、処理を小メソッドへ逃がす。
+
+public PersonalSkillGraphResponse getPersonalSkillNetwork(String hrid) {
+    List<Career> careers = careerRepository.findByProfileHrid(hrid);
+
+    validateProfileExists(hrid, careers);
+
+    List<CareerSkill> careerSkills = getCareerSkills(careers);
+
+    Map<Long, String> skillNameMap = createSkillNameMap(careerSkills);
+    Map<Long, Integer> totalMonthsMap = createTotalMonthsMap(careerSkills);
+    Map<String, Integer> edgeMonthsMap = createEdgeMonthsMap(careerSkills);
+
+    List<PersonalSkillNodeResponse> nodes =
+            createPersonalSkillNodes(skillNameMap, totalMonthsMap);
+
+    List<PersonalSkillEdgeResponse> edges =
+            createPersonalSkillEdges(edgeMonthsMap, totalMonthsMap);
+
+    return new PersonalSkillGraphResponse(nodes, edges);
+}
+
+追加メソッドはこれ。
+
+private void validateProfileExists(String hrid, List<Career> careers) {
+    if (!careers.isEmpty()) {
+        return;
+    }
+
+    profileRepository.findById(hrid)
+            .orElseThrow(() ->
+                    new IllegalArgumentException("社員が見つかりません: " + hrid)
+            );
+}
+private Map<Long, String> createSkillNameMap(List<CareerSkill> careerSkills) {
+    Map<Long, String> skillNameMap = new HashMap<>();
+
+    for (CareerSkill careerSkill : careerSkills) {
+        Long skillId = (long) careerSkill.getSkill().getSkillId();
+
+        skillNameMap.put(
+                skillId,
+                careerSkill.getSkill().getSkillName()
+        );
+    }
+
+    return skillNameMap;
+}
+private Map<Long, Integer> createTotalMonthsMap(
+        List<CareerSkill> careerSkills
+) {
+    Map<Long, List<CareerSkill>> bySkillId =
+            careerSkills.stream()
+                    .collect(Collectors.groupingBy(
+                            cs -> (long) cs.getSkill().getSkillId()
+                    ));
+
+    Map<Long, Integer> totalMonthsMap = new HashMap<>();
+
+    for (Map.Entry<Long, List<CareerSkill>> entry : bySkillId.entrySet()) {
+        totalMonthsMap.put(
+                entry.getKey(),
+                mergedMonths(entry.getValue())
+        );
+    }
+
+    return totalMonthsMap;
+}
+private Map<String, Integer> createEdgeMonthsMap(
+        List<CareerSkill> careerSkills
+) {
+    Map<Long, List<CareerSkill>> byCareerId =
+            careerSkills.stream()
+                    .collect(Collectors.groupingBy(
+                            cs -> cs.getCareer().getCareerId()
+                    ));
+
+    Map<String, Integer> edgeMonthsMap = new HashMap<>();
+
+    for (List<CareerSkill> list : byCareerId.values()) {
+        addEdgeMonths(edgeMonthsMap, list);
+    }
+
+    return edgeMonthsMap;
+}
+private void addEdgeMonths(
+        Map<String, Integer> edgeMonthsMap,
+        List<CareerSkill> careerSkills
+) {
+    for (int i = 0; i < careerSkills.size(); i++) {
+        for (int j = i + 1; j < careerSkills.size(); j++) {
+            addEdgeMonth(edgeMonthsMap, careerSkills.get(i), careerSkills.get(j));
+        }
+    }
+}
+private void addEdgeMonth(
+        Map<String, Integer> edgeMonthsMap,
+        CareerSkill a,
+        CareerSkill b
+) {
+    Long idA = (long) a.getSkill().getSkillId();
+    Long idB = (long) b.getSkill().getSkillId();
+
+    if (idA.equals(idB)) {
+        return;
+    }
+
+    Long source = Math.min(idA, idB);
+    Long target = Math.max(idA, idB);
+
+    edgeMonthsMap.merge(
+            source + "-" + target,
+            months(a),
+            Integer::sum
+    );
+}
+private List<PersonalSkillNodeResponse> createPersonalSkillNodes(
+        Map<Long, String> skillNameMap,
+        Map<Long, Integer> totalMonthsMap
+) {
+    int maxMonths = totalMonthsMap.values()
+            .stream()
+            .max(Integer::compareTo)
+            .orElse(1);
+
+    return totalMonthsMap.entrySet()
+            .stream()
+            .map(entry -> new PersonalSkillNodeResponse(
+                    entry.getKey(),
+                    skillNameMap.get(entry.getKey()),
+                    entry.getValue(),
+                    maxMonths == 0
+                            ? 0.0
+                            : (double) entry.getValue() / maxMonths
+            ))
+            .toList();
+}
+private List<PersonalSkillEdgeResponse> createPersonalSkillEdges(
+        Map<String, Integer> edgeMonthsMap,
+        Map<Long, Integer> totalMonthsMap
+) {
+    return edgeMonthsMap.entrySet()
+            .stream()
+            .map(entry -> createPersonalSkillEdge(entry, totalMonthsMap))
+            .toList();
+}
+private PersonalSkillEdgeResponse createPersonalSkillEdge(
+        Map.Entry<String, Integer> entry,
+        Map<Long, Integer> totalMonthsMap
+) {
+    String[] ids = entry.getKey().split("-");
+    Long source = Long.valueOf(ids[0]);
+    Long target = Long.valueOf(ids[1]);
+    int totalMonths = entry.getValue();
+
+    int denominator = Math.min(
+            totalMonthsMap.getOrDefault(source, 0),
+            totalMonthsMap.getOrDefault(target, 0)
+    );
+
+    double normalizedWeight = denominator == 0
+            ? 0.0
+            : (double) totalMonths / denominator;
+
+    return new PersonalSkillEdgeResponse(
+            source,
+            target,
+            totalMonths,
+            normalizedWeight
+    );
+}
+
+
+
+
+＃＃＃＃＃
+@startuml
+!theme plain
+hide circle
+
+top to bottom direction
+
+entity "ユーザー" as user {
+  ユーザーID
+  管理者フラグ
+  SUB
+}
+
+entity "プロフィール" as profile {
+  HRID
+  氏名
+  メールアドレス
+  自由記述
+}
+
+entity "ランク" as rank {
+  ランク名
+}
+
+entity "会社" as company {
+  会社名
+}
+
+entity "部署" as division {
+  部署名
+}
+
+entity "プロジェクト" as project {
+  プロジェクト名
+  プロジェクト内容
+}
+
+entity "経歴" as career {
+  開始日
+  終了日
+}
+
+entity "スキル" as skill {
+  スキル名
+}
+
+user "1" -- "1" profile : 持つ
+rank "1" -- "0..n" profile : 属する
+
+company "1" -- "0..n" division : 持つ
+division "1" -- "0..n" project : 管理する
+
+profile "1" -- "0..n" career : 経験する
+project "1" -- "0..n" career : 含まれる
+
+career "0..n" -- "0..n" skill : 使用する
+
+@enduml
