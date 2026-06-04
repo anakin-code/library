@@ -1,1 +1,258 @@
 
+ProfileService.java の中で、まずこの3つを追加。
+
+private record CareerPeriod(
+        LocalDate startTime,
+        LocalDate endTime
+) {
+}
+
+private record CareerDuration(
+        int years,
+        int months
+) {
+}
+
+private int toTotalMonths(CareerDuration duration) {
+    return duration.years() * 12 + duration.months();
+}
+1. 同じ期間の同じスキルを2重計算しない共通メソッド
+private Map<Long, CareerDuration> calculateSkillDurations(
+        List<CareerSkill> careerSkills
+) {
+    Map<Long, List<CareerPeriod>> skillPeriodMap = new HashMap<>();
+
+    for (CareerSkill careerSkill : careerSkills) {
+        Career career = careerSkill.getCareer();
+
+        if (career == null || career.getStartTime() == null) {
+            continue;
+        }
+
+        Long skillId = (long) careerSkill.getSkill().getSkillId();
+
+        LocalDate startTime = career.getStartTime();
+        LocalDate endTime = career.getEndTime() == null
+                ? LocalDate.now()
+                : career.getEndTime();
+
+        skillPeriodMap
+                .computeIfAbsent(skillId, key -> new ArrayList<>())
+                .add(new CareerPeriod(startTime, endTime));
+    }
+
+    Map<Long, CareerDuration> result = new HashMap<>();
+
+    for (Map.Entry<Long, List<CareerPeriod>> entry
+            : skillPeriodMap.entrySet()) {
+
+        List<CareerPeriod> uniquePeriods =
+                entry.getValue()
+                        .stream()
+                        .distinct()
+                        .toList();
+
+        int totalYears = 0;
+        int totalMonths = 0;
+
+        for (CareerPeriod period : uniquePeriods) {
+            Period p = Period.between(
+                    period.startTime(),
+                    period.endTime()
+            );
+
+            totalYears += p.getYears();
+            totalMonths += p.getMonths();
+        }
+
+        totalYears += totalMonths / 12;
+        totalMonths = totalMonths % 12;
+
+        result.put(
+                entry.getKey(),
+                new CareerDuration(totalYears, totalMonths)
+        );
+    }
+
+    return result;
+}
+2. getPersonalSkillNetwork 完全版
+public PersonalSkillGraphResponse getPersonalSkillNetwork(String hrid) {
+    List<Career> careers = careerRepository.findByProfileHrid(hrid);
+
+    if (careers.isEmpty()) {
+        profileRepository.findById(hrid)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "社員が見つかりません: " + hrid
+                        )
+                );
+    }
+
+    List<CareerSkill> careerSkills = getCareerSkills(careers);
+
+    Map<Long, String> skillNameMap = new HashMap<>();
+
+    for (CareerSkill careerSkill : careerSkills) {
+        Long skillId = (long) careerSkill.getSkill().getSkillId();
+
+        skillNameMap.put(
+                skillId,
+                careerSkill.getSkill().getSkillName()
+        );
+    }
+
+    Map<Long, CareerDuration> durationMap =
+            calculateSkillDurations(careerSkills);
+
+    Map<Long, Integer> totalMonthsMap = new HashMap<>();
+
+    for (Map.Entry<Long, CareerDuration> entry
+            : durationMap.entrySet()) {
+
+        totalMonthsMap.put(
+                entry.getKey(),
+                toTotalMonths(entry.getValue())
+        );
+    }
+
+    Map<String, List<CareerPeriod>> edgePeriodMap = new HashMap<>();
+
+    Map<Long, List<CareerSkill>> byCareerId =
+            careerSkills.stream()
+                    .collect(Collectors.groupingBy(
+                            cs -> cs.getCareer().getCareerId()
+                    ));
+
+    for (List<CareerSkill> list : byCareerId.values()) {
+        if (list.isEmpty()) {
+            continue;
+        }
+
+        Career career = list.get(0).getCareer();
+
+        if (career == null || career.getStartTime() == null) {
+            continue;
+        }
+
+        LocalDate startTime = career.getStartTime();
+        LocalDate endTime = career.getEndTime() == null
+                ? LocalDate.now()
+                : career.getEndTime();
+
+        CareerPeriod period =
+                new CareerPeriod(startTime, endTime);
+
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                Long idA = (long) list.get(i).getSkill().getSkillId();
+                Long idB = (long) list.get(j).getSkill().getSkillId();
+
+                if (idA.equals(idB)) {
+                    continue;
+                }
+
+                Long source = Math.min(idA, idB);
+                Long target = Math.max(idA, idB);
+
+                String key = source + "-" + target;
+
+                edgePeriodMap
+                        .computeIfAbsent(key, k -> new ArrayList<>())
+                        .add(period);
+            }
+        }
+    }
+
+    int maxMonths = totalMonthsMap.values()
+            .stream()
+            .max(Integer::compareTo)
+            .orElse(1);
+
+    List<PersonalSkillNodeResponse> nodes =
+            durationMap.entrySet()
+                    .stream()
+                    .map(entry -> {
+                        Long skillId = entry.getKey();
+                        CareerDuration duration = entry.getValue();
+                        int totalMonths = toTotalMonths(duration);
+
+                        return new PersonalSkillNodeResponse(
+                                skillId,
+                                skillNameMap.get(skillId),
+                                duration.years(),
+                                duration.months(),
+                                maxMonths == 0
+                                        ? 0.0
+                                        : (double) totalMonths / maxMonths
+                        );
+                    })
+                    .toList();
+
+    List<PersonalSkillEdgeResponse> edges =
+            edgePeriodMap.entrySet()
+                    .stream()
+                    .map(entry -> {
+                        String[] ids = entry.getKey().split("-");
+
+                        Long source = Long.valueOf(ids[0]);
+                        Long target = Long.valueOf(ids[1]);
+
+                        CareerDuration duration =
+                                calculateDurationFromPeriods(
+                                        entry.getValue()
+                                );
+
+                        int edgeTotalMonths =
+                                toTotalMonths(duration);
+
+                        int denominator = Math.min(
+                                totalMonthsMap.getOrDefault(source, 0),
+                                totalMonthsMap.getOrDefault(target, 0)
+                        );
+
+                        double normalizedWeight =
+                                denominator == 0
+                                        ? 0.0
+                                        : (double) edgeTotalMonths
+                                        / denominator;
+
+                        return new PersonalSkillEdgeResponse(
+                                source,
+                                target,
+                                duration.years(),
+                                duration.months(),
+                                normalizedWeight
+                        );
+                    })
+                    .toList();
+
+    return new PersonalSkillGraphResponse(nodes, edges);
+}
+3. エッジ用の期間計算
+private CareerDuration calculateDurationFromPeriods(
+        List<CareerPeriod> periods
+) {
+    List<CareerPeriod> uniquePeriods =
+            periods.stream()
+                    .distinct()
+                    .toList();
+
+    int totalYears = 0;
+    int totalMonths = 0;
+
+    for (CareerPeriod period : uniquePeriods) {
+        Period p = Period.between(
+                period.startTime(),
+                period.endTime()
+        );
+
+        totalYears += p.getYears();
+        totalMonths += p.getMonths();
+    }
+
+    totalYears += totalMonths / 12;
+    totalMonths = totalMonths % 12;
+
+    return new CareerDuration(totalYears, totalMonths);
+}
