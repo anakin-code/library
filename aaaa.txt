@@ -1,1 +1,62 @@
 
+function layoutNodesAndEdges(nodes: Node[], edges: Edge[]): {
+  nodes: Node[];
+  edges: Edge[];
+} {
+  const centerX = 360;
+  const centerY = 300;
+  const radius = 220;
+
+  const layoutedNodes = nodes.map((node, index) => {
+    const angle = (2 * Math.PI * index) / nodes.length;
+
+    const width =
+      typeof node.style?.width === "number"
+        ? node.style.width
+        : 120;
+
+    const height =
+      typeof node.style?.height === "number"
+        ? node.style.height
+        : 120;
+
+    return {
+      ...node,
+      position: {
+        x: centerX + radius * Math.cos(angle) - width / 2,
+        y: centerY + radius * Math.sin(angle) - height / 2,
+      },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+    };
+  });
+
+  return {
+    nodes: layoutedNodes,
+    edges,
+  };
+}
+
+あと、エッジは直線だと円形で重なりやすいから、
+
+type: "straight",
+
+を
+
+type: "smoothstep",
+
+か
+
+type: "default",
+
+に変えると見やすい。
+
+type: "smoothstep",
+
+がおすすめ。
+
+さらに横長モーダルなら、ReactFlowの高さを少し下げてもいい。
+
+<div style={{ width: "100%", height: "600px" }}>
+
+今の表示なら、まずは 円形配置 + smoothstep が一番マシ。
