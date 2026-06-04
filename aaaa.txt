@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import ReactFlow, {
+import {
   Background,
   Controls,
   Handle,
   Position,
-  type Edge,
-  type Node,
+  ReactFlow,
 } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { api } from "../api/client";
+import api from "../../api/api";
 
 type SkillNode = {
   id: number;
   label: string;
   years: number;
   months: number;
+  totalMonths: number;
   normalizedSize: number;
 };
 
@@ -24,6 +25,7 @@ type SkillEdge = {
   target: number;
   years: number;
   months: number;
+  totalMonths: number;
   normalizedWeight: number;
 };
 
@@ -40,9 +42,11 @@ function formatPeriod(years: number, months: number): string {
   if (years > 0 && months > 0) {
     return `${years}年${months}ヶ月`;
   }
+
   if (years > 0) {
     return `${years}年`;
   }
+
   return `${months}ヶ月`;
 }
 
@@ -50,18 +54,28 @@ function getNodeSize(skill: SkillNode): number {
   return 64 + Math.sqrt(skill.normalizedSize) * 90;
 }
 
+function getEdgeWidth(edge: SkillEdge): number {
+  return 0.5 + edge.normalizedWeight * 10;
+}
+
 /**
- * エッジを円の中心から出すためのカスタムノード
+ * 円の中心からエッジを出すためのカスタムノード
  */
 function SkillCircleNode({ data }: any) {
   return (
-    <div style={data.style}>
+    <div
+      style={{
+        ...data.style,
+        position: "relative",
+      }}
+    >
       <Handle
         type="source"
         position={Position.Top}
         style={{
           left: "50%",
           top: "50%",
+          transform: "translate(-50%, -50%)",
           opacity: 0,
           pointerEvents: "none",
         }}
@@ -73,6 +87,7 @@ function SkillCircleNode({ data }: any) {
         style={{
           left: "50%",
           top: "50%",
+          transform: "translate(-50%, -50%)",
           opacity: 0,
           pointerEvents: "none",
         }}
@@ -102,10 +117,14 @@ function layoutNodesAndEdges(
     const angle = (2 * Math.PI * index) / nodes.length;
 
     const width =
-      typeof node.style?.width === "number" ? node.style.width : 120;
+      typeof node.style?.width === "number"
+        ? node.style.width
+        : 120;
 
     const height =
-      typeof node.style?.height === "number" ? node.style.height : 120;
+      typeof node.style?.height === "number"
+        ? node.style.height
+        : 120;
 
     return {
       ...node,
@@ -122,7 +141,7 @@ function layoutNodesAndEdges(
   };
 }
 
-export default function PersonalSkillNetwork({ hrid }: Props) {
+export default function PersonalSkillNetwork({ hrid }: Props): JSX.Element {
   const [data, setData] = useState<SkillNetworkResponse>({
     nodes: [],
     edges: [],
@@ -134,7 +153,7 @@ export default function PersonalSkillNetwork({ hrid }: Props) {
     }
 
     api
-      .get<SkillNetworkResponse>(`/profiles/${hrid}/skill-network`)
+      .get<SkillNetworkResponse>(`/user/${hrid}/skill-network`)
       .then((response) => {
         setData(response.data);
       })
@@ -180,6 +199,12 @@ export default function PersonalSkillNetwork({ hrid }: Props) {
             boxShadow: "0 3px 10px rgba(0, 0, 0, 0.18)",
           },
         },
+        style: {
+          width: size,
+          height: size,
+          background: "transparent",
+          border: "none",
+        },
       };
     });
   }, [data.nodes]);
@@ -194,7 +219,7 @@ export default function PersonalSkillNetwork({ hrid }: Props) {
         label: formatPeriod(edge.years, edge.months),
         style: {
           stroke: "#334155",
-          strokeWidth: 0.5 + edge.normalizedWeight * 10,
+          strokeWidth: getEdgeWidth(edge),
         },
         labelStyle: {
           fontSize: 11,
@@ -211,32 +236,30 @@ export default function PersonalSkillNetwork({ hrid }: Props) {
 
   return (
     <div style={{ width: "100%", height: "720px", overflow: "hidden" }}>
-      <ReactFlow
-        nodes={layouted.nodes}
-        edges={layouted.edges}
-        nodeTypes={nodeTypes}
-        defaultViewport={{
-          x: 80,
-          y: -70,
-          zoom: 0.75,
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          transform: "scale(0.85) translateY(-60px)",
+          transformOrigin: "center top",
         }}
-        minZoom={0.15}
-        maxZoom={2}
-        nodesDraggable={true}
-        nodesConnectable={false}
-        elementsSelectable={false}
       >
-        <Background color="#e5e7eb" gap={24} />
-        <Controls />
-      </ReactFlow>
+        <ReactFlow
+          nodes={layouted.nodes}
+          edges={layouted.edges}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.25 }}
+          minZoom={0.15}
+          maxZoom={2}
+          nodesDraggable={true}
+          nodesConnectable={false}
+          elementsSelectable={false}
+        >
+          <Background color="#e5e7eb" gap={24} />
+          <Controls />
+        </ReactFlow>
+      </div>
     </div>
   );
 }
-
-もし api の場所が違うならここだけ戻して。
-
-import { api } from "../api/client";
-
-前のコードで ../../api/client なら、そこだけこう。
-
-import { api } from "../../api/client";
