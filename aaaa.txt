@@ -1,1 +1,19 @@
 
+<ReactFlow
+  nodes={layouted.nodes}
+  edges={layouted.edges}
+  minZoom={0.15}
+  maxZoom={2}
+>
+  <style>
+    {`
+      .react-flow__handle {
+        opacity: 0;
+        pointer-events: none;
+      }
+    `}
+  </style>
+
+  <Background />
+  <Controls />
+</ReactFlow>
