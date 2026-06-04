@@ -1,265 +1,341 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Background,
-  Controls,
-  Handle,
-  Position,
-  ReactFlow,
-} from "@xyflow/react";
-import type { Edge, Node } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+SearchSqlBuilder.java にこれを追加すればOK。
+minYears を スキル・プロジェクト・ディビジョン共通で使う版。
 
-import api from "../../api/api";
+まず applyConditions() の最後をこうする。
 
-type SkillNode = {
-  id: number;
-  label: string;
-  years: number;
-  months: number;
-  totalMonths: number;
-  normalizedSize: number;
-};
+// 既存の条件たちの後
+addSkillCondition(request);
+addProjectYearsCondition(request);
+addDivisionYearsCondition(request);
 
-type SkillEdge = {
-  source: number;
-  target: number;
-  years: number;
-  months: number;
-  totalMonths: number;
-  normalizedWeight: number;
-};
+そして下にこの2つを追加。
 
-type SkillNetworkResponse = {
-  nodes: SkillNode[];
-  edges: SkillEdge[];
-};
-
-type Props = {
-  hrid: string;
-};
-
-function formatPeriod(years: number, months: number): string {
-  if (years > 0 && months > 0) {
-    return `${years}年${months}ヶ月`;
-  }
-
-  if (years > 0) {
-    return `${years}年`;
-  }
-
-  return `${months}ヶ月`;
-}
-
-function getNodeSize(skill: SkillNode): number {
-  return 64 + Math.sqrt(skill.normalizedSize) * 90;
-}
-
-function getEdgeWidth(edge: SkillEdge): number {
-  return 0.5 + edge.normalizedWeight * 10;
-}
-
-/**
- * 円の中心からエッジを出すためのカスタムノード
- */
-function SkillCircleNode({ data }: any) {
-  return (
-    <div
-      style={{
-        ...data.style,
-        position: "relative",
-      }}
-    >
-      <Handle
-        type="source"
-        position={Position.Top}
-        style={{
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-          opacity: 0,
-          pointerEvents: "none",
-        }}
-      />
-
-      <Handle
-        type="target"
-        position={Position.Top}
-        style={{
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-          opacity: 0,
-          pointerEvents: "none",
-        }}
-      />
-
-      {data.label}
-    </div>
-  );
-}
-
-const nodeTypes = {
-  skillCircle: SkillCircleNode,
-};
-
-function layoutNodesAndEdges(
-  nodes: Node[],
-  edges: Edge[]
-): {
-  nodes: Node[];
-  edges: Edge[];
-} {
-  const centerX = 360;
-  const centerY = 300;
-  const radius = 220;
-
-  const layoutedNodes = nodes.map((node, index) => {
-    const angle = (2 * Math.PI * index) / nodes.length;
-
-    const width =
-      typeof node.style?.width === "number"
-        ? node.style.width
-        : 120;
-
-    const height =
-      typeof node.style?.height === "number"
-        ? node.style.height
-        : 120;
-
-    return {
-      ...node,
-      position: {
-        x: centerX + radius * Math.cos(angle) - width / 2,
-        y: centerY + radius * Math.sin(angle) - height / 2,
-      },
-    };
-  });
-
-  return {
-    nodes: layoutedNodes,
-    edges,
-  };
-}
-
-export default function PersonalSkillNetwork({ hrid }: Props): JSX.Element {
-  const [data, setData] = useState<SkillNetworkResponse>({
-    nodes: [],
-    edges: [],
-  });
-
-  useEffect(() => {
-    if (!hrid) {
-      return;
+private void addProjectYearsCondition(SearchRequest request) {
+    if (request.getProjectName() == null
+            || request.getProjectName().isBlank()
+            || request.getMinYears() == null) {
+        return;
     }
 
-    api
-      .get<SkillNetworkResponse>(`/user/${hrid}/skill-network`)
-      .then((response) => {
-        setData(response.data);
-      })
-      .catch((error) => {
-        console.error(error);
-        setData({
-          nodes: [],
-          edges: [],
-        });
-      });
-  }, [hrid]);
+    sql.append("""
+        AND EXISTS (
+            SELECT 1
+            FROM career c2
+            JOIN project pr2 ON pr2.project_id = c2.project_id
+            WHERE c2.profile_id = p.hrid
+              AND pr2.project_name = ?
+            GROUP BY pr2.project_name
+            HAVING COALESCE(SUM(
+                DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
+                + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
+            ), 0) >= ?
+        )
+    """);
 
-  const rawNodes: Node[] = useMemo(() => {
-    return data.nodes.map((skill) => {
-      const size = getNodeSize(skill);
-
-      return {
-        id: String(skill.id),
-        type: "skillCircle",
-        position: {
-          x: 0,
-          y: 0,
-        },
-        data: {
-          label: `${skill.label}\n${formatPeriod(
-            skill.years,
-            skill.months
-          )}`,
-          style: {
-            width: size,
-            height: size,
-            background: "#d7f3e3",
-            border: "2px solid #56b68b",
-            borderRadius: "50%",
-            color: "#222",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            fontSize: 13,
-            fontWeight: 700,
-            whiteSpace: "pre-line",
-            boxShadow: "0 3px 10px rgba(0, 0, 0, 0.18)",
-          },
-        },
-        style: {
-          width: size,
-          height: size,
-          background: "transparent",
-          border: "none",
-        },
-      };
-    });
-  }, [data.nodes]);
-
-  const rawEdges: Edge[] = useMemo(() => {
-    return data.edges.map((edge) => {
-      return {
-        id: `${edge.source}-${edge.target}`,
-        source: String(edge.source),
-        target: String(edge.target),
-        type: "straight",
-        label: formatPeriod(edge.years, edge.months),
-        style: {
-          stroke: "#334155",
-          strokeWidth: getEdgeWidth(edge),
-        },
-        labelStyle: {
-          fontSize: 11,
-          fontWeight: 600,
-          fill: "#222",
-        },
-      };
-    });
-  }, [data.edges]);
-
-  const layouted = useMemo(() => {
-    return layoutNodesAndEdges(rawNodes, rawEdges);
-  }, [rawNodes, rawEdges]);
-
-  return (
-    <div style={{ width: "100%", height: "720px", overflow: "hidden" }}>
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          transform: "scale(0.85) translateY(-60px)",
-          transformOrigin: "center top",
-        }}
-      >
-        <ReactFlow
-          nodes={layouted.nodes}
-          edges={layouted.edges}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.25 }}
-          minZoom={0.15}
-          maxZoom={2}
-          nodesDraggable={true}
-          nodesConnectable={false}
-          elementsSelectable={false}
-        >
-          <Background color="#e5e7eb" gap={24} />
-          <Controls />
-        </ReactFlow>
-      </div>
-    </div>
-  );
+    params.add(request.getProjectName().trim());
+    params.add(request.getMinYears() * 12);
 }
+private void addDivisionYearsCondition(SearchRequest request) {
+    if (request.getDivisionName() == null
+            || request.getDivisionName().isBlank()
+            || request.getMinYears() == null) {
+        return;
+    }
+
+    sql.append("""
+        AND EXISTS (
+            SELECT 1
+            FROM career c2
+            JOIN project pr2 ON pr2.project_id = c2.project_id
+            JOIN division d2 ON d2.division_id = pr2.division_id
+            WHERE c2.profile_id = p.hrid
+              AND d2.division_name = ?
+            GROUP BY d2.division_name
+            HAVING COALESCE(SUM(
+                DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
+                + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
+            ), 0) >= ?
+        )
+    """);
+
+    params.add(request.getDivisionName().trim());
+    params.add(request.getMinYears() * 12);
+}
+
+注意：すでに projectName / divisionName の単純一致条件があるなら、そのままでも動くけど、条件が二重になる。まずはこのままでOK。
+
+完全版コード
+
+SearchSqlBuilder.java はこれで置き換え。
+
+package simplex.bn26.master.server.repository;
+
+import simplex.bn26.master.server.dto.request.SearchRequest;
+import simplex.bn26.master.server.dto.request.ProfileSearchField;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class SearchSqlBuilder {
+
+    private final StringBuilder sql;
+    private final List<Object> params;
+
+    public SearchSqlBuilder() {
+        this.sql = new StringBuilder("""
+                SELECT
+                    p.hrid,
+                    p.name,
+                    p.mail_address,
+                    r.rank_name,
+                    co.company_name
+                FROM profile p
+                LEFT JOIN rank r ON r.rank_id = p.rank_id
+                LEFT JOIN career c ON c.profile_id = p.hrid
+                LEFT JOIN project pr ON pr.project_id = c.project_id
+                LEFT JOIN division d ON d.division_id = pr.division_id
+                LEFT JOIN company co ON co.company_id = d.company_id
+                LEFT JOIN career_skill cs ON cs.career_id = c.career_id
+                LEFT JOIN skill s ON s.skill_id = cs.skill_id
+                WHERE 1 = 1
+                """);
+
+        this.params = new ArrayList<>();
+    }
+
+    public void applyConditions(SearchRequest request) {
+        addKeywordCondition(request);
+
+        if (request.getHrid() != null && !request.getHrid().isBlank()) {
+            sql.append(" AND p.hrid = ? ");
+            params.add(request.getHrid().trim());
+        }
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            sql.append(" AND p.name ILIKE ? ");
+            params.add("%" + request.getName().trim() + "%");
+        }
+
+        if (request.isCurrentProjectOnly()) {
+            sql.append(" AND c.end_time IS NULL ");
+        }
+
+        if (request.getSkillName() != null && !request.getSkillName().isBlank()) {
+            sql.append(" AND s.skill_name = ? ");
+            params.add(request.getSkillName().trim());
+        }
+
+        if (request.getDivisionName() != null && !request.getDivisionName().isBlank()) {
+            sql.append(" AND d.division_name = ? ");
+            params.add(request.getDivisionName().trim());
+        }
+
+        if (request.getProjectName() != null && !request.getProjectName().isBlank()) {
+            sql.append(" AND pr.project_name = ? ");
+            params.add(request.getProjectName().trim());
+        }
+
+        if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
+            sql.append(" AND co.company_name = ? ");
+            params.add(request.getCompanyName().trim());
+        }
+
+        if (request.getRankName() != null && !request.getRankName().isBlank()) {
+            sql.append(" AND r.rank_name = ? ");
+            params.add(request.getRankName().trim());
+        }
+
+        addSkillCondition(request);
+        addProjectYearsCondition(request);
+        addDivisionYearsCondition(request);
+    }
+
+    private void addKeywordCondition(SearchRequest request) {
+        String keyword = request.getKeyword();
+
+        if (keyword == null || keyword.isBlank()) {
+            return;
+        }
+
+        List<ProfileSearchField> targetFields = request.getFields();
+
+        if (targetFields == null || targetFields.isEmpty()) {
+            targetFields = List.of(ProfileSearchField.values());
+        }
+
+        String exactValue = keyword.trim().toLowerCase();
+        List<String> conditions = new ArrayList<>();
+
+        for (ProfileSearchField field : targetFields) {
+            switch (field) {
+                case HRID -> {
+                    conditions.add("LOWER(p.hrid) = ?");
+                    params.add(exactValue);
+                }
+                case NAME -> {
+                    conditions.add("LOWER(p.name) ILIKE ?");
+                    params.add("%" + exactValue + "%");
+                }
+                case MAIL_ADDRESS -> {
+                    conditions.add("LOWER(p.mail_address) = ?");
+                    params.add(exactValue);
+                }
+                case RANK_NAME -> {
+                    conditions.add("LOWER(COALESCE(r.rank_name, '')) = ?");
+                    params.add(exactValue);
+                }
+                case FREE -> {
+                    conditions.add("LOWER(COALESCE(p.free, '')) ILIKE ?");
+                    params.add("%" + exactValue + "%");
+                }
+                case PROJECT_NAME -> {
+                    conditions.add("LOWER(COALESCE(pr.project_name, '')) = ?");
+                    params.add(exactValue);
+                }
+                case SKILL_NAME -> {
+                    conditions.add("LOWER(COALESCE(s.skill_name, '')) = ?");
+                    params.add(exactValue);
+                }
+                case DIVISION_NAME -> {
+                    conditions.add("LOWER(COALESCE(d.division_name, '')) = ?");
+                    params.add(exactValue);
+                }
+                case COMPANY_NAME -> {
+                    conditions.add("LOWER(COALESCE(co.company_name, '')) = ?");
+                    params.add(exactValue);
+                }
+            }
+        }
+
+        if (!conditions.isEmpty()) {
+            sql.append(" AND (")
+                    .append(String.join(" OR ", conditions))
+                    .append(") ");
+        }
+    }
+
+    public void applyGroupByAndHaving(SearchRequest request) {
+        sql.append("""
+                GROUP BY
+                    p.hrid,
+                    p.name,
+                    p.mail_address,
+                    r.rank_name,
+                    co.company_name
+                """);
+
+        sql.append(" ORDER BY p.hrid ");
+    }
+
+    private void addSkillCondition(SearchRequest request) {
+        if (request.getSkillNames() == null) {
+            return;
+        }
+
+        List<String> skillNames = request.getSkillNames().stream()
+                .filter(skillName -> skillName != null)
+                .map(skillName -> skillName.replace("　", " ").trim())
+                .filter(skillName -> !skillName.isEmpty())
+                .distinct()
+                .toList();
+
+        for (String skillName : skillNames) {
+            sql.append("""
+                    AND EXISTS (
+                        SELECT 1
+                        FROM career c2
+                        JOIN career_skill cs2 ON cs2.career_id = c2.career_id
+                        JOIN skill s2 ON s2.skill_id = cs2.skill_id
+                        WHERE c2.profile_id = p.hrid
+                          AND s2.skill_name = ?
+                    """);
+
+            params.add(skillName);
+
+            if (request.getMinYears() != null) {
+                sql.append("""
+                        GROUP BY s2.skill_name
+                        HAVING COALESCE(SUM(
+                            DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
+                            + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
+                        ), 0) >= ?
+                        """);
+
+                params.add(request.getMinYears() * 12);
+            }
+
+            sql.append("""
+                    )
+                    """);
+        }
+    }
+
+    private void addProjectYearsCondition(SearchRequest request) {
+        if (request.getProjectName() == null
+                || request.getProjectName().isBlank()
+                || request.getMinYears() == null) {
+            return;
+        }
+
+        sql.append("""
+                AND EXISTS (
+                    SELECT 1
+                    FROM career c2
+                    JOIN project pr2 ON pr2.project_id = c2.project_id
+                    WHERE c2.profile_id = p.hrid
+                      AND pr2.project_name = ?
+                    GROUP BY pr2.project_name
+                    HAVING COALESCE(SUM(
+                        DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
+                        + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
+                    ), 0) >= ?
+                )
+                """);
+
+        params.add(request.getProjectName().trim());
+        params.add(request.getMinYears() * 12);
+    }
+
+    private void addDivisionYearsCondition(SearchRequest request) {
+        if (request.getDivisionName() == null
+                || request.getDivisionName().isBlank()
+                || request.getMinYears() == null) {
+            return;
+        }
+
+        sql.append("""
+                AND EXISTS (
+                    SELECT 1
+                    FROM career c2
+                    JOIN project pr2 ON pr2.project_id = c2.project_id
+                    JOIN division d2 ON d2.division_id = pr2.division_id
+                    WHERE c2.profile_id = p.hrid
+                      AND d2.division_name = ?
+                    GROUP BY d2.division_name
+                    HAVING COALESCE(SUM(
+                        DATE_PART('year', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time)) * 12
+                        + DATE_PART('month', AGE(COALESCE(c2.end_time, CURRENT_DATE), c2.start_time))
+                    ), 0) >= ?
+                )
+                """);
+
+        params.add(request.getDivisionName().trim());
+        params.add(request.getMinYears() * 12);
+    }
+
+    public String getSql() {
+        return sql.toString();
+    }
+
+    public Object[] getParams() {
+        return params.toArray();
+    }
+}
+
+これで minYears は共通で使える。
+
+skillNames + minYears
+projectName + minYears
+divisionName + minYears
+
+全部対応。
