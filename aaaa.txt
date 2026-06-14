@@ -1,1 +1,186 @@
 
+1. ProjectRole.java【新規作成】
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "project_role")
+public class ProjectRole { // ★追加
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "role_id")
+    private Long roleId;
+
+    @Column(name = "role_name", nullable = false, unique = true)
+    private String roleName;
+
+    public Long getRoleId() {
+        return roleId;
+    }
+
+    public void setRoleId(Long roleId) {
+        this.roleId = roleId;
+    }
+
+    public String getRoleName() {
+        return roleName;
+    }
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
+    }
+}
+2. Career.java【変更】
+
+既存の Career にこれを追加。
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "role_id")
+private ProjectRole projectRole; // ★追加
+
+getter / setter も追加。
+
+public ProjectRole getProjectRole() { // ★追加
+    return projectRole;
+}
+
+public void setProjectRole(ProjectRole projectRole) { // ★追加
+    this.projectRole = projectRole;
+}
+3. ProjectRoleRepository.java【新規作成】
+package com.example.demo.repository;
+
+import com.example.demo.entity.ProjectRole;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface ProjectRoleRepository extends JpaRepository<ProjectRole, Long> { // ★追加
+
+    Optional<ProjectRole> findByRoleName(String roleName); // ★追加
+}
+4. CreateCareerRequest.java【変更】
+
+既存DTOに追加。
+
+private String roleName; // ★追加
+public String getRoleName() { // ★追加
+    return roleName;
+}
+
+public void setRoleName(String roleName) { // ★追加
+    this.roleName = roleName;
+}
+5. UpdateCareerRequest.java【変更】
+private String roleName; // ★追加
+public String getRoleName() { // ★追加
+    return roleName;
+}
+
+public void setRoleName(String roleName) { // ★追加
+    this.roleName = roleName;
+}
+6. CareerResponse.java【変更】
+private String roleName; // ★追加
+public String getRoleName() { // ★追加
+    return roleName;
+}
+
+public void setRoleName(String roleName) { // ★追加
+    this.roleName = roleName;
+}
+7. CareerService.java【変更】
+フィールド追加
+private final ProjectRoleRepository projectRoleRepository; // ★追加
+コンストラクタに追加
+public CareerService(
+        CareerRepository careerRepository,
+        ProfileRepository profileRepository,
+        ProjectRepository projectRepository,
+        SkillRepository skillRepository,
+        CareerSkillRepository careerSkillRepository,
+        ProjectRoleRepository projectRoleRepository // ★追加
+) {
+    this.careerRepository = careerRepository;
+    this.profileRepository = profileRepository;
+    this.projectRepository = projectRepository;
+    this.skillRepository = skillRepository;
+    this.careerSkillRepository = careerSkillRepository;
+    this.projectRoleRepository = projectRoleRepository; // ★追加
+}
+createCareer に追加
+
+Career career = new Career(); の前か後にこれ。
+
+ProjectRole role = projectRoleRepository.findByRoleName(request.getRoleName()) // ★追加
+        .orElseThrow(() -> new IllegalArgumentException(
+                "ロールが見つかりません: " + request.getRoleName()
+        ));
+
+そして career.setProject(project); の近くに追加。
+
+career.setProjectRole(role); // ★追加
+
+つまりここはこうなる。
+
+ProjectRole role = projectRoleRepository.findByRoleName(request.getRoleName()) // ★追加
+        .orElseThrow(() -> new IllegalArgumentException(
+                "ロールが見つかりません: " + request.getRoleName()
+        ));
+
+Career career = new Career();
+career.setProfile(profile);
+career.setProject(project);
+career.setProjectRole(role); // ★追加
+career.setStartTime(request.getStartTime());
+career.setEndTime(request.getEndTime());
+updateCareer に追加
+if (request.getRoleName() != null) { // ★追加
+    ProjectRole role = projectRoleRepository.findByRoleName(request.getRoleName())
+            .orElseThrow(() -> new IllegalArgumentException(
+                    "ロールが見つかりません: " + request.getRoleName()
+            ));
+
+    career.setProjectRole(role);
+}
+convertToResponse に追加
+response.setRoleName( // ★追加
+        career.getProjectRole() != null
+                ? career.getProjectRole().getRoleName()
+                : null
+);
+8. data.sql【追加】
+INSERT INTO project_role (role_id, role_name) VALUES
+(1, 'PM'),
+(2, 'PL'),
+(3, 'SE'),
+(4, 'PG'),
+(5, 'Tester');
+curl
+curl -X POST http://localhost:8080/api/career/create \
+-H "Content-Type: application/json" \
+-d '{
+  "hrid": "A001",
+  "projectId": 1,
+  "roleName": "PM",
+  "startTime": "2024-04-01",
+  "endTime": "2025-03-31",
+  "skillIds": [1, 2, 3]
+}'
+
+要するに、新規作成は2つ。
+
+ProjectRole.java
+ProjectRoleRepository.java
+
+既存修正は5つ。
+
+Career.java
+CreateCareerRequest.java
+UpdateCareerRequest.java
+CareerResponse.java
+CareerService.java
