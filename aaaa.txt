@@ -1,1 +1,76 @@
 
+① useStateに追加
+
+今ここらへんにあるやつの下。
+
+const [deleteSkillKeyword, setDeleteSkillKeyword] = useState<string>("");
+
+これを追加。
+
+const [showDeleteSkillCandidates, setShowDeleteSkillCandidates] =
+    useState<boolean>(false);
+② 削除モーダルのinputを変更
+
+value={deleteSkillKeyword} の input をこれにする。
+
+onChange={(e) => {
+    setDeleteSkillKeyword(e.target.value);
+    setDeleteSkillId("");
+    setShowDeleteSkillCandidates(true);
+}}
+③ 候補一覧のクリック処理
+
+候補の onClick をこれにする。
+
+onClick={() => {
+    setDeleteSkillId(String(skill.skillId));
+    setDeleteSkillKeyword(skill.skillName);
+    setShowDeleteSkillCandidates(false);
+}}
+④ 候補一覧を出す条件
+
+候補一覧を囲ってるところをこれにする。
+
+{showDeleteSkillCandidates && deleteSkillKeyword && (
+    <div>
+        {filteredDeleteSkills.map((skill) => (
+            // 候補
+        ))}
+    </div>
+)}
+⑤ 削除ボタンを変更
+
+モーダル内の削除ボタンをこれに置き換え。
+
+<button
+    type="button"
+    onClick={handleDeleteSkill}
+    disabled={!deleteSkillId || isDeletingSkill}
+    className={`
+        rounded-lg px-4 py-2 font-semibold text-white
+        ${
+            deleteSkillId && !isDeletingSkill
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-gray-400 cursor-not-allowed"
+        }
+    `}
+>
+    {isDeletingSkill ? "削除中..." : "DBから削除"}
+</button>
+⑥ catch の最後に追加
+
+今もうここがある。
+
+setIsSkillDeleteModalOpen(false);
+setDeleteSkillId("");
+setDeleteSkillKeyword("");
+
+この下に追加。
+
+setShowDeleteSkillCandidates(false);
+
+つまり目的はこれ。
+
+手入力だけ → deleteSkillId は空 → 削除ボタン押せない
+候補クリック → deleteSkillId が入る → 削除ボタン押せる
+失敗 → モーダル閉じる＋入力リセット
