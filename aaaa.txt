@@ -1,1 +1,111 @@
 
+今の削除モーダルが
+
+<select
+    value={deleteSkillId}
+    onChange={(e) => setDeleteSkillId(e.target.value)}
+>
+    {allAvailableSkills.map(...)}
+</select>
+
+になってるなら、この部分を「使用スキル設定」と同じ入力欄に置き換える。
+
+まず state を追加。
+
+① useState追加
+
+既存の
+
+const [deleteSkillId, setDeleteSkillId] = useState("");
+
+の近く。
+
+const [deleteSkillKeyword, setDeleteSkillKeyword] = useState("");
+② 候補絞り込み追加
+
+handleDeleteSkill の上あたり。
+
+const filteredDeleteSkills = allAvailableSkills.filter((skill) =>
+    skill.skillName
+        .toLowerCase()
+        .includes(deleteSkillKeyword.toLowerCase())
+);
+③ モーダルの select を消す
+
+今のこれ。
+
+<select
+    value={deleteSkillId}
+    onChange={(e) => setDeleteSkillId(e.target.value)}
+>
+    <option value="">スキルを選択してください</option>
+
+    {allAvailableSkills.map((skill) => (
+        <option
+            key={skill.skillId}
+            value={skill.skillId}
+        >
+            {skill.skillName}
+        </option>
+    ))}
+</select>
+
+全部削除。
+
+④ 代わりにこれを追加
+
+同じ場所。
+
+<input
+    type="text"
+    value={deleteSkillKeyword}
+    onChange={(e) => {
+        setDeleteSkillKeyword(e.target.value);
+        setDeleteSkillId("");
+    }}
+    placeholder="削除するスキル名を入力"
+    className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2"
+/>
+
+<div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-300">
+    {filteredDeleteSkills.map((skill) => (
+        <button
+            key={skill.skillId}
+            type="button"
+            onClick={() => {
+                setDeleteSkillId(String(skill.skillId));
+                setDeleteSkillKeyword(skill.skillName);
+            }}
+            className="block w-full px-3 py-2 text-left hover:bg-slate-100"
+        >
+            {skill.skillName}
+        </button>
+    ))}
+</div>
+⑤ モーダル閉じるとき
+
+今たぶん
+
+setDeleteSkillId("");
+
+だけになってる。
+
+そこを
+
+setDeleteSkillId("");
+setDeleteSkillKeyword("");
+
+にする。
+
+⑥ 削除成功時
+
+今
+
+setDeleteSkillId("");
+
+のところ。
+
+setDeleteSkillId("");
+setDeleteSkillKeyword("");
+
+追加。
