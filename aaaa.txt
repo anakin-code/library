@@ -1,1 +1,8 @@
 
+curl -X PUT "http://localhost:8080/api/project/1?hrid=A001" \
+-H "Content-Type: application/json" \
+-d '{
+  "projectName": "DummyProject1",
+  "projectContent": "テスト更新",
+  "divisionId": 1
+}'
