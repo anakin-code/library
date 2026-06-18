@@ -1,9 +1,1 @@
-export const updateBelongedProject = (
-  projectId: number,
-  request: UpdateProjectRequest,
-  hrid: string
-) =>
-  api.put(
-    `/project/${projectId}/belonged?hrid=${hrid}`,
-    request
-  );
+
