@@ -1,1 +1,10 @@
-
+export const updateProject = (
+  projectId: number,
+  request: UpdateProjectRequest,
+  hrid: string
+) => {
+  return api.put(
+    `/api/project/${projectId}?hrid=${hrid}`,
+    request
+  );
+};
