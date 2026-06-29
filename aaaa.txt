@@ -1,1 +1,29 @@
 
+<Autocomplete
+  options={categories}
+  getOptionLabel={(category) => category.categoryName}
+  value={
+    categories.find(
+      (category) => category.categoryId === formData.categoryId
+    ) ?? null
+  }
+  onChange={(_, selectedCategory) => {
+    setFormData({
+      ...formData,
+      categoryId: selectedCategory?.categoryId ?? "",
+    });
+  }}
+  renderInput={(params) => (
+    <TextField
+      {...params}
+      required
+      label="カテゴリ"
+      placeholder="カテゴリを選択"
+      sx={{
+        "& .MuiFormLabel-asterisk": {
+          color: "red",
+        },
+      }}
+    />
+  )}
+/>
