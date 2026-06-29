@@ -1,1 +1,757 @@
+1. Controller層：NeedsController.java
+package simplex.pj148.skippy.server.controller;
 
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.controller.dto.create.NeedDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedResponseDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.NeedService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RequestMapping("/api/needs")
+@RequiredArgsConstructor
+@RestController
+public class NeedsController {
+
+    private final NeedService needService;
+    private final UserInfoService userInfoService;
+
+    @GetMapping("")
+    public Page<NeedResponseDto> getAllNeedsInfo(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "created_desc") String orderBy,
+            @PageableDefault(
+                    size = 20,
+                    sort = "createdTime",
+                    direction = Sort.Direction.DESC
+            )
+            Pageable pageable
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        return needService.findAllNeed(loginUser, pageable, orderBy);
+    }
+
+    @PostMapping("")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void createNeed(
+            @RequestBody @Valid NeedDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
+        needService.createNewNeed(input, userId);
+    }
+
+    @PutMapping("/{needsId}")
+    public ResponseEntity<Void> updateNeed(
+            @PathVariable Long needsId,
+            @RequestBody @Valid NeedDto input
+    ) {
+        needService.updateNeeds(needsId, input);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{needsId}/delete")
+    public ResponseEntity<Void> deleteNeed(
+            @PathVariable Long needsId
+    ) {
+        needService.deleteNeed(needsId);
+        return ResponseEntity.ok().build();
+    }
+}
+
+ポイントはここ。
+
+public Page<NeedResponseDto> getAllNeedsInfo(...)
+
+既存の List<NeedResponseDto> をやめて、Page<NeedResponseDto> にする。
+
+2. Service層：NeedService.java
+
+既存の雰囲気に寄せて、
+toContentShowResponseDtoPage(...) のNeed版として、
+
+toNeedResponseDtoPage(...)
+
+を作る。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.create.NeedDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedResponseDto;
+import simplex.pj148.skippy.server.entity.Need;
+import simplex.pj148.skippy.server.entity.NeedsTag;
+import simplex.pj148.skippy.server.entity.Tag;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.exception.EntityNotFoundException;
+import simplex.pj148.skippy.server.repository.NeedRepository;
+import simplex.pj148.skippy.server.repository.NeedsTagRepository;
+import simplex.pj148.skippy.server.repository.TagRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+import simplex.pj148.skippy.server.repository.WantRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class NeedService {
+
+    private final NeedRepository needsRepository;
+    private final NeedsTagRepository needsTagRepository;
+    private final UserRepository userRepository;
+    private final TagRepository tagRepository;
+    private final WantRepository wantRepository;
+
+    // findAllNeed内で使うタグ取得
+    private List<String> makeTagListFromNeed(Need need) {
+        Long needsId = need.getNeedsId();
+
+        return needsTagRepository.findByNeed_needsId(needsId)
+                .stream()
+                .map(needsTag -> needsTag.getTag().getTagName())
+                .toList();
+    }
+
+    // GET ニーズ一覧
+    public Page<NeedResponseDto> findAllNeed(
+            User loginUser,
+            Pageable pageable,
+            String orderBy
+    ) {
+        Page<Need> needPage;
+
+        if ("want_desc".equals(orderBy)) {
+            needPage = needsRepository.findSelectedNeedsSortedWantCount(pageable);
+        } else {
+            needPage = needsRepository.findByDeleteFlgFalse(pageable);
+        }
+
+        return toNeedResponseDtoPage(needPage, loginUser);
+    }
+
+    // Page<Need> を Page<NeedResponseDto> に変える関数
+    public Page<NeedResponseDto> toNeedResponseDtoPage(
+            Page<Need> needPage,
+            User loginUser
+    ) {
+        return needPage.map(need -> {
+            Long needsId = need.getNeedsId();
+
+            boolean editFlg = loginUser.equals(need.getUser());
+
+            boolean wantedByCurrentUser =
+                    wantRepository.existsByNeed_needsIdAndUser_userId(
+                            needsId,
+                            loginUser.getUserId()
+                    );
+
+            Long wantCount =
+                    wantRepository.countByNeed_needsId(needsId);
+
+            return NeedResponseDto.builder()
+                    .needsId(needsId)
+                    .needsBody(need.getNeedsBody())
+                    .userId(need.getUser().getUserId())
+                    .userName(need.getUser().getName())
+                    .editFlg(editFlg)
+                    .wantedByCurrentUser(wantedByCurrentUser)
+                    .wantCount(wantCount)
+                    .tagList(makeTagListFromNeed(need))
+                    .build();
+        });
+    }
+
+    // POST ニーズ作成
+    @Transactional
+    public void createNewNeed(NeedDto input, Long userId) {
+        User user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new EntityNotFoundException("ユーザーDBに存在しないユーザー"));
+
+        Need need = Need.builder()
+                .needsBody(input.getNeedsBody())
+                .user(user)
+                .deleteFlg(false)
+                .build();
+
+        needsRepository.save(need);
+
+        for (Long tagId : input.getTagIdList()) {
+            Tag tag = tagRepository.findByTagId(tagId)
+                    .orElseThrow(() -> new EntityNotFoundException("タグDBに存在しないタグ"));
+
+            NeedsTag needsTag = NeedsTag.builder()
+                    .need(need)
+                    .tag(tag)
+                    .build();
+
+            needsTagRepository.save(needsTag);
+        }
+    }
+
+    // ニーズ更新
+    @Transactional
+    public void updateNeeds(Long needsId, NeedDto input) {
+        Need need = needsRepository.findByNeedsId(needsId)
+                .orElseThrow(() -> new RuntimeException("投稿が見つかりません"));
+
+        List<Tag> inputTags = input.getTagIdList()
+                .stream()
+                .map(tagId -> tagRepository.findByTagId(tagId)
+                        .orElseThrow(() -> new RuntimeException("タグが見つかりません：" + tagId)))
+                .toList();
+
+        need.setNeedsBody(input.getNeedsBody());
+        needsRepository.save(need);
+
+        List<NeedsTag> nowNeedsTags =
+                needsTagRepository.findByNeed_needsId(need.getNeedsId());
+
+        List<Long> nowNeedsTagIds = nowNeedsTags
+                .stream()
+                .map(needsTag -> needsTag.getTag().getTagId())
+                .toList();
+
+        for (NeedsTag nowNeedsTag : nowNeedsTags) {
+            if (!input.getTagIdList().contains(nowNeedsTag.getTag().getTagId())) {
+                needsTagRepository.delete(nowNeedsTag);
+            }
+        }
+
+        for (Long inputTagId : input.getTagIdList()) {
+            if (!nowNeedsTagIds.contains(inputTagId)) {
+                NeedsTag needsTag = NeedsTag.builder()
+                        .need(need)
+                        .tag(tagRepository.getReferenceById(inputTagId))
+                        .build();
+
+                needsTagRepository.save(needsTag);
+            }
+        }
+    }
+
+    // ニーズ削除
+    @Transactional
+    public void deleteNeed(Long needsId) {
+        Need need = needsRepository.findByNeedsId(needsId)
+                .orElseThrow(() -> new RuntimeException("投稿が見つかりません"));
+
+        need.setDeleteFlg(true);
+        needsRepository.save(need);
+    }
+}
+3. Repository層：NeedRepository.java
+
+既存は List<Need> findTop100ByDeleteFlgFalseOrderByCreatedTimeDesc() になっているので、ここを Page<Need> にする。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import simplex.pj148.skippy.server.entity.Need;
+
+import java.util.Optional;
+
+public interface NeedRepository extends JpaRepository<Need, Long> {
+
+    Optional<Need> findByNeedsId(Long needsId);
+
+    Page<Need> findByDeleteFlgFalse(Pageable pageable);
+
+    @Query("""
+            SELECT n
+            FROM Need n
+            LEFT JOIN Want w ON w.need = n
+            WHERE n.deleteFlg = false
+            GROUP BY n
+            ORDER BY COUNT(w) DESC, n.createdTime DESC
+            """)
+    Page<Need> findSelectedNeedsSortedWantCount(Pageable pageable);
+}
+まず確実に動かしたいなら
+
+want_desc のソートまで一気にやると、Want エンティティの関連名が違ったときにエラーになる可能性がある。
+
+だから最初は、Repositoryをこれだけにしてもいい。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Need;
+
+import java.util.Optional;
+
+public interface NeedRepository extends JpaRepository<Need, Long> {
+
+    Optional<Need> findByNeedsId(Long needsId);
+
+    Page<Need> findByDeleteFlgFalse(Pageable pageable);
+}
+
+Serviceも最初はこれでいい。
+
+public Page<NeedResponseDto> findAllNeed(
+        User loginUser,
+        Pageable pageable,
+        String orderBy
+) {
+    Page<Need> needPage = needsRepository.findByDeleteFlgFalse(pageable);
+    return toNeedResponseDtoPage(needPage, loginUser);
+}
+
+これなら 作成日順のページング はすぐ動く。
+
+修正後のAPI
+GET /api/needs?page=0&size=20
+GET /api/needs?page=1&size=20
+
+orderBy を残すなら、
+
+GET /api/needs?page=0&size=20&orderBy=created_desc
+GET /api/needs?page=0&size=20&orderBy=want_desc
+
+
+
+
+
+
+
+今の NeedList.tsx は、api.fetch("/api/needs?orderBy=${sortBy}") で取得して、返ってきた data をそのまま setNeedList(data) している。つまり 配列が返ってくる前提。
+でもサーバー側を Page<NeedResponseDto> に変えると、返却は配列ではなく、
+
+{
+  content: Need[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+}
+
+みたいな形になる。
+
+だから client 側は、
+
+setNeedList(data);
+
+ではなく、
+
+setNeedList(data.content);
+setTotalPage(data.totalPages);
+
+に変える。
+
+Home.tsx はすでに page, totalPage, handlePageChange, Pagination を持っているので、この形に寄せればいい。
+
+NeedList.tsx 完全版イメージ
+
+既存コードに寄せるなら、こう。
+
+import { useEffect, useState, type ChangeEvent } from "react";
+import {
+  Box,
+  Typography,
+  Grid,
+  Fab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  FormControl,
+  Select,
+  MenuItem,
+  Pagination,
+  Stack,
+  Button,
+} from "@mui/material";
+import type { SelectChangeEvent } from "@mui/material/Select";
+import AddIcon from "@mui/icons-material/Add";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+
+import { useApi } from "../hooks/useApi";
+import NeedCard from "../components/NeedCard";
+import NeedForm from "../components/NeedForm";
+import type { Need } from "../types/Need";
+
+type NeedPageResponse = {
+  content: Need[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+};
+
+export default function NeedsList(): JSX.Element {
+  const api = useApi();
+
+  const [needList, setNeedList] = useState<Need[]>([]);
+  const [postOpen, setPostOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<string>("createdTime,desc");
+
+  // 追加
+  const [page, setPage] = useState(0);
+  const [totalPage, setTotalPage] = useState(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+
+    api
+      .fetch(`/api/needs?orderBy=${sortBy}&page=${page}&size=20`)
+      .then((res: Response) => {
+        if (!res.ok) {
+          throw new Error("Error fetching need");
+        }
+        return res.json();
+      })
+      .then((data: NeedPageResponse) => {
+        setNeedList(data.content);
+        setTotalPage(data.totalPages);
+        setIsLoading(false);
+      })
+      .catch((err: Error) => {
+        console.error(err.message);
+        setIsLoading(false);
+      });
+  }, [sortBy, page]);
+
+  const handleSortChange = (event: SelectChangeEvent) => {
+    setSortBy(event.target.value);
+    setPage(0);
+  };
+
+  const handlePageChange = (
+    _event: ChangeEvent<unknown>,
+    value: number
+  ) => {
+    setPage(value - 1);
+  };
+
+  return (
+    <>
+      <Box
+        sx={{
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          mb: 4,
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            color: "primary.main",
+            fontWeight: 700,
+            textJustify: "center",
+            textTransform: "uppercase",
+            letterSpacing: "0.15rem",
+          }}
+        >
+          Needs
+        </Typography>
+
+        <Typography
+          component="h1"
+          variant="h3"
+          sx={{
+            color: "#1a1a1a",
+            fontWeight: 800,
+            textJustify: "center",
+            letterSpacing: "-0.03rem",
+            fontSize: { xs: "2rem", sm: "2.5rem" },
+            mb: 6,
+          }}
+        >
+          ニーズ一覧
+        </Typography>
+      </Box>
+
+      <Box
+        sx={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "flex-end",
+          mt: 2,
+          mb: 4,
+        }}
+      >
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <Select
+            value={sortBy}
+            onChange={handleSortChange}
+            displayEmpty
+            startAdornment={
+              <Typography
+                fontSize="small"
+                sx={{ mr: 0.5, color: "text.secondary" }}
+              >
+                ト
+              </Typography>
+            }
+            sx={{
+              borderRadius: "10px",
+              fontWeight: 600,
+              fontSize: "0.9rem",
+              backgroundColor: "#fff",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: "rgba(0,0,0,0.08)",
+              },
+              "&:hover .MuiOutlinedInput-notchedOutline": {
+                borderColor: "rgba(0,0,0,0.15)",
+              },
+              "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                borderColor: "primary.main",
+              },
+            }}
+          >
+            <MenuItem value="createdTime,desc" sx={{ fontSize: "0.9rem", fontWeight: 500 }}>
+              新着順
+            </MenuItem>
+            <MenuItem value="wantCount" sx={{ fontSize: "0.9rem", fontWeight: 500 }}>
+              Want数順
+            </MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      {isLoading ? (
+        <Typography>読み込み中...</Typography>
+      ) : (
+        <>
+          <Grid container spacing={3}>
+            {needList.map((need: Need, index: number) => (
+              <Grid
+                size={{ xs: 12, sm: 6, md: 4 }}
+                key={need.needsId ?? index}
+              >
+                <NeedCard need={need} />
+              </Grid>
+            ))}
+          </Grid>
+
+          <Stack
+            direction="row"
+            sx={{
+              pt: 4,
+              borderTop: "1px solid",
+              borderColor: "rgba(0, 0, 0, 0.06)",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Button
+              variant="text"
+              startIcon={<ChevronLeftIcon />}
+              disabled={page === 0}
+              onClick={() => setPage(0)}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              First
+            </Button>
+
+            <Button
+              variant="text"
+              startIcon={<ChevronLeftIcon />}
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+              sx={{
+                borderRadius: 3,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              前へ
+            </Button>
+
+            <Pagination
+              count={totalPage}
+              page={page + 1}
+              onChange={handlePageChange}
+              hidePrevButton
+              hideNextButton
+              color="primary"
+              variant="text"
+              shape="rounded"
+              sx={{
+                "& .MuiPaginationItem-root": {
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  "&.Mui-selected": {
+                    backgroundColor: "primary.main",
+                    color: "white",
+                    "&:hover": { backgroundColor: "primary.dark" },
+                  },
+                },
+              }}
+            />
+
+            <Button
+              variant="text"
+              endIcon={<ChevronRightIcon />}
+              disabled={totalPage <= 1 || page >= totalPage - 1}
+              onClick={() => setPage(page + 1)}
+              sx={{
+                borderRadius: 3,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              次へ
+            </Button>
+
+            <Button
+              variant="text"
+              endIcon={<ChevronRightIcon />}
+              disabled={totalPage <= 1 || page >= totalPage - 1}
+              onClick={() => setPage(totalPage - 1)}
+              sx={{
+                borderRadius: 3,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              Last
+            </Button>
+          </Stack>
+        </>
+      )}
+
+      <Fab
+        color="primary"
+        onClick={() => setPostOpen(true)}
+        sx={{
+          position: "fixed",
+          right: 32,
+          bottom: 32,
+          zIndex: 1000,
+        }}
+      >
+        <AddIcon />
+      </Fab>
+
+      <Dialog
+        open={postOpen}
+        onClose={() => setPostOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>ニーズを投稿</DialogTitle>
+        <DialogContent>
+          <NeedForm />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+大事な変更点だけ言うと
+1. stateを追加
+const [page, setPage] = useState(0);
+const [totalPage, setTotalPage] = useState(0);
+const [isLoading, setIsLoading] = useState<boolean>(true);
+
+これは Home.tsx と同じ考え方。Home.tsx でも page, totalPage, isLoading を持って、API取得後に setContents(data.content) と setTotalPage(data.totalPages) している。
+
+2. API URLを変える
+
+今のNeedListはたぶんこれ。
+
+api.fetch(`/api/needs?orderBy=${sortBy}`)
+
+変更後。
+
+api.fetch(`/api/needs?orderBy=${sortBy}&page=${page}&size=20`)
+3. 受け取りを変える
+
+今はこれ。
+
+.then((data: Need[]) => {
+  setNeedList(data);
+});
+
+変更後。
+
+.then((data: NeedPageResponse) => {
+  setNeedList(data.content);
+  setTotalPage(data.totalPages);
+});
+4. ソート変更時は1ページ目に戻す
+const handleSortChange = (event: SelectChangeEvent) => {
+  setSortBy(event.target.value);
+  setPage(0);
+};
+
+これをしないと、例えば3ページ目を見ている状態で「Want数順」に変えたとき、いきなり3ページ目を取得する。地味にバグっぽく見える。
+
+5. useEffectの依存配列に page を入れる
+}, [sortBy, page]);
+
+page を入れないと、ページボタンを押してもAPI再取得されない。
+
+たぶん一番エラーになりやすいところ
+
+sortBy の値。
+
+今のNeedListでは、
+
+const [sortBy, setSortBy] = useState("createdTime,desc");
+
+で、選択肢も、
+
+<MenuItem value="createdTime,desc">新着順</MenuItem>
+<MenuItem value="wantCount">Want数順</MenuItem>
+
+になっている。
+
+でもサーバー側で前に書いたコードが、
+
+if ("want_desc".equals(orderBy)) {
+
+なら、clientはこう合わせる必要がある。
+
+<MenuItem value="created_desc">新着順</MenuItem>
+<MenuItem value="want_desc">Want数順</MenuItem>
+
+どっちでもいいけど、clientとserverで文字列を合わせる必要がある。
+
+今のclientに寄せるなら、server側をこうした方が自然。
+
+if ("wantCount".equals(orderBy)) {
+    needPage = needsRepository.findSelectedNeedsSortedWantCount(pageable);
+} else {
+    needPage = needsRepository.findByDeleteFlgFalse(pageable);
+}
+
+この方が今の NeedList.tsx の sortBy を大きく変えなくて済む。
