@@ -1,1 +1,49 @@
+<TextField
+  required
+  select
+  fullWidth
+  label="カテゴリ"
+  name="categoryId"
+  value={formData.categoryId ?? ""}
+  onChange={handleChange}
+  SelectProps={{
+    displayEmpty: true,
+    MenuProps: {
+      disableAutoFocusItem: true,
+      anchorOrigin: {
+        vertical: "bottom",
+        horizontal: "left",
+      },
+      transformOrigin: {
+        vertical: "top",
+        horizontal: "left",
+      },
+      PaperProps: {
+        style: {
+          maxHeight: 300,
+        },
+      },
+    },
+  }}
+  sx={{
+    "& .MuiSelect-select": {
+      textAlign: "left",
+    },
+    "& .MuiFormLabel-asterisk": {
+      color: "red",
+    },
+  }}
+>
+  <MenuItem value="" disabled>
+    カテゴリを選択
+  </MenuItem>
 
+  {categories.map((category) => (
+    <MenuItem
+      key={category.categoryId}
+      value={category.categoryId}
+    >
+      {category.categoryName}
+    </MenuItem>
+  ))}
+</TextField>
