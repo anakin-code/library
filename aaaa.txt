@@ -1,1 +1,1027 @@
+MyPage.tsx 側でやること
+追加するstate
+const [myContentsPage, setMyContentsPage] = useState(0);
+const [myContentsTotalPage, setMyContentsTotalPage] = useState(0);
 
+const [likedContentsPage, setLikedContentsPage] = useState(0);
+const [likedContentsTotalPage, setLikedContentsTotalPage] = useState(0);
+Pageレスポンス型を追加
+
+MyPage.tsx の上の方に追加。
+
+type PageResponse<T> = {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+};
+最初のプロフィール取得後の投稿取得を修正
+
+今たぶんこう。
+
+return api.fetch(`/api/users/${data.userId}/contents`)
+
+これをこうする。
+
+return api.fetch(`/api/users/${data.userId}/contents?page=${myContentsPage}&size=20`)
+
+そして受け取りをこうする。
+
+.then((data: PageResponse<Content>) => {
+  setMyContents(data.content);
+  setMyContentsTotalPage(data.totalPages);
+  setIsLoading(false);
+})
+
+ただし、useEffect の中で myContentsPage を使うなら、依存配列にも入れる。
+
+}, [selectedTab, myContentsPage]);
+
+でも selectedTab と絡むと少しややこしいから、関数に分けた方がきれい。
+
+既存コードに近い修正版
+
+MyPage.tsx の中にこういう関数を作る。
+
+const fetchMyContents = (userId: number, page: number): void => {
+  setIsLoading(true);
+
+  api
+    .fetch(`/api/users/${userId}/contents?page=${page}&size=20`)
+    .then((res: Response) => res.json())
+    .then((data: PageResponse<Content>) => {
+      setMyContents(data.content);
+      setMyContentsTotalPage(data.totalPages);
+      setIsLoading(false);
+    })
+    .catch((error: Error) => {
+      console.error(error);
+      setIsLoading(false);
+    });
+};
+
+いいね用も作る。
+
+const fetchLikedContents = (userId: number, page: number): void => {
+  setIsLoading(true);
+
+  api
+    .fetch(`/api/users/${userId}/likedContents?page=${page}&size=20`)
+    .then((res: Response) => res.json())
+    .then((data: PageResponse<Content>) => {
+      setLikedContents(data.content);
+      setLikedContentsTotalPage(data.totalPages);
+      setIsLoading(false);
+    })
+    .catch((error: Error) => {
+      console.error(error);
+      setIsLoading(false);
+    });
+};
+タブ切り替え時
+
+今の handleMenuChange の posts と liked をこうする。
+
+const handleMenuChange = (selectedTab: string): void => {
+  setSelectedTab(selectedTab);
+  setIsLoading(true);
+
+  switch (selectedTab) {
+    case "posts":
+      if (profile?.userId) {
+        setMyContentsPage(0);
+        fetchMyContents(profile.userId, 0);
+      }
+      break;
+
+    case "liked":
+      if (profile?.userId) {
+        setLikedContentsPage(0);
+        fetchLikedContents(profile.userId, 0);
+      }
+      break;
+
+    case "mybest":
+      Promise.all([
+        api.fetch(`/api/myBest/${profile?.userId}`),
+        api.fetch(`/api/categories`),
+      ])
+        .then(([myBestRes, categoryRes]) =>
+          Promise.all([myBestRes.json(), categoryRes.json()])
+        )
+        .then(([data1, data2]) => {
+          const myBestData = data1;
+          const categoryData = data2;
+          setMapMyBest(new Map(Object.entries(myBestData)));
+          setCategories(categoryData);
+          setIsLoading(false);
+        })
+        .catch((error: Error) => {
+          console.error(error);
+          setIsLoading(false);
+        });
+      break;
+
+    default:
+      setIsLoading(false);
+      break;
+  }
+};
+ページ変更関数
+const handleMyContentsPageChange = (
+  _event: React.ChangeEvent<unknown>,
+  value: number
+): void => {
+  const nextPage = value - 1;
+  setMyContentsPage(nextPage);
+
+  if (profile?.userId) {
+    fetchMyContents(profile.userId, nextPage);
+  }
+};
+
+const handleLikedContentsPageChange = (
+  _event: React.ChangeEvent<unknown>,
+  value: number
+): void => {
+  const nextPage = value - 1;
+  setLikedContentsPage(nextPage);
+
+  if (profile?.userId) {
+    fetchLikedContents(profile.userId, nextPage);
+  }
+};
+JSX側：投稿タブの下にPagination追加
+
+投稿一覧を表示しているところが今こういう感じだと思う。
+
+{myContents.map((content: Content) => (
+  <ContentCard
+    key={content.contentsId}
+    content={content}
+  />
+))}
+
+その下にこれを追加。
+
+{myContentsTotalPage > 1 && (
+  <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+    <Pagination
+      count={myContentsTotalPage}
+      page={myContentsPage + 1}
+      onChange={handleMyContentsPageChange}
+      color="primary"
+      shape="rounded"
+    />
+  </Box>
+)}
+JSX側：いいねタブの下にもPagination追加
+
+いいね一覧の下にこれ。
+
+{likedContentsTotalPage > 1 && (
+  <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+    <Pagination
+      count={likedContentsTotalPage}
+      page={likedContentsPage + 1}
+      onChange={handleLikedContentsPageChange}
+      color="primary"
+      shape="rounded"
+    />
+  </Box>
+)}
+import 追加
+
+Pagination がなければ追加。
+
+import {
+  Container,
+  Box,
+  Avatar,
+  Typography,
+  Tabs,
+  Tab,
+  Button,
+  TextField,
+  CircularProgress,
+  Pagination,
+} from "@mui/material";
+つまり、直す場所はここ
+サーバー
+
+投稿側はこの形ならOK。
+
+Page<ContentShowResponseDto>
+
+かつ
+
+@PageableDefault(size = 20, sort = "createdTime", direction = Sort.Direction.DESC)
+Pageable pageable
+
+を受けているので、ページングAPIとしては存在してる。
+
+クライアント
+
+今はこれだからダメ。
+
+/api/users/${data.userId}/contents
+
+これだと常にデフォルトの1ページ目だけ。
+
+こうする。
+
+/api/users/${data.userId}/contents?page=${myContentsPage}&size=20
+
+さらに画面に <Pagination /> を置く。
+
+なんで「最新20個だけ」になったか
+
+@PageableDefault(size = 20) が効いてるから。
+
+クライアントが page を指定していないので、
+
+page=0
+size=20
+sort=createdTime desc
+
+として扱われる。
+
+だから 最新20件だけ返ってくる。
+2ページ目を見るには、クライアントが
+
+page=1
+
+を送らないといけない。
+
+
+
+
+
+
+1. UserContentController.java 完全版
+
+まずサーバー側。
+これは今の実装に近い形でOK。
+
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.response.ContentShowResponseDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.ContentService;
+import simplex.pj148.skippy.server.service.LikeService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/users")
+public class UserContentController {
+
+    private final ContentService contentService;
+    private final UserInfoService userInfoService;
+    private final LikeService likeService;
+
+    // 任意のユーザーが作ったコンテンツを一覧で返すとき用
+    @GetMapping("/{userId}/contents")
+    public Page<ContentShowResponseDto> listContentsByUser(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long userId,
+            @PageableDefault(
+                    size = 20,
+                    sort = "createdTime",
+                    direction = Sort.Direction.DESC
+            )
+            Pageable pageable
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        return contentService.findPublicContentByUser(
+                userId,
+                loginUser.getUserId(),
+                pageable
+        );
+    }
+
+    // 任意のユーザーのいいねしたコンテンツを一覧で返すとき用
+    @GetMapping("/{userId}/likedContents")
+    public Page<ContentShowResponseDto> listLikedContentsByUser(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long userId,
+            @PageableDefault(
+                    size = 20,
+                    sort = "createdTime",
+                    direction = Sort.Direction.DESC
+            )
+            Pageable pageable
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        return contentService.findLikedContentsByUser(
+                userId,
+                loginUser,
+                pageable
+        );
+    }
+}
+2. ContentService.java に追加するメソッド
+
+投稿 はすでに近いメソッドがあると思う。
+いいね は今、List<Like> を全部取ってからページングしているなら微妙なので、できれば Page<Content> をRepositoryから直接取る形がいい。
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+を追加して、以下を入れる。
+
+public Page<ContentShowResponseDto> findPublicContentByUser(
+        Long userId,
+        Long loginUserId,
+        Pageable pageable
+) {
+    User loginUser = userRepository.findByUserId(loginUserId)
+            .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+    Page<Content> publicContentPage =
+            contentRepository.findByUser_userIdAndPrivateFlgFalseAndDeleteFlgFalse(
+                    userId,
+                    pageable
+            );
+
+    return toContentShowResponseDtoPage(publicContentPage, loginUser);
+}
+
+public Page<ContentShowResponseDto> findLikedContentsByUser(
+        Long userId,
+        User loginUser,
+        Pageable pageable
+) {
+    Page<Content> likedContentPage =
+            contentRepository.findLikedContentsByUserId(
+                    userId,
+                    pageable
+            );
+
+    return toContentShowResponseDtoPage(likedContentPage, loginUser);
+}
+
+既存の toContentShowResponseDtoPage(...) があるなら、それをそのまま使う。
+なければ、前に作っていたやつと同じ考え方で Page<Content> を Page<ContentShowResponseDto> に変換する。
+
+3. ContentRepository.java に追加
+
+投稿一覧用。
+
+Page<Content> findByUser_userIdAndPrivateFlgFalseAndDeleteFlgFalse(
+        Long userId,
+        Pageable pageable
+);
+
+いいね一覧用。
+
+@Query("""
+        SELECT c
+        FROM Like l
+        JOIN l.content c
+        WHERE l.user.userId = :userId
+          AND c.privateFlg = false
+          AND c.deleteFlg = false
+        ORDER BY l.createdTime DESC
+        """)
+Page<Content> findLikedContentsByUserId(
+        @Param("userId") Long userId,
+        Pageable pageable
+);
+
+Repository全体の該当部分はこんな感じ。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import simplex.pj148.skippy.server.entity.Content;
+
+public interface ContentRepository extends JpaRepository<Content, Long> {
+
+    Page<Content> findByUser_userIdAndPrivateFlgFalseAndDeleteFlgFalse(
+            Long userId,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT c
+            FROM Like l
+            JOIN l.content c
+            WHERE l.user.userId = :userId
+              AND c.privateFlg = false
+              AND c.deleteFlg = false
+            ORDER BY l.createdTime DESC
+            """)
+    Page<Content> findLikedContentsByUserId(
+            @Param("userId") Long userId,
+            Pageable pageable
+    );
+}
+
+Like エンティティ側のフィールド名が content ではなく別名なら、そこだけ合わせて。
+普通は private Like content; じゃなくて private Content content; みたいになっているはず。
+
+4. MyPage.tsx 完全版：ページング対応
+
+こっちは 自分の投稿 と いいね の両方に Pagination を追加した版。
+
+import { useEffect, useState, type ChangeEvent } from "react";
+import {
+  Container,
+  Box,
+  Avatar,
+  Typography,
+  Tabs,
+  Tab,
+  Button,
+  TextField,
+  CircularProgress,
+  Pagination,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import { Link } from "react-router-dom";
+
+import ContentCard from "../components/ContentCard";
+import type { Content } from "../models/content";
+import type { User } from "../models/user";
+import type { Category } from "../models/category";
+import { useApi } from "../lib/useApi";
+
+type PageResponse<T> = {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+};
+
+function MyBestSeries(
+  myBestMap: Map<string, Content>,
+  category: Category
+): JSX.Element | undefined {
+  const myBestContent = myBestMap.get(category.categoryName);
+
+  if (myBestContent === undefined) {
+    return undefined;
+  }
+
+  return (
+    <ContentCard
+      key={category.categoryId}
+      content={myBestContent}
+    />
+  );
+}
+
+function MyPage(): JSX.Element {
+  const [myContents, setMyContents] = useState<Content[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [likedContents, setLikedContents] = useState<Content[]>([]);
+  const [profile, setProfile] = useState<User>();
+  const [editProfile, setEditProfile] = useState<User>();
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState("posts");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [mapMyBest, setMapMyBest] = useState<Map<string, Content>>(() => {
+    return new Map<string, Content>();
+  });
+
+  const [myContentsPage, setMyContentsPage] = useState(0);
+  const [myContentsTotalPage, setMyContentsTotalPage] = useState(0);
+
+  const [likedContentsPage, setLikedContentsPage] = useState(0);
+  const [likedContentsTotalPage, setLikedContentsTotalPage] = useState(0);
+
+  const api = useApi();
+
+  const fetchMyContents = (userId: number, page: number): void => {
+    setIsLoading(true);
+
+    api
+      .fetch(`/api/users/${userId}/contents?page=${page}&size=20`)
+      .then((res: Response): Promise<PageResponse<Content>> => res.json())
+      .then((data: PageResponse<Content>): void => {
+        setMyContents(data.content);
+        setMyContentsTotalPage(data.totalPages);
+        setIsLoading(false);
+      })
+      .catch((error: Error): void => {
+        console.error(error);
+        setIsLoading(false);
+      });
+  };
+
+  const fetchLikedContents = (userId: number, page: number): void => {
+    setIsLoading(true);
+
+    api
+      .fetch(`/api/users/${userId}/likedContents?page=${page}&size=20`)
+      .then((res: Response): Promise<PageResponse<Content>> => res.json())
+      .then((data: PageResponse<Content>): void => {
+        setLikedContents(data.content);
+        setLikedContentsTotalPage(data.totalPages);
+        setIsLoading(false);
+      })
+      .catch((error: Error): void => {
+        console.error(error);
+        setIsLoading(false);
+      });
+  };
+
+  useEffect((): void => {
+    api
+      .fetch("/api/me/profile")
+      .then((res: Response): Promise<User> => res.json())
+      .then((data: User): void => {
+        setProfile(data);
+        setEditProfile(data);
+
+        setMyContentsPage(0);
+        fetchMyContents(data.userId, 0);
+      })
+      .catch((error: Error): void => {
+        console.error(error);
+        setIsLoading(false);
+      });
+  }, []);
+
+  const handleChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ): void => {
+    if (!editProfile) {
+      return;
+    }
+
+    const { name, value } = event.target;
+    setEditProfile({
+      ...editProfile,
+      [name]: value,
+    });
+  };
+
+  const handleMenuChange = (selectedTabString: string): void => {
+    setSelectedTab(selectedTabString);
+    setIsLoading(true);
+
+    switch (selectedTabString) {
+      case "posts":
+        if (profile?.userId) {
+          setMyContentsPage(0);
+          fetchMyContents(profile.userId, 0);
+        }
+        break;
+
+      case "liked":
+        if (profile?.userId) {
+          setLikedContentsPage(0);
+          fetchLikedContents(profile.userId, 0);
+        }
+        break;
+
+      case "mybest":
+        Promise.all([
+          api.fetch(`/api/myBest/${profile?.userId}`),
+          api.fetch("/api/categories"),
+        ])
+          .then(([myBestRes, categoryRes]: [Response, Response]) =>
+            Promise.all([myBestRes.json(), categoryRes.json()])
+          )
+          .then(([myBestData, categoryData]: [Record<string, Content>, Category[]]) => {
+            setMapMyBest(new Map<string, Content>(Object.entries(myBestData)));
+            setCategories(categoryData);
+            setIsLoading(false);
+          })
+          .catch((error: Error): void => {
+            console.error(error);
+            setIsLoading(false);
+          });
+        break;
+
+      default:
+        setIsLoading(false);
+        break;
+    }
+  };
+
+  const handleEdit = (): void => {
+    setEditProfile(profile);
+    setIsEditing(true);
+  };
+
+  const handleCancel = (): void => {
+    setEditProfile(profile);
+    setIsEditing(false);
+  };
+
+  const handleSave = (): void => {
+    if (!editProfile?.name) {
+      alert("名前を入力してください。");
+      return;
+    }
+
+    api
+      .sendJson(`/api/users/${profile?.userId}`, editProfile, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      .then((res: Response): Promise<User> => res.json())
+      .then((data: User): void => {
+        setProfile(data);
+        setEditProfile(data);
+        setIsEditing(false);
+      })
+      .catch((error: Error): void => {
+        console.error(error);
+      });
+  };
+
+  const handleMyContentsPageChange = (
+    _event: ChangeEvent<unknown>,
+    value: number
+  ): void => {
+    const nextPage = value - 1;
+    setMyContentsPage(nextPage);
+
+    if (profile?.userId) {
+      fetchMyContents(profile.userId, nextPage);
+    }
+  };
+
+  const handleLikedContentsPageChange = (
+    _event: ChangeEvent<unknown>,
+    value: number
+  ): void => {
+    const nextPage = value - 1;
+    setLikedContentsPage(nextPage);
+
+    if (profile?.userId) {
+      fetchLikedContents(profile.userId, nextPage);
+    }
+  };
+
+  return (
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Box sx={{ position: "relative", mb: 6 }}>
+        <Box
+          sx={{
+            height: 140,
+            borderRadius: 3,
+            background: "linear-gradient(135deg, #60A5FA, #A78BFA)",
+          }}
+        />
+
+        <Avatar
+          sx={{
+            width: 90,
+            height: 90,
+            position: "absolute",
+            bottom: -45,
+            left: 24,
+            border: "4px solid white",
+            fontSize: 32,
+          }}
+        >
+          {profile?.name?.[0]}
+        </Avatar>
+      </Box>
+
+      {!isEditing && (
+        <Button
+          startIcon={<EditIcon />}
+          sx={{
+            position: "relative",
+            color: "grey",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+          onClick={handleEdit}
+        >
+          編集
+        </Button>
+      )}
+
+      <Box sx={{ px: 2, mb: 4 }}>
+        {isEditing ? (
+          <>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                textAlign: "left",
+              }}
+            >
+              名前
+            </Typography>
+
+            <TextField
+              label="名前"
+              name="name"
+              slotProps={{
+                htmlInput: {
+                  maxLength: 10,
+                },
+              }}
+              helperText="10文字まで"
+              value={editProfile?.name ?? ""}
+              onChange={handleChange}
+              fullWidth
+              sx={{
+                mb: 2,
+                textAlign: "left",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            />
+
+            <TextField
+              label="部署"
+              name="department"
+              slotProps={{
+                htmlInput: {
+                  maxLength: 10,
+                },
+              }}
+              helperText="10文字まで"
+              value={editProfile?.department ?? ""}
+              onChange={handleChange}
+              fullWidth
+              sx={{
+                mb: 2,
+                textAlign: "left",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            />
+
+            <TextField
+              label="自己紹介"
+              name="description"
+              slotProps={{
+                htmlInput: {
+                  maxLength: 100,
+                },
+              }}
+              helperText="100文字まで"
+              value={editProfile?.description ?? ""}
+              onChange={handleChange}
+              multiline
+              rows={5}
+              fullWidth
+              sx={{
+                textAlign: "left",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            />
+
+            <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
+              <Button variant="contained" onClick={handleSave}>
+                保存
+              </Button>
+              <Button variant="text" onClick={handleCancel}>
+                キャンセル
+              </Button>
+            </Box>
+          </>
+        ) : (
+          <>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                textAlign: "left",
+              }}
+            >
+              名前：{profile?.name}
+            </Typography>
+
+            <Typography color="text.secondary" sx={{ textAlign: "left" }}>
+              部署：{profile?.department}
+            </Typography>
+
+            <Typography sx={{ mt: 1, whiteSpace: "pre-wrap", textAlign: "left" }}>
+              自己紹介：{profile?.description}
+            </Typography>
+          </>
+        )}
+      </Box>
+
+      <Tabs
+        value={selectedTab}
+        onChange={(_event, value: string): void => handleMenuChange(value)}
+        variant="fullWidth"
+        sx={{
+          borderBottom: 1,
+          borderColor: "divider",
+          mb: 2,
+        }}
+      >
+        <Tab label="投稿" value="posts" />
+        <Tab label="いいね" value="liked" />
+        <Tab label="マイベスト" value="mybest" />
+      </Tabs>
+
+      {selectedTab === "posts" && (
+        <>
+          {isLoading ? (
+            <CircularProgress aria-label="Loading..." />
+          ) : myContents.length === 0 ? (
+            <Typography align="center" color="text.secondary">
+              投稿はまだありません
+            </Typography>
+          ) : (
+            <>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 450px)",
+                  columnGap: 4,
+                  rowGap: 6,
+                  justifyContent: "center",
+                  pb: 6,
+                }}
+              >
+                {myContents.map((content: Content) => (
+                  <ContentCard
+                    key={content.contentsId}
+                    content={content}
+                  />
+                ))}
+              </Box>
+
+              {myContentsTotalPage > 1 && (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 2, mb: 4 }}>
+                  <Pagination
+                    count={myContentsTotalPage}
+                    page={myContentsPage + 1}
+                    onChange={handleMyContentsPageChange}
+                    color="primary"
+                    shape="rounded"
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {selectedTab === "liked" && (
+        <>
+          {isLoading ? (
+            <CircularProgress aria-label="Loading..." />
+          ) : likedContents.length === 0 ? (
+            <Typography align="center" color="text.secondary">
+              投稿はまだありません
+            </Typography>
+          ) : (
+            <>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 450px)",
+                  columnGap: 4,
+                  rowGap: 6,
+                  justifyContent: "center",
+                  pb: 6,
+                }}
+              >
+                {likedContents.map((content: Content) => (
+                  <ContentCard
+                    key={content.contentsId}
+                    content={content}
+                  />
+                ))}
+              </Box>
+
+              {likedContentsTotalPage > 1 && (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 2, mb: 4 }}>
+                  <Pagination
+                    count={likedContentsTotalPage}
+                    page={likedContentsPage + 1}
+                    onChange={handleLikedContentsPageChange}
+                    color="primary"
+                    shape="rounded"
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {selectedTab === "mybest" && (
+        <>
+          {isLoading ? (
+            <CircularProgress aria-label="Loading..." />
+          ) : (
+            <Box
+              sx={{
+                display: "grid",
+                alignItems: "start",
+                gridTemplateColumns: "repeat(2, 450px)",
+                justifyContent: "center",
+                columnGap: 8,
+                rowGap: 30,
+                pb: 8,
+              }}
+            >
+              {categories.map((category: Category) => (
+                <Box key={category.categoryId}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 500,
+                      color: "black",
+                      mb: 2,
+                      pb: 1.5,
+                      borderBottom: "2px solid #dbeafe",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
+                    {category.categoryName}のベスト
+                  </Typography>
+
+                  {mapMyBest.has(category.categoryName) ? (
+                    MyBestSeries(mapMyBest, category)
+                  ) : (
+                    <Box
+                      component={Link}
+                      to="/home"
+                      sx={{
+                        width: "100%",
+                        height: "100%",
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        borderRadius: 10,
+                        backgroundColor: "#f0f9ff",
+                        border: "1px dashed #93c5fd",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          color: "#2563eb",
+                          fontWeight: 700,
+                          fontSize: 15,
+                        }}
+                      >
+                        未選択しょう！
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
+        </>
+      )}
+    </Container>
+  );
+}
+
+export default MyPage;
+ここで直ること
+
+今はクライアントがこれしか呼んでない。
+
+/api/users/${data.userId}/contents
+
+だから、サーバー側の @PageableDefault(size = 20) により、常に
+
+page=0
+size=20
+
+扱いになる。
+
+上のコードではこうなる。
+
+/api/users/${userId}/contents?page=${page}&size=20
+
+だから、Paginationの2ページ目を押すと、
+
+/api/users/1/contents?page=1&size=20
+
+が呼ばれる。
