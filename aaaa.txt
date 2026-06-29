@@ -1,1 +1,315 @@
 
+import { type ChangeEvent, useEffect, useState } from "react";
+import { useApi } from "../hooks/useApi.ts";
+import type { Need } from "../models/Need.ts";
+import NeedCard from "../components/NeedCard.tsx";
+import SubmitNeeds from "../components/SubmitNeeds.tsx";
+import SortIcon from "@mui/icons-material/Sort";
+import AddIcon from "@mui/icons-material/Add";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import {
+  Box,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Fab,
+  FormControl,
+  Grid,
+  MenuItem,
+  Pagination,
+  Select,
+  Typography,
+  Stack,
+  Button,
+  type SelectChangeEvent,
+} from "@mui/material";
+
+type NeedPageResponse = {
+  content: Need[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+};
+
+export default function NeedsList(): JSX.Element {
+  const api = useApi();
+
+  const [needList, setNeedList] = useState<Need[]>([]);
+  const [postOpen, setPostOpen] = useState(false);
+  const [sortBy, setSortBy] = useState("createdTime,desc");
+  const [page, setPage] = useState(0);
+  const [totalPage, setTotalPage] = useState(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect((): void => {
+    setIsLoading(true);
+
+    api
+      .fetch(`/api/needs?orderBy=${sortBy}&page=${page}&size=20`)
+      .then((res: Response): Promise<NeedPageResponse> => {
+        if (!res.ok) {
+          throw new Error("Error fetching need");
+        }
+        return res.json();
+      })
+      .then((data: NeedPageResponse): void => {
+        setNeedList(data.content);
+        setTotalPage(data.totalPages);
+        setIsLoading(false);
+      })
+      .catch((err: Error): void => {
+        console.error(err.message);
+        setIsLoading(false);
+      });
+  }, [sortBy, page]);
+
+  const handleSortChange = (event: SelectChangeEvent): void => {
+    setSortBy(event.target.value);
+    setPage(0);
+  };
+
+  const handlePageChange = (
+    _event: ChangeEvent<unknown>,
+    value: number
+  ): void => {
+    setPage(value - 1);
+  };
+
+  return (
+    <>
+      <Box
+        sx={{
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          mb: 4,
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            color: "primary.main",
+            fontWeight: 700,
+            textJustify: "center",
+            textTransform: "uppercase",
+            letterSpacing: "0.15rem",
+          }}
+        >
+          Needs
+        </Typography>
+
+        <Typography
+          component="h1"
+          variant="h3"
+          sx={{
+            color: "#1a1a1a",
+            fontWeight: 800,
+            textJustify: "center",
+            letterSpacing: "-0.03rem",
+            fontSize: { xs: "2rem", sm: "2.5rem" },
+            mb: 6,
+          }}
+        >
+          ニーズ一覧
+        </Typography>
+      </Box>
+
+      <Box
+        sx={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "flex-end",
+          mt: 2,
+          mb: 4,
+        }}
+      >
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <Select
+            value={sortBy}
+            onChange={handleSortChange}
+            displayEmpty
+            startAdornment={
+              <SortIcon
+                fontSize="small"
+                sx={{ mr: 0.5, color: "text.secondary" }}
+              />
+            }
+            sx={{
+              borderRadius: "10px",
+              fontWeight: 600,
+              fontSize: "0.9rem",
+              backgroundColor: "#fff",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: "rgba(0, 0, 0, 0.08)",
+              },
+              "&:hover .MuiOutlinedInput-notchedOutline": {
+                borderColor: "rgba(0, 0, 0, 0.15)",
+              },
+              "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                borderColor: "primary.main",
+              },
+            }}
+          >
+            <MenuItem
+              value="createdTime,desc"
+              sx={{ fontSize: "0.9rem", fontWeight: 500 }}
+            >
+              新着順
+            </MenuItem>
+            <MenuItem
+              value="wantCount"
+              sx={{ fontSize: "0.9rem", fontWeight: 500 }}
+            >
+              Want数順
+            </MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      {isLoading ? (
+        <Typography>読み込み中...</Typography>
+      ) : (
+        <>
+          <Grid container spacing={3}>
+            {needList.map((need: Need, index: number) => (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={need.needsId ?? index}>
+                <NeedCard need={need} />
+              </Grid>
+            ))}
+          </Grid>
+
+          <Stack
+            direction="row"
+            sx={{
+              pt: 4,
+              borderTop: "1px solid",
+              borderColor: "rgba(0, 0, 0, 0.06)",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Button
+              variant="text"
+              startIcon={<ChevronLeftIcon />}
+              disabled={page === 0}
+              onClick={() => setPage(0)}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              First
+            </Button>
+
+            <Button
+              variant="text"
+              startIcon={<ChevronLeftIcon />}
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+              sx={{
+                borderRadius: 3,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              前へ
+            </Button>
+
+            <Pagination
+              count={totalPage}
+              page={page + 1}
+              onChange={handlePageChange}
+              hidePrevButton
+              hideNextButton
+              color="primary"
+              variant="text"
+              shape="rounded"
+              sx={{
+                "& .MuiPaginationItem-root": {
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  "&.Mui-selected": {
+                    backgroundColor: "primary.main",
+                    color: "white",
+                    "&:hover": {
+                      backgroundColor: "primary.dark",
+                    },
+                  },
+                },
+              }}
+            />
+
+            <Button
+              variant="text"
+              endIcon={<ChevronRightIcon />}
+              disabled={totalPage <= 1 || page >= totalPage - 1}
+              onClick={() => setPage(page + 1)}
+              sx={{
+                borderRadius: 3,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              次へ
+            </Button>
+
+            <Button
+              variant="text"
+              endIcon={<ChevronRightIcon />}
+              disabled={totalPage <= 1 || page >= totalPage - 1}
+              onClick={() => setPage(totalPage - 1)}
+              sx={{
+                borderRadius: 3,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 2,
+                color: "text.primary",
+                "&:disabled": { color: "text.disabled" },
+              }}
+            >
+              Last
+            </Button>
+          </Stack>
+        </>
+      )}
+
+      <Fab
+        color="primary"
+        onClick={() => setPostOpen(true)}
+        sx={{
+          position: "fixed",
+          right: 32,
+          bottom: 32,
+          zIndex: 1000,
+        }}
+      >
+        <AddIcon />
+      </Fab>
+
+      <Dialog
+        open={postOpen}
+        onClose={() => setPostOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>ニーズを投稿</DialogTitle>
+        <DialogContent>
+          <SubmitNeeds />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
