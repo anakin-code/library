@@ -1,1 +1,648 @@
 
+パターンA：空白もそのまま検索する版
+
+まずはこっちが簡単。
+今の仕様としてはこれで十分だと思う。
+
+修正箇所
+修正：
+- ContentRepository.java
+- ContentService.java
+
+削除・使わない：
+- Service内の Specification 処理
+- Service内の subList 手動ページング
+ContentRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import simplex.pj148.skippy.server.entity.Content;
+
+public interface ContentRepository extends JpaRepository<Content, Long> {
+
+    /**
+     * 検索条件なし：公開・未削除の投稿のみ取得
+     */
+    Page<Content> findByPrivateFlgFalseAndDeleteFlgFalse(Pageable pageable);
+
+    /**
+     * タイトル検索
+     * 入力されたkeywordをそのまま1つの文字列として検索する
+     */
+    Page<Content> findByPrivateFlgFalseAndDeleteFlgFalseAndTitleContainingIgnoreCase(
+            String keyword,
+            Pageable pageable
+    );
+
+    /**
+     * ユーザー名検索
+     */
+    @Query("""
+            SELECT c
+            FROM Content c
+            JOIN c.user u
+            WHERE c.privateFlg = false
+              AND c.deleteFlg = false
+              AND LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            """)
+    Page<Content> searchByUserName(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    /**
+     * タグ名検索
+     */
+    @Query("""
+            SELECT DISTINCT c
+            FROM Content c
+            JOIN ContentsTag ct ON ct.content = c
+            JOIN ct.tag t
+            WHERE c.privateFlg = false
+              AND c.deleteFlg = false
+              AND LOWER(t.tagName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            """)
+    Page<Content> searchByTagName(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    /**
+     * カテゴリ名検索
+     * カテゴリ検索が不要ならこのメソッドは消してOK
+     */
+    @Query("""
+            SELECT c
+            FROM Content c
+            JOIN c.category ca
+            WHERE c.privateFlg = false
+              AND c.deleteFlg = false
+              AND LOWER(ca.categoryName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            """)
+    Page<Content> searchByCategoryName(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+}
+ContentService.java
+
+searchContentsMultiKeyword みたいなメソッドが今あるなら、これに置き換える。
+
+package simplex.pj148.skippy.server.service;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import simplex.pj148.skippy.server.dto.ContentShowResponseDto;
+import simplex.pj148.skippy.server.entity.Content;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.ContentRepository;
+import simplex.pj148.skippy.server.repository.LikeRepository;
+
+@Service
+@Transactional
+public class ContentService {
+
+    private final ContentRepository contentRepository;
+    private final LikeRepository likeRepository;
+
+    public ContentService(
+            ContentRepository contentRepository,
+            LikeRepository likeRepository
+    ) {
+        this.contentRepository = contentRepository;
+        this.likeRepository = likeRepository;
+    }
+
+    /**
+     * 検索結果取得
+     *
+     * パターンA：
+     * keywordは空白で分割せず、そのまま1つの文字列として検索する。
+     */
+    @Transactional(readOnly = true)
+    public Page<ContentShowResponseDto> searchedContentsResponse(
+            String keyword,
+            String context,
+            User loginUser,
+            Pageable pageable
+    ) {
+        Page<Content> contentPage = searchContents(keyword, context, pageable);
+
+        return contentPage.map(content -> {
+            boolean liked = likeRepository.existsByUser_UserIdAndContent_ContentsId(
+                    loginUser.getUserId(),
+                    content.getContentsId()
+            );
+
+            Long likeCount = likeRepository.countByContent_ContentsId(
+                    content.getContentsId()
+            );
+
+            return toContentAllShowResponseDto(content, liked, likeCount);
+        });
+    }
+
+    /**
+     * contextに応じてRepositoryを呼び分ける。
+     * Serviceは検索条件を作らない。
+     */
+    private Page<Content> searchContents(
+            String keyword,
+            String context,
+            Pageable pageable
+    ) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return contentRepository.findByPrivateFlgFalseAndDeleteFlgFalse(pageable);
+        }
+
+        String trimmedKeyword = keyword.trim();
+
+        if ("title".equals(context)) {
+            return contentRepository
+                    .findByPrivateFlgFalseAndDeleteFlgFalseAndTitleContainingIgnoreCase(
+                            trimmedKeyword,
+                            pageable
+                    );
+        }
+
+        if ("user".equals(context)) {
+            return contentRepository.searchByUserName(trimmedKeyword, pageable);
+        }
+
+        if ("tag".equals(context)) {
+            return contentRepository.searchByTagName(trimmedKeyword, pageable);
+        }
+
+        if ("category".equals(context)) {
+            return contentRepository.searchByCategoryName(trimmedKeyword, pageable);
+        }
+
+        return contentRepository.findByPrivateFlgFalseAndDeleteFlgFalse(pageable);
+    }
+
+    /**
+     * 既存のDTO変換メソッドをそのまま使う。
+     * すでにContentService内にあるなら、新しく作らなくていい。
+     */
+    private ContentShowResponseDto toContentAllShowResponseDto(
+            Content content,
+            boolean liked,
+            Long likeCount
+    ) {
+        // ここは既存コードをそのまま残す
+        // 例：
+        // return new ContentShowResponseDto(...);
+
+        throw new UnsupportedOperationException("既存のDTO変換処理を使ってください");
+    }
+}
+
+このパターンAでは、
+
+Java Spring
+
+と検索したら、
+
+LIKE '%Java Spring%'
+
+になる。
+
+パターンB：空白で分割して複数キーワード検索する版
+
+こっちは、検索条件が今後増えるなら向いてる。
+@Query だけで頑張るとつらいので、Custom Repository + Criteria API にする。
+
+修正箇所
+修正：
+- ContentRepository.java
+- ContentService.java
+
+追加：
+- ContentSearchRepository.java
+- ContentSearchRepositoryImpl.java
+
+削除・使わない：
+- Service内の Specification 処理
+- Service内の subList 手動ページング
+ContentRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import simplex.pj148.skippy.server.entity.Content;
+
+public interface ContentRepository
+        extends JpaRepository<Content, Long>, ContentSearchRepository {
+}
+ContentSearchRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import simplex.pj148.skippy.server.entity.Content;
+
+public interface ContentSearchRepository {
+
+    Page<Content> searchContents(
+            String keyword,
+            String context,
+            Pageable pageable
+    );
+}
+ContentSearchRepositoryImpl.java
+package simplex.pj148.skippy.server.repository;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Order;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+import simplex.pj148.skippy.server.entity.Content;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class ContentSearchRepositoryImpl implements ContentSearchRepository {
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Override
+    public Page<Content> searchContents(
+            String keyword,
+            String context,
+            Pageable pageable
+    ) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+
+        CriteriaQuery<Content> query = cb.createQuery(Content.class);
+        Root<Content> root = query.from(Content.class);
+
+        List<Predicate> predicates =
+                buildPredicates(cb, query, root, keyword, context);
+
+        query.select(root)
+                .where(cb.and(predicates.toArray(new Predicate[0])))
+                .distinct(true);
+
+        applySort(cb, query, root, pageable);
+
+        TypedQuery<Content> typedQuery = entityManager.createQuery(query);
+
+        typedQuery.setFirstResult((int) pageable.getOffset());
+        typedQuery.setMaxResults(pageable.getPageSize());
+
+        List<Content> contents = typedQuery.getResultList();
+
+        long total = countContents(keyword, context);
+
+        return new PageImpl<>(contents, pageable, total);
+    }
+
+    private long countContents(
+            String keyword,
+            String context
+    ) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+
+        CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
+        Root<Content> root = countQuery.from(Content.class);
+
+        List<Predicate> predicates =
+                buildPredicates(cb, countQuery, root, keyword, context);
+
+        countQuery.select(cb.countDistinct(root))
+                .where(cb.and(predicates.toArray(new Predicate[0])));
+
+        return entityManager.createQuery(countQuery).getSingleResult();
+    }
+
+    /**
+     * 検索条件を作る。
+     *
+     * パターンB：
+     * keywordを空白で分割する。
+     *
+     * 例：
+     * "Java Spring" → ["Java", "Spring"]
+     *
+     * ここではOR検索にしている。
+     * つまり Java または Spring に一致すればヒット。
+     */
+    private List<Predicate> buildPredicates(
+            CriteriaBuilder cb,
+            CriteriaQuery<?> query,
+            Root<Content> root,
+            String keyword,
+            String context
+    ) {
+        List<Predicate> predicates = new ArrayList<>();
+
+        // 共通条件：公開・未削除のみ
+        predicates.add(cb.equal(root.get("privateFlg"), false));
+        predicates.add(cb.equal(root.get("deleteFlg"), false));
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return predicates;
+        }
+
+        String[] keywordArray = keyword.trim().split("[\\s　]+");
+
+        if ("title".equals(context)) {
+            predicates.add(
+                    buildLikePredicatesForRootField(
+                            cb,
+                            root,
+                            "title",
+                            keywordArray
+                    )
+            );
+            return predicates;
+        }
+
+        if ("user".equals(context)) {
+            Join<Object, Object> userJoin = root.join("user", JoinType.LEFT);
+
+            predicates.add(
+                    buildLikePredicatesForJoinField(
+                            cb,
+                            userJoin,
+                            "userName",
+                            keywordArray
+                    )
+            );
+            return predicates;
+        }
+
+        if ("tag".equals(context)) {
+            Join<Object, Object> contentsTagJoin =
+                    root.join("contentsTagList", JoinType.LEFT);
+
+            Join<Object, Object> tagJoin =
+                    contentsTagJoin.join("tag", JoinType.LEFT);
+
+            predicates.add(
+                    buildLikePredicatesForJoinField(
+                            cb,
+                            tagJoin,
+                            "tagName",
+                            keywordArray
+                    )
+            );
+            return predicates;
+        }
+
+        if ("category".equals(context)) {
+            Join<Object, Object> categoryJoin =
+                    root.join("category", JoinType.LEFT);
+
+            predicates.add(
+                    buildLikePredicatesForJoinField(
+                            cb,
+                            categoryJoin,
+                            "categoryName",
+                            keywordArray
+                    )
+            );
+            return predicates;
+        }
+
+        // contextが不正、または未指定の場合は、検索条件なしで返す
+        return predicates;
+    }
+
+    /**
+     * Content自身のフィールドにLIKE検索をかける。
+     * 例：title
+     */
+    private Predicate buildLikePredicatesForRootField(
+            CriteriaBuilder cb,
+            Root<Content> root,
+            String fieldName,
+            String[] keywordArray
+    ) {
+        List<Predicate> keywordPredicates = new ArrayList<>();
+
+        for (String keyword : keywordArray) {
+            String likePattern = "%" + keyword.toLowerCase() + "%";
+
+            keywordPredicates.add(
+                    cb.like(
+                            cb.lower(root.get(fieldName)),
+                            likePattern
+                    )
+            );
+        }
+
+        return cb.or(keywordPredicates.toArray(new Predicate[0]));
+    }
+
+    /**
+     * Join先のフィールドにLIKE検索をかける。
+     * 例：user.userName, tag.tagName, category.categoryName
+     */
+    private Predicate buildLikePredicatesForJoinField(
+            CriteriaBuilder cb,
+            Join<Object, Object> join,
+            String fieldName,
+            String[] keywordArray
+    ) {
+        List<Predicate> keywordPredicates = new ArrayList<>();
+
+        for (String keyword : keywordArray) {
+            String likePattern = "%" + keyword.toLowerCase() + "%";
+
+            keywordPredicates.add(
+                    cb.like(
+                            cb.lower(join.get(fieldName)),
+                            likePattern
+                    )
+            );
+        }
+
+        return cb.or(keywordPredicates.toArray(new Predicate[0]));
+    }
+
+    /**
+     * PageableのsortをCriteriaQueryに反映する。
+     * sort未指定ならcreatedTime DESC。
+     */
+    private void applySort(
+            CriteriaBuilder cb,
+            CriteriaQuery<Content> query,
+            Root<Content> root,
+            Pageable pageable
+    ) {
+        if (pageable.getSort().isUnsorted()) {
+            query.orderBy(cb.desc(root.get("createdTime")));
+            return;
+        }
+
+        List<Order> orders = new ArrayList<>();
+
+        for (Sort.Order sortOrder : pageable.getSort()) {
+            if (sortOrder.isAscending()) {
+                orders.add(cb.asc(root.get(sortOrder.getProperty())));
+            } else {
+                orders.add(cb.desc(root.get(sortOrder.getProperty())));
+            }
+        }
+
+        query.orderBy(orders);
+    }
+}
+ContentService.java
+package simplex.pj148.skippy.server.service;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import simplex.pj148.skippy.server.dto.ContentShowResponseDto;
+import simplex.pj148.skippy.server.entity.Content;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.ContentRepository;
+import simplex.pj148.skippy.server.repository.LikeRepository;
+
+@Service
+@Transactional
+public class ContentService {
+
+    private final ContentRepository contentRepository;
+    private final LikeRepository likeRepository;
+
+    public ContentService(
+            ContentRepository contentRepository,
+            LikeRepository likeRepository
+    ) {
+        this.contentRepository = contentRepository;
+        this.likeRepository = likeRepository;
+    }
+
+    /**
+     * 検索結果取得
+     *
+     * パターンB：
+     * keywordを空白で分割して、Repository層で検索条件を作る。
+     */
+    @Transactional(readOnly = true)
+    public Page<ContentShowResponseDto> searchedContentsResponse(
+            String keyword,
+            String context,
+            User loginUser,
+            Pageable pageable
+    ) {
+        Page<Content> contentPage =
+                contentRepository.searchContents(keyword, context, pageable);
+
+        return contentPage.map(content -> {
+            boolean liked = likeRepository.existsByUser_UserIdAndContent_ContentsId(
+                    loginUser.getUserId(),
+                    content.getContentsId()
+            );
+
+            Long likeCount = likeRepository.countByContent_ContentsId(
+                    content.getContentsId()
+            );
+
+            return toContentAllShowResponseDto(content, liked, likeCount);
+        });
+    }
+
+    /**
+     * 既存のDTO変換メソッドをそのまま使う。
+     * すでにContentService内にあるなら、新しく作らなくていい。
+     */
+    private ContentShowResponseDto toContentAllShowResponseDto(
+            Content content,
+            boolean liked,
+            Long likeCount
+    ) {
+        // ここは既存コードをそのまま残す
+        // 例：
+        // return new ContentShowResponseDto(...);
+
+        throw new UnsupportedOperationException("既存のDTO変換処理を使ってください");
+    }
+}
+
+このパターンBでは、
+
+Java Spring
+
+と検索したら、
+
+title LIKE '%Java%'
+OR title LIKE '%Spring%'
+
+のような条件になる。
+
+AND検索にしたい場合
+
+パターンBの複数キーワードを OR検索 ではなく AND検索 にしたいなら、ここだけ変える。
+
+変更前：OR検索
+return cb.or(keywordPredicates.toArray(new Predicate[0]));
+変更後：AND検索
+return cb.and(keywordPredicates.toArray(new Predicate[0]));
+
+変更箇所はこの2つ。
+
+buildLikePredicatesForRootField(...)
+buildLikePredicatesForJoinField(...)
+
+つまり、
+
+private Predicate buildLikePredicatesForRootField(
+        CriteriaBuilder cb,
+        Root<Content> root,
+        String fieldName,
+        String[] keywordArray
+) {
+    List<Predicate> keywordPredicates = new ArrayList<>();
+
+    for (String keyword : keywordArray) {
+        String likePattern = "%" + keyword.toLowerCase() + "%";
+
+        keywordPredicates.add(
+                cb.like(
+                        cb.lower(root.get(fieldName)),
+                        likePattern
+                )
+        );
+    }
+
+    return cb.and(keywordPredicates.toArray(new Predicate[0]));
+}
+
+こっちにすると、
+
+Java Spring
+
+は、
+
+title LIKE '%Java%'
+AND title LIKE '%Spring%'
+
+になる。
