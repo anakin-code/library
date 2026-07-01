@@ -1,1082 +1,992 @@
-Service層の構成
+controller
+controller
+├── AuthController.java
+├── CategoryController.java
+├── TagController.java
+├── TipController.java
+├── CommentController.java
+├── TipInterestController.java
+├── NeedController.java
+├── NeedEmpathyController.java
+└── NotificationController.java
 
-今回ならこう分けるのがいい。
+controller/dto/create
+├── TipDto.java
+├── CommentDto.java
+├── NeedDto.java
+├── NotificationDto.java
 
-service
-├── CategoryService
-├── TagService
-├── UserService
-├── NeedService
-├── NeedEmpathyService
-├── TipService
-├── TipCreateService
-├── TipDetailService
-├── TipUpdateService
-├── TipInterestService
-├── CommentService
-└── NotificationService
+controller/dto/response
+├── CategoryResponseDto.java
+├── TagResponseDto.java
+├── UserInfoResponseDto.java
+├── TipShowResponseDto.java
+├── TipDetailResponseDto.java
+├── CommentShowResponseDto.java
+├── NeedResponseDto.java
+├── NotificationResponseDto.java
+create DTO
+TipDto.java
+package simplex.pj148.skippy.server.controller.dto.create;
 
-既存に寄せるなら、ContentService, ContentCreateService, ContentDetailService, ContentUpdateService を名前変更する感じ。
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
 
-1. TipService
+import java.util.List;
 
-投稿一覧・検索・DTO変換担当。
-旧 ContentService の置き換え。
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class TipDto {
 
-package simplex.pj148.skippy.server.service;
+    private Long userId;
 
+    @NotBlank
+    private String tipTitle;
+
+    private String tipUrl;
+
+    @NotBlank
+    private String tipDetail;
+
+    @NotNull
+    private Long categoryId;
+
+    private Long needId;
+
+    private List<Long> tagIdList;
+}
+CommentDto.java
+package simplex.pj148.skippy.server.controller.dto.create;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class CommentDto {
+
+    private Long userId;
+
+    @NotBlank
+    private String commentBody;
+}
+NeedDto.java
+package simplex.pj148.skippy.server.controller.dto.create;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class NeedDto {
+
+    private Long userId;
+
+    @NotBlank
+    private String needTitle;
+
+    @NotBlank
+    private String needsDetail;
+
+    @NotNull
+    private Long categoryId;
+}
+NotificationDto.java
+package simplex.pj148.skippy.server.controller.dto.create;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+
+import java.time.LocalTime;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class NotificationDto {
+
+    @NotNull
+    private Long tipInterestId;
+
+    @NotNull
+    private Long frequencyId;
+
+    /**
+     * 毎週通知用。
+     * 1=月曜, 7=日曜
+     */
+    private Integer notificationWeek;
+
+    /**
+     * 毎月通知用。
+     * 1〜31
+     */
+    private Integer notificationDay;
+
+    @NotNull
+    private LocalTime notificationTime;
+}
+response DTO
+CategoryResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class CategoryResponseDto {
+
+    private Long categoryId;
+
+    private String categoryName;
+}
+TagResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class TagResponseDto {
+
+    private Long tagId;
+
+    private String tagName;
+}
+UserInfoResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class UserInfoResponseDto {
+
+    private Long userId;
+
+    private String userName;
+
+    private String selfIntroduction;
+
+    private String affiliatedName;
+
+    private String rankName;
+
+    private String mailAddress;
+}
+CommentShowResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class CommentShowResponseDto {
+
+    private Long commentId;
+
+    private Long tipId;
+
+    private Long userId;
+
+    private String userName;
+
+    private String commentBody;
+
+    private Boolean isLooked;
+
+    private LocalDateTime createdTime;
+}
+TipShowResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class TipShowResponseDto {
+
+    private Long tipId;
+
+    private Long userId;
+
+    private String userName;
+
+    private String tipTitle;
+
+    private String tipUrl;
+
+    private String tipDetail;
+
+    private Long categoryId;
+
+    private String categoryName;
+
+    private List<String> tagNameList;
+
+    private Boolean interestedByCurrentUser;
+
+    private Long interestCount;
+
+    private Boolean mybestByCurrentUser;
+
+    private Long mybestCount;
+
+    private LocalDateTime createdTime;
+
+    private LocalDateTime updatedTime;
+}
+TipDetailResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class TipDetailResponseDto {
+
+    private Long tipId;
+
+    private Long userId;
+
+    private String userName;
+
+    private String tipTitle;
+
+    private String tipUrl;
+
+    private String tipDetail;
+
+    private Long categoryId;
+
+    private String categoryName;
+
+    private Long needId;
+
+    private List<String> tagNameList;
+
+    private Boolean editFlg;
+
+    private Boolean interestedByCurrentUser;
+
+    private Long interestCount;
+
+    private Boolean mybestByCurrentUser;
+
+    private Long mybestCount;
+
+    private List<CommentShowResponseDto> comments;
+
+    private Boolean hasNotification;
+
+    private LocalDateTime createdTime;
+
+    private LocalDateTime updatedTime;
+}
+NeedResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class NeedResponseDto {
+
+    private Long needsId;
+
+    private Long userId;
+
+    private String userName;
+
+    private String needTitle;
+
+    private String needsDetail;
+
+    private Long categoryId;
+
+    private String categoryName;
+
+    private Long empathyCount;
+
+    private Boolean empathizedByCurrentUser;
+
+    private LocalDateTime createdTime;
+
+    private LocalDateTime updatedTime;
+}
+NotificationResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.*;
+
+import java.time.LocalTime;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class NotificationResponseDto {
+
+    private Long notificationId;
+
+    private Long tipInterestId;
+
+    private Long tipId;
+
+    private String tipTitle;
+
+    private Long frequencyId;
+
+    private String frequencyName;
+
+    private Integer notificationWeek;
+
+    private Integer notificationDay;
+
+    private LocalTime notificationTime;
+
+    private Boolean isActive;
+}
+Controller
+AuthController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.controller.dto.auth.ProfileDto;
+import simplex.pj148.skippy.server.controller.dto.response.UserInfoResponseDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequestMapping("/api/me")
+@RequiredArgsConstructor
+public class AuthController {
+
+    private final UserInfoService userInfoService;
+
+    @GetMapping
+    public ProfileDto getMe(@AuthenticationPrincipal Jwt jwt) {
+        return switch (jwt) {
+            case Jwt token -> {
+                var cognitoResponse = userInfoService.retrieve(token);
+                yield new ProfileDto(
+                        cognitoResponse.name(),
+                        cognitoResponse.email(),
+                        cognitoResponse.givenName(),
+                        cognitoResponse.familyName()
+                );
+            }
+            default -> null;
+        };
+    }
+
+    @GetMapping("/profile")
+    public UserInfoResponseDto aboutMe(@AuthenticationPrincipal Jwt jwt) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return UserInfoResponseDto.builder()
+                .userId(loginUser.getUserId())
+                .userName(loginUser.getUserName())
+                .selfIntroduction(loginUser.getSelfIntroduction())
+                .affiliatedName(loginUser.getAffiliated().getAffiliatedName())
+                .rankName(loginUser.getRank().getRankName())
+                .mailAddress(loginUser.getMailAddress())
+                .build();
+    }
+
+    @GetMapping("/id")
+    public Long getUserId(@AuthenticationPrincipal Jwt jwt) {
+        return userInfoService.getUserFromJwt(jwt).getUserId();
+    }
+}
+CategoryController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.controller.dto.response.CategoryResponseDto;
+import simplex.pj148.skippy.server.service.CategoryService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/categories")
+@RequiredArgsConstructor
+public class CategoryController {
+
+    private final CategoryService categoryService;
+
+    @GetMapping
+    public List<CategoryResponseDto> findAllCategory() {
+        return categoryService.findAllCategory();
+    }
+}
+TagController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.controller.dto.response.TagResponseDto;
+import simplex.pj148.skippy.server.service.TagService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/tags")
+@RequiredArgsConstructor
+public class TagController {
+
+    private final TagService tagService;
+
+    @GetMapping
+    public List<TagResponseDto> findAllTags() {
+        return tagService.findAllTags();
+    }
+}
+TipController.java
+package simplex.pj148.skippy.server.controller;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import simplex.pj148.skippy.server.controller.dto.response.TipShowResponseDto;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.TipInterest;
-import simplex.pj148.skippy.server.entity.TipsTag;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.TipInterestRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipsTagRepository;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-@Service
-@RequiredArgsConstructor
-public class TipService {
-
-    private final TipRepository tipRepository;
-    private final TipInterestRepository tipInterestRepository;
-    private final TipsTagRepository tipsTagRepository;
-
-    public Page<TipShowResponseDto> findAllTips(
-            User loginUser,
-            Pageable pageable,
-            String orderBy,
-            Long categoryId
-    ) {
-        Page<Tip> tipPage;
-
-        if ("interestCount".equals(orderBy)) {
-            tipPage = tipRepository.findSelectedTipsSortedByInterestCount(pageable, categoryId);
-        } else {
-            tipPage = tipRepository.findSelectedTipsSortedByCreatedTime(pageable, categoryId);
-        }
-
-        return toTipShowResponseDtoPage(tipPage, loginUser);
-    }
-
-    public Page<TipShowResponseDto> searchTips(
-            String keyword,
-            String context,
-            User loginUser,
-            Pageable pageable
-    ) {
-        if (keyword == null || keyword.trim().isEmpty()) {
-            return findAllTips(loginUser, pageable, "createdTime", 0L);
-        }
-
-        Page<Tip> tipPage = tipRepository.searchTips(
-                keyword.trim(),
-                context,
-                pageable
-        );
-
-        return toTipShowResponseDtoPage(tipPage, loginUser);
-    }
-
-    public Page<TipShowResponseDto> findTipsByUser(
-            Long userId,
-            User loginUser,
-            Pageable pageable
-    ) {
-        Page<Tip> tipPage = tipRepository.findByUser_UserIdOrderByCreatedTimeDesc(
-                userId,
-                pageable
-        );
-
-        return toTipShowResponseDtoPage(tipPage, loginUser);
-    }
-
-    private Page<TipShowResponseDto> toTipShowResponseDtoPage(
-            Page<Tip> tipPage,
-            User loginUser
-    ) {
-        List<Long> tipIds = tipPage.getContent()
-                .stream()
-                .map(Tip::getTipId)
-                .toList();
-
-        if (tipIds.isEmpty()) {
-            return tipPage.map(tip -> toTipShowResponseDto(tip, false, 0L));
-        }
-
-        List<TipInterest> userInterests =
-                tipInterestRepository.findByUser_UserIdAndTip_TipIdIn(
-                        loginUser.getUserId(),
-                        tipIds
-                );
-
-        Set<Long> interestedTipIdSet = new HashSet<>(
-                userInterests.stream()
-                        .map(tipInterest -> tipInterest.getTip().getTipId())
-                        .toList()
-        );
-
-        List<Object[]> interestCounts =
-                tipInterestRepository.countInterestsByTipIds(tipIds);
-
-        Map<Long, Long> interestCountMap = new HashMap<>();
-
-        for (Object[] row : interestCounts) {
-            Long tipId = (Long) row[0];
-            Long count = (Long) row[1];
-            interestCountMap.put(tipId, count);
-        }
-
-        return tipPage.map(tip -> {
-            boolean interested = interestedTipIdSet.contains(tip.getTipId());
-            Long interestCount = interestCountMap.getOrDefault(tip.getTipId(), 0L);
-
-            return toTipShowResponseDto(tip, interested, interestCount);
-        });
-    }
-
-    private TipShowResponseDto toTipShowResponseDto(
-            Tip tip,
-            boolean interested,
-            Long interestCount
-    ) {
-        List<TipsTag> tipsTags = tipsTagRepository.findByTip_TipId(tip.getTipId());
-
-        List<String> tagNameList = tipsTags.stream()
-                .map(tipsTag -> tipsTag.getTag().getTagName())
-                .toList();
-
-        return TipShowResponseDto.builder()
-                .tipId(tip.getTipId())
-                .userId(tip.getUser().getUserId())
-                .userName(tip.getUser().getUserName())
-                .tipTitle(tip.getTipTitle())
-                .tipUrl(tip.getTipUrl())
-                .tipDetail(tip.getTipDetail())
-                .categoryId(tip.getCategory().getCategoryId())
-                .categoryName(tip.getCategory().getCategoryName())
-                .tagNameList(tagNameList)
-                .interestedByCurrentUser(interested)
-                .interestCount(interestCount)
-                .createdTime(tip.getCreatedTime())
-                .updatedTime(tip.getUpdatedTime())
-                .build();
-    }
-}
-
-ポイントは、旧 LikeRepository を使っていたところを全部 TipInterestRepository に変えること。
-
-likeRepository.countLikesByContentIds(...)
-
-ではなく、
-
-tipInterestRepository.countInterestsByTipIds(...)
-
-になる。
-
-2. TipCreateService
-
-旧 ContentCreateService の置き換え。
-
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
 import simplex.pj148.skippy.server.controller.dto.create.TipDto;
-import simplex.pj148.skippy.server.entity.Category;
-import simplex.pj148.skippy.server.entity.Need;
-import simplex.pj148.skippy.server.entity.Tag;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.TipsTag;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.CategoryRepository;
-import simplex.pj148.skippy.server.repository.NeedRepository;
-import simplex.pj148.skippy.server.repository.TagRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipsTagRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
-
-@Service
-@RequiredArgsConstructor
-public class TipCreateService {
-
-    private final TipRepository tipRepository;
-    private final TipsTagRepository tipsTagRepository;
-    private final TagRepository tagRepository;
-    private final CategoryRepository categoryRepository;
-    private final NeedRepository needRepository;
-    private final UserRepository userRepository;
-
-    @Transactional
-    public void registerNewTip(TipDto input) {
-        User user = userRepository.findByUserId(input.getUserId())
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-
-        Category category = categoryRepository.findByCategoryId(input.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
-
-        Need need = null;
-
-        if (input.getNeedId() != null) {
-            need = needRepository.findByNeedsId(input.getNeedId())
-                    .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
-        }
-
-        Tip tip = Tip.builder()
-                .user(user)
-                .tipTitle(input.getTipTitle())
-                .tipUrl(input.getTipUrl())
-                .tipDetail(input.getTipDetail())
-                .category(category)
-                .need(need)
-                .build();
-
-        tipRepository.save(tip);
-
-        for (Long tagId : input.getTagIdList()) {
-            Tag tag = tagRepository.findByTagId(tagId)
-                    .orElseThrow(() -> new RuntimeException("タグが見つかりません"));
-
-            TipsTag tipsTag = TipsTag.builder()
-                    .tip(tip)
-                    .tag(tag)
-                    .build();
-
-            tipsTagRepository.save(tipsTag);
-        }
-    }
-}
-
-既存では Content に privateFlg, deleteFlg を入れていたけど、今回は入れない。
-
-3. TipDetailService
-
-旧 ContentDetailService の置き換え。
-詳細画面で、コメント・タグ・気になる状態・mybest状態・通知設定を見る。
-
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import simplex.pj148.skippy.server.controller.dto.response.CommentShowResponseDto;
 import simplex.pj148.skippy.server.controller.dto.response.TipDetailResponseDto;
-import simplex.pj148.skippy.server.entity.Comment;
-import simplex.pj148.skippy.server.entity.Notification;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.TipsTag;
+import simplex.pj148.skippy.server.controller.dto.response.TipShowResponseDto;
 import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.CommentRepository;
-import simplex.pj148.skippy.server.repository.NotificationRepository;
-import simplex.pj148.skippy.server.repository.TipInterestRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipsTagRepository;
+import simplex.pj148.skippy.server.service.*;
 
-import java.util.List;
-import java.util.Optional;
-
-@Service
+@RestController
+@RequestMapping("/api/tips")
 @RequiredArgsConstructor
-public class TipDetailService {
+public class TipController {
 
-    private final TipRepository tipRepository;
-    private final TipsTagRepository tipsTagRepository;
-    private final CommentRepository commentRepository;
-    private final TipInterestRepository tipInterestRepository;
-    private final NotificationRepository notificationRepository;
+    private final TipService tipService;
+    private final TipCreateService tipCreateService;
+    private final TipDetailService tipDetailService;
+    private final TipUpdateService tipUpdateService;
+    private final TipDeleteService tipDeleteService;
+    private final UserInfoService userInfoService;
 
-    public TipDetailResponseDto getTipDetail(
-            User loginUser,
-            Long tipId
+    @GetMapping
+    public Page<TipShowResponseDto> listTips(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "createdTime") String orderBy,
+            @RequestParam(defaultValue = "0") Long categoryId,
+            @PageableDefault(
+                    size = 20,
+                    sort = "createdTime",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
     ) {
-        Tip tip = tipRepository.findByTipId(tipId)
-                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+        User loginUser = userInfoService.getUserFromJwt(jwt);
 
-        boolean editFlg = loginUser.getUserId().equals(tip.getUser().getUserId());
+        return tipService.findAllTips(
+                loginUser,
+                pageable,
+                orderBy,
+                categoryId
+        );
+    }
 
-        boolean interestedByCurrentUser =
-                tipInterestRepository.existsByUser_UserIdAndTip_TipId(
-                        loginUser.getUserId(),
+    @GetMapping("/search")
+    public Page<TipShowResponseDto> searchTips(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam String context,
+            @RequestParam String q,
+            @PageableDefault(
+                    size = 20,
+                    sort = "createdTime",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return tipService.searchTips(
+                q,
+                context,
+                loginUser,
+                pageable
+        );
+    }
+
+    @GetMapping("/{tipId}")
+    public ResponseEntity<TipDetailResponseDto> getTipDetail(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        TipDetailResponseDto response =
+                tipDetailService.getTipDetail(loginUser, tipId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping
+    public ResponseEntity<Void> createTip(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody @Valid TipDto input
+    ) {
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
+
+        input.setUserId(userId);
+
+        tipCreateService.registerNewTip(input);
+
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @GetMapping("/{tipId}/edit")
+    public ResponseEntity<TipDto> getEditTip(
+            @PathVariable Long tipId
+    ) {
+        return ResponseEntity.ok(
+                tipUpdateService.getUpdateTip(tipId)
+        );
+    }
+
+    @PutMapping("/{tipId}")
+    public ResponseEntity<Void> updateTip(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId,
+            @RequestBody @Valid TipDto input
+    ) {
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
+
+        TipDetailResponseDto tipDetail =
+                tipDetailService.getTipDetail(
+                        userInfoService.getUserFromJwt(jwt),
                         tipId
                 );
 
-        Long interestCount = tipInterestRepository.countByTip_TipId(tipId);
+        if (!userId.equals(tipDetail.getUserId())) {
+            throw new RuntimeException("投稿者以外は更新できません");
+        }
 
-        boolean mybestByCurrentUser =
-                tipInterestRepository
-                        .findByUser_UserIdAndTip_TipIdAndIsRegisterMybestTrue(
-                                loginUser.getUserId(),
-                                tipId
-                        )
-                        .isPresent();
+        input.setUserId(userId);
 
-        Long mybestCount =
-                tipInterestRepository.countByTip_TipIdAndIsRegisterMybestTrue(tipId);
+        tipUpdateService.updateTip(tipId, input);
 
-        List<String> tagNameList = tipsTagRepository.findByTip_TipId(tipId)
-                .stream()
-                .map(tipsTag -> tipsTag.getTag().getTagName())
-                .toList();
-
-        List<CommentShowResponseDto> comments =
-                commentRepository.findByTip_TipIdOrderByCreatedTimeAsc(tipId)
-                        .stream()
-                        .map(this::toCommentShowResponseDto)
-                        .toList();
-
-        Optional<Notification> notification =
-                tipInterestRepository.findByUser_UserIdAndTip_TipId(
-                                loginUser.getUserId(),
-                                tipId
-                        )
-                        .flatMap(tipInterest ->
-                                notificationRepository.findByTipInterest_TipInterestId(
-                                        tipInterest.getTipInterestId()
-                                )
-                        );
-
-        return TipDetailResponseDto.builder()
-                .tipId(tip.getTipId())
-                .userId(tip.getUser().getUserId())
-                .userName(tip.getUser().getUserName())
-                .tipTitle(tip.getTipTitle())
-                .tipUrl(tip.getTipUrl())
-                .tipDetail(tip.getTipDetail())
-                .categoryId(tip.getCategory().getCategoryId())
-                .categoryName(tip.getCategory().getCategoryName())
-                .needId(tip.getNeed() == null ? null : tip.getNeed().getNeedsId())
-                .tagNameList(tagNameList)
-                .editFlg(editFlg)
-                .interestedByCurrentUser(interestedByCurrentUser)
-                .interestCount(interestCount)
-                .mybestByCurrentUser(mybestByCurrentUser)
-                .mybestCount(mybestCount)
-                .comments(comments)
-                .hasNotification(notification.isPresent())
-                .createdTime(tip.getCreatedTime())
-                .updatedTime(tip.getUpdatedTime())
-                .build();
+        return ResponseEntity.ok().build();
     }
 
-    private CommentShowResponseDto toCommentShowResponseDto(Comment comment) {
-        return CommentShowResponseDto.builder()
-                .commentId(comment.getCommentId())
-                .tipId(comment.getTip().getTipId())
-                .userId(comment.getUser().getUserId())
-                .userName(comment.getUser().getUserName())
-                .commentBody(comment.getCommentBody())
-                .createdTime(comment.getCreatedTime())
-                .build();
-    }
-}
-
-既存の詳細Serviceでは LikeRepository, MyBestRepository を見ていたけど、新設計では TipInterestRepository に寄せる。
-
-4. TipUpdateService
-
-旧 ContentUpdateService。
-更新時も deleteFlg は関係ない。
-
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.create.TipDto;
-import simplex.pj148.skippy.server.entity.Category;
-import simplex.pj148.skippy.server.entity.Need;
-import simplex.pj148.skippy.server.entity.Tag;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.TipsTag;
-import simplex.pj148.skippy.server.repository.CategoryRepository;
-import simplex.pj148.skippy.server.repository.NeedRepository;
-import simplex.pj148.skippy.server.repository.TagRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipsTagRepository;
-
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-public class TipUpdateService {
-
-    private final TipRepository tipRepository;
-    private final CategoryRepository categoryRepository;
-    private final NeedRepository needRepository;
-    private final TagRepository tagRepository;
-    private final TipsTagRepository tipsTagRepository;
-
-    public TipDto getUpdateTip(Long tipId) {
-        Tip tip = tipRepository.findByTipId(tipId)
-                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
-
-        List<Long> tagIdList = tipsTagRepository.findByTip_TipId(tipId)
-                .stream()
-                .map(tipsTag -> tipsTag.getTag().getTagId())
-                .toList();
-
-        return TipDto.builder()
-                .userId(tip.getUser().getUserId())
-                .tipTitle(tip.getTipTitle())
-                .tipUrl(tip.getTipUrl())
-                .tipDetail(tip.getTipDetail())
-                .categoryId(tip.getCategory().getCategoryId())
-                .needId(tip.getNeed() == null ? null : tip.getNeed().getNeedsId())
-                .tagIdList(tagIdList)
-                .build();
-    }
-
-    @Transactional
-    public void updateTip(
-            Long tipId,
-            TipDto input
+    @DeleteMapping("/{tipId}")
+    public ResponseEntity<Void> deleteTip(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId
     ) {
-        Tip tip = tipRepository.findByTipId(tipId)
-                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        Category category = categoryRepository.findByCategoryId(input.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
+        TipDetailResponseDto tipDetail =
+                tipDetailService.getTipDetail(
+                        userInfoService.getUserFromJwt(jwt),
+                        tipId
+                );
 
-        Need need = null;
-
-        if (input.getNeedId() != null) {
-            need = needRepository.findByNeedsId(input.getNeedId())
-                    .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
+        if (!userId.equals(tipDetail.getUserId())) {
+            throw new RuntimeException("投稿者以外は削除できません");
         }
 
-        tip.setTipTitle(input.getTipTitle());
-        tip.setTipUrl(input.getTipUrl());
-        tip.setTipDetail(input.getTipDetail());
-        tip.setCategory(category);
-        tip.setNeed(need);
+        tipDeleteService.deleteTip(tipId);
 
-        tipRepository.save(tip);
-
-        updateTipTags(tip, input.getTagIdList());
-    }
-
-    private void updateTipTags(
-            Tip tip,
-            List<Long> inputTagIdList
-    ) {
-        List<TipsTag> currentTipsTags =
-                tipsTagRepository.findByTip_TipId(tip.getTipId());
-
-        List<Long> currentTagIdList = currentTipsTags.stream()
-                .map(tipsTag -> tipsTag.getTag().getTagId())
-                .toList();
-
-        for (TipsTag currentTipsTag : currentTipsTags) {
-            Long currentTagId = currentTipsTag.getTag().getTagId();
-
-            if (!inputTagIdList.contains(currentTagId)) {
-                tipsTagRepository.delete(currentTipsTag);
-            }
-        }
-
-        for (Long inputTagId : inputTagIdList) {
-            if (!currentTagIdList.contains(inputTagId)) {
-                Tag tag = tagRepository.findByTagId(inputTagId)
-                        .orElseThrow(() -> new RuntimeException("タグが見つかりません"));
-
-                TipsTag tipsTag = TipsTag.builder()
-                        .tip(tip)
-                        .tag(tag)
-                        .build();
-
-                tipsTagRepository.save(tipsTag);
-            }
-        }
+        return ResponseEntity.noContent().build();
     }
 }
-5. TipDeleteService
+CommentController.java
+package simplex.pj148.skippy.server.controller;
 
-物理削除なので、ここが超重要。
-tip を消す前に、ぶら下がっている子データを消す。
-
-package simplex.pj148.skippy.server.service;
-
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.entity.TipInterest;
-import simplex.pj148.skippy.server.repository.CommentRepository;
-import simplex.pj148.skippy.server.repository.NotificationRepository;
-import simplex.pj148.skippy.server.repository.TipInterestRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipsTagRepository;
-
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-public class TipDeleteService {
-
-    private final TipRepository tipRepository;
-    private final TipsTagRepository tipsTagRepository;
-    private final CommentRepository commentRepository;
-    private final TipInterestRepository tipInterestRepository;
-    private final NotificationRepository notificationRepository;
-
-    @Transactional
-    public void deleteTip(Long tipId) {
-        if (!tipRepository.existsById(tipId)) {
-            throw new RuntimeException("Tipが見つかりません");
-        }
-
-        List<TipInterest> tipInterests =
-                tipInterestRepository.findByTip_TipId(tipId);
-
-        for (TipInterest tipInterest : tipInterests) {
-            notificationRepository.deleteByTipInterest_TipInterestId(
-                    tipInterest.getTipInterestId()
-            );
-        }
-
-        tipInterestRepository.deleteByTip_TipId(tipId);
-
-        commentRepository.deleteByTip_TipId(tipId);
-
-        tipsTagRepository.deleteByTip_TipId(tipId);
-
-        tipRepository.deleteById(tipId);
-    }
-}
-
-これをやらずに tipRepository.deleteById(tipId) だけすると、外部キー制約で落ちる可能性が高い。
-
-6. CommentService
-
-旧Serviceでは deleteFlg=true にしていたけど、今回は完全削除。
-
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
 import simplex.pj148.skippy.server.controller.dto.create.CommentDto;
 import simplex.pj148.skippy.server.controller.dto.response.CommentShowResponseDto;
-import simplex.pj148.skippy.server.entity.Comment;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.CommentRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
+import simplex.pj148.skippy.server.service.CommentService;
+import simplex.pj148.skippy.server.service.UserInfoService;
 
 import java.util.List;
 
-@Service
+@RestController
+@RequestMapping("/api/comments")
 @RequiredArgsConstructor
-public class CommentService {
+public class CommentController {
 
-    private final CommentRepository commentRepository;
-    private final TipRepository tipRepository;
-    private final UserRepository userRepository;
+    private final CommentService commentService;
+    private final UserInfoService userInfoService;
 
-    public List<CommentShowResponseDto> findComments(Long tipId) {
-        return commentRepository.findByTip_TipIdOrderByCreatedTimeAsc(tipId)
-                .stream()
-                .map(this::toCommentShowResponseDto)
-                .toList();
-    }
-
-    @Transactional
-    public void createNewComment(
-            CommentDto input,
-            Long tipId
+    @GetMapping("/{tipId}")
+    public List<CommentShowResponseDto> getComments(
+            @PathVariable Long tipId
     ) {
-        User user = userRepository.findByUserId(input.getUserId())
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-
-        Tip tip = tipRepository.findByTipId(tipId)
-                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
-
-        Comment comment = Comment.builder()
-                .user(user)
-                .tip(tip)
-                .commentBody(input.getCommentBody())
-                .isLooked(false)
-                .build();
-
-        commentRepository.save(comment);
+        return commentService.findComments(tipId);
     }
 
-    @Transactional
-    public void deleteComment(Long commentId) {
-        if (!commentRepository.existsById(commentId)) {
-            throw new RuntimeException("コメントが見つかりません");
-        }
+    @PostMapping("/{tipId}")
+    public ResponseEntity<Void> createComment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId,
+            @RequestBody @Valid CommentDto input
+    ) {
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        commentRepository.deleteById(commentId);
+        input.setUserId(userId);
+
+        commentService.createNewComment(input, tipId);
+
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    private CommentShowResponseDto toCommentShowResponseDto(Comment comment) {
-        return CommentShowResponseDto.builder()
-                .commentId(comment.getCommentId())
-                .tipId(comment.getTip().getTipId())
-                .userId(comment.getUser().getUserId())
-                .userName(comment.getUser().getUserName())
-                .commentBody(comment.getCommentBody())
-                .createdTime(comment.getCreatedTime())
-                .isLooked(comment.getIsLooked())
-                .build();
+    @DeleteMapping("/{commentId}")
+    public ResponseEntity<Void> deleteComment(
+            @PathVariable Long commentId
+    ) {
+        commentService.deleteComment(commentId);
+
+        return ResponseEntity.noContent().build();
     }
 }
-7. TipInterestService
+TipInterestController.java
 
-旧 LikeService, FavoriteService, MyBestService をまとめる。
+旧 LikeController, MyBestController を統合したやつ。
 
-package simplex.pj148.skippy.server.service;
+package simplex.pj148.skippy.server.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.TipInterest;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.NotificationRepository;
-import simplex.pj148.skippy.server.repository.TipInterestRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.service.TipInterestService;
+import simplex.pj148.skippy.server.service.UserInfoService;
 
-@Service
+@RestController
+@RequestMapping("/api/tip-interests")
 @RequiredArgsConstructor
-public class TipInterestService {
+public class TipInterestController {
 
-    private final TipInterestRepository tipInterestRepository;
-    private final TipRepository tipRepository;
-    private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
+    private final TipInterestService tipInterestService;
+    private final UserInfoService userInfoService;
 
-    @Transactional
-    public void registerInterest(
-            Long userId,
-            Long tipId
+    @PostMapping("/{tipId}")
+    public ResponseEntity<Void> registerInterest(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId
     ) {
-        if (tipInterestRepository.existsByUser_UserIdAndTip_TipId(userId, tipId)) {
-            return;
-        }
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        User user = userRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+        tipInterestService.registerInterest(userId, tipId);
 
-        Tip tip = tipRepository.findByTipId(tipId)
-                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
-
-        TipInterest tipInterest = TipInterest.builder()
-                .user(user)
-                .tip(tip)
-                .isLooked(false)
-                .isRegisterMybest(false)
-                .build();
-
-        tipInterestRepository.save(tipInterest);
+        return ResponseEntity.ok().build();
     }
 
-    @Transactional
-    public void cancelInterest(
-            Long userId,
-            Long tipId
+    @DeleteMapping("/{tipId}")
+    public ResponseEntity<Void> cancelInterest(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId
     ) {
-        TipInterest tipInterest =
-                tipInterestRepository.findByUser_UserIdAndTip_TipId(userId, tipId)
-                        .orElseThrow(() -> new RuntimeException("気になる登録がありません"));
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        notificationRepository.deleteByTipInterest_TipInterestId(
-                tipInterest.getTipInterestId()
-        );
+        tipInterestService.cancelInterest(userId, tipId);
 
-        tipInterestRepository.delete(tipInterest);
+        return ResponseEntity.noContent().build();
     }
 
-    @Transactional
-    public void registerMybest(
-            Long userId,
-            Long tipId
+    @PostMapping("/{tipId}/mybest")
+    public ResponseEntity<Void> registerMybest(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId
     ) {
-        TipInterest tipInterest =
-                tipInterestRepository.findByUser_UserIdAndTip_TipId(userId, tipId)
-                        .orElseGet(() -> createTipInterest(userId, tipId));
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        tipInterest.setIsRegisterMybest(true);
+        tipInterestService.registerMybest(userId, tipId);
 
-        tipInterestRepository.save(tipInterest);
+        return ResponseEntity.ok().build();
     }
 
-    @Transactional
-    public void cancelMybest(
-            Long userId,
-            Long tipId
+    @DeleteMapping("/{tipId}/mybest")
+    public ResponseEntity<Void> cancelMybest(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long tipId
     ) {
-        TipInterest tipInterest =
-                tipInterestRepository.findByUser_UserIdAndTip_TipId(userId, tipId)
-                        .orElseThrow(() -> new RuntimeException("気になる登録がありません"));
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        tipInterest.setIsRegisterMybest(false);
+        tipInterestService.cancelMybest(userId, tipId);
 
-        tipInterestRepository.save(tipInterest);
-    }
-
-    private TipInterest createTipInterest(
-            Long userId,
-            Long tipId
-    ) {
-        User user = userRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-
-        Tip tip = tipRepository.findByTipId(tipId)
-                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
-
-        TipInterest tipInterest = TipInterest.builder()
-                .user(user)
-                .tip(tip)
-                .isLooked(false)
-                .isRegisterMybest(false)
-                .build();
-
-        return tipInterestRepository.save(tipInterest);
+        return ResponseEntity.noContent().build();
     }
 }
-8. NeedService
+NeedController.java
+package simplex.pj148.skippy.server.controller;
 
-deleteFlg なしなので、削除は物理削除。
-
-package simplex.pj148.skippy.server.service;
-
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
 import simplex.pj148.skippy.server.controller.dto.create.NeedDto;
 import simplex.pj148.skippy.server.controller.dto.response.NeedResponseDto;
-import simplex.pj148.skippy.server.entity.Category;
-import simplex.pj148.skippy.server.entity.Need;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.CategoryRepository;
-import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
-import simplex.pj148.skippy.server.repository.NeedRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
+import simplex.pj148.skippy.server.service.NeedService;
+import simplex.pj148.skippy.server.service.UserInfoService;
 
-@Service
+@RestController
+@RequestMapping("/api/needs")
 @RequiredArgsConstructor
-public class NeedService {
+public class NeedController {
 
-    private final NeedRepository needRepository;
-    private final NeedEmpathyRepository needEmpathyRepository;
-    private final UserRepository userRepository;
-    private final CategoryRepository categoryRepository;
+    private final NeedService needService;
+    private final UserInfoService userInfoService;
 
-    public Page<NeedResponseDto> findAllNeeds(Pageable pageable) {
-        return needRepository.findAllByOrderByCreatedTimeDesc(pageable)
-                .map(this::toNeedResponseDto);
+    @GetMapping
+    public Page<NeedResponseDto> listNeeds(
+            @PageableDefault(
+                    size = 20,
+                    sort = "createdTime",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
+    ) {
+        return needService.findAllNeeds(pageable);
     }
 
-    @Transactional
-    public void createNewNeed(NeedDto input) {
-        User user = userRepository.findByUserId(input.getUserId())
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+    @PostMapping
+    public ResponseEntity<Void> createNeed(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody @Valid NeedDto input
+    ) {
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        Category category = categoryRepository.findByCategoryId(input.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
+        input.setUserId(userId);
 
-        Need need = Need.builder()
-                .user(user)
-                .needTitle(input.getNeedTitle())
-                .needsDetail(input.getNeedsDetail())
-                .category(category)
-                .wantCount(0L)
-                .build();
+        needService.createNewNeed(input);
 
-        needRepository.save(need);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    @Transactional
-    public void deleteNeed(Long needsId) {
-        Need need = needRepository.findByNeedsId(needsId)
-                .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
+    @DeleteMapping("/{needsId}")
+    public ResponseEntity<Void> deleteNeed(
+            @PathVariable Long needsId
+    ) {
+        needService.deleteNeed(needsId);
 
-        needEmpathyRepository.findByNeed_NeedsId(needsId)
-                .forEach(needEmpathyRepository::delete);
-
-        needRepository.delete(need);
-    }
-
-    private NeedResponseDto toNeedResponseDto(Need need) {
-        Long empathyCount = needEmpathyRepository.countByNeed_NeedsId(
-                need.getNeedsId()
-        );
-
-        return NeedResponseDto.builder()
-                .needsId(need.getNeedsId())
-                .userId(need.getUser().getUserId())
-                .userName(need.getUser().getUserName())
-                .needTitle(need.getNeedTitle())
-                .needsDetail(need.getNeedsDetail())
-                .categoryId(need.getCategory().getCategoryId())
-                .categoryName(need.getCategory().getCategoryName())
-                .empathyCount(empathyCount)
-                .createdTime(need.getCreatedTime())
-                .updatedTime(need.getUpdatedTime())
-                .build();
+        return ResponseEntity.noContent().build();
     }
 }
-9. NeedEmpathyService
+NeedEmpathyController.java
 
-旧 WantService の置き換え。
+旧 WantController の置き換え。
 
-package simplex.pj148.skippy.server.service;
+package simplex.pj148.skippy.server.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.entity.Need;
-import simplex.pj148.skippy.server.entity.NeedEmpathy;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
-import simplex.pj148.skippy.server.repository.NeedRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.service.NeedEmpathyService;
+import simplex.pj148.skippy.server.service.UserInfoService;
 
-@Service
+@RestController
+@RequestMapping("/api/need-empathies")
 @RequiredArgsConstructor
-public class NeedEmpathyService {
+public class NeedEmpathyController {
 
-    private final NeedEmpathyRepository needEmpathyRepository;
-    private final NeedRepository needRepository;
-    private final UserRepository userRepository;
+    private final NeedEmpathyService needEmpathyService;
+    private final UserInfoService userInfoService;
 
-    @Transactional
-    public void registerEmpathy(
-            Long userId,
-            Long needsId
+    @PostMapping("/{needsId}")
+    public ResponseEntity<Void> registerEmpathy(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long needsId
     ) {
-        if (needEmpathyRepository.existsByUser_UserIdAndNeed_NeedsId(userId, needsId)) {
-            return;
-        }
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        User user = userRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+        needEmpathyService.registerEmpathy(userId, needsId);
 
-        Need need = needRepository.findByNeedsId(needsId)
-                .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
-
-        NeedEmpathy empathy = NeedEmpathy.builder()
-                .user(user)
-                .need(need)
-                .isLooked(false)
-                .build();
-
-        needEmpathyRepository.save(empathy);
+        return ResponseEntity.ok().build();
     }
 
-    @Transactional
-    public void cancelEmpathy(
-            Long userId,
-            Long needsId
+    @DeleteMapping("/{needsId}")
+    public ResponseEntity<Void> cancelEmpathy(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long needsId
     ) {
-        NeedEmpathy empathy =
-                needEmpathyRepository.findByUser_UserIdAndNeed_NeedsId(userId, needsId)
-                        .orElseThrow(() -> new RuntimeException("共感登録がありません"));
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        needEmpathyRepository.delete(empathy);
+        needEmpathyService.cancelEmpathy(userId, needsId);
+
+        return ResponseEntity.noContent().build();
     }
 }
-10. NotificationService
+NotificationController.java
+package simplex.pj148.skippy.server.controller;
 
-通知設定を作成・更新・削除する。
-
-package simplex.pj148.skippy.server.service;
-
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
 import simplex.pj148.skippy.server.controller.dto.create.NotificationDto;
-import simplex.pj148.skippy.server.entity.Frequency;
 import simplex.pj148.skippy.server.entity.Notification;
-import simplex.pj148.skippy.server.entity.TipInterest;
-import simplex.pj148.skippy.server.repository.FrequencyRepository;
-import simplex.pj148.skippy.server.repository.NotificationRepository;
-import simplex.pj148.skippy.server.repository.TipInterestRepository;
+import simplex.pj148.skippy.server.service.NotificationService;
+import simplex.pj148.skippy.server.service.UserInfoService;
 
 import java.util.List;
 
-@Service
+@RestController
+@RequestMapping("/api/notifications")
 @RequiredArgsConstructor
-public class NotificationService {
+public class NotificationController {
 
-    private final NotificationRepository notificationRepository;
-    private final TipInterestRepository tipInterestRepository;
-    private final FrequencyRepository frequencyRepository;
+    private final NotificationService notificationService;
+    private final UserInfoService userInfoService;
 
-    public List<Notification> findMyNotifications(Long userId) {
-        return notificationRepository.findByTipInterest_User_UserId(userId);
-    }
-
-    @Transactional
-    public void createNotification(NotificationDto input) {
-        TipInterest tipInterest =
-                tipInterestRepository.findByTipInterestId(input.getTipInterestId())
-                        .orElseThrow(() -> new RuntimeException("気になる登録が見つかりません"));
-
-        Frequency frequency =
-                frequencyRepository.findByFrequencyId(input.getFrequencyId())
-                        .orElseThrow(() -> new RuntimeException("通知頻度が見つかりません"));
-
-        validateNotificationRule(
-                frequency.getFrequencyName(),
-                input.getNotificationWeek(),
-                input.getNotificationDay()
-        );
-
-        Notification notification = Notification.builder()
-                .tipInterest(tipInterest)
-                .frequency(frequency)
-                .notificationWeek(input.getNotificationWeek())
-                .notificationDay(input.getNotificationDay())
-                .notificationTime(input.getNotificationTime())
-                .isActive(true)
-                .build();
-
-        notificationRepository.save(notification);
-    }
-
-    @Transactional
-    public void updateNotification(
-            Long notificationId,
-            NotificationDto input
+    @GetMapping
+    public List<Notification> findMyNotifications(
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        Notification notification =
-                notificationRepository.findByNotificationId(notificationId)
-                        .orElseThrow(() -> new RuntimeException("通知設定が見つかりません"));
+        Long userId = userInfoService.getUserFromJwt(jwt).getUserId();
 
-        Frequency frequency =
-                frequencyRepository.findByFrequencyId(input.getFrequencyId())
-                        .orElseThrow(() -> new RuntimeException("通知頻度が見つかりません"));
-
-        validateNotificationRule(
-                frequency.getFrequencyName(),
-                input.getNotificationWeek(),
-                input.getNotificationDay()
-        );
-
-        notification.setFrequency(frequency);
-        notification.setNotificationWeek(input.getNotificationWeek());
-        notification.setNotificationDay(input.getNotificationDay());
-        notification.setNotificationTime(input.getNotificationTime());
-
-        notificationRepository.save(notification);
+        return notificationService.findMyNotifications(userId);
     }
 
-    @Transactional
-    public void deleteNotification(Long notificationId) {
-        if (!notificationRepository.existsById(notificationId)) {
-            throw new RuntimeException("通知設定が見つかりません");
-        }
-
-        notificationRepository.deleteById(notificationId);
-    }
-
-    @Transactional
-    public void changeActive(
-            Long notificationId,
-            boolean active
+    @PostMapping
+    public ResponseEntity<Void> createNotification(
+            @RequestBody @Valid NotificationDto input
     ) {
-        Notification notification =
-                notificationRepository.findByNotificationId(notificationId)
-                        .orElseThrow(() -> new RuntimeException("通知設定が見つかりません"));
+        notificationService.createNotification(input);
 
-        notification.setIsActive(active);
-
-        notificationRepository.save(notification);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    private void validateNotificationRule(
-            String frequencyName,
-            Integer notificationWeek,
-            Integer notificationDay
+    @PutMapping("/{notificationId}")
+    public ResponseEntity<Void> updateNotification(
+            @PathVariable Long notificationId,
+            @RequestBody @Valid NotificationDto input
     ) {
-        if ("DAILY".equals(frequencyName)) {
-            if (notificationWeek != null || notificationDay != null) {
-                throw new RuntimeException("毎日通知では曜日・日付を指定できません");
-            }
-            return;
-        }
+        notificationService.updateNotification(notificationId, input);
 
-        if ("WEEKLY".equals(frequencyName)) {
-            if (notificationWeek == null) {
-                throw new RuntimeException("毎週通知では曜日指定が必要です");
-            }
+        return ResponseEntity.ok().build();
+    }
 
-            if (notificationDay != null) {
-                throw new RuntimeException("毎週通知では日付指定はできません");
-            }
+    @PatchMapping("/{notificationId}/active")
+    public ResponseEntity<Void> changeActive(
+            @PathVariable Long notificationId,
+            @RequestParam boolean active
+    ) {
+        notificationService.changeActive(notificationId, active);
 
-            if (notificationWeek < 1 || notificationWeek > 7) {
-                throw new RuntimeException("曜日は1〜7で指定してください");
-            }
+        return ResponseEntity.ok().build();
+    }
 
-            return;
-        }
+    @DeleteMapping("/{notificationId}")
+    public ResponseEntity<Void> deleteNotification(
+            @PathVariable Long notificationId
+    ) {
+        notificationService.deleteNotification(notificationId);
 
-        if ("MONTHLY".equals(frequencyName)) {
-            if (notificationDay == null) {
-                throw new RuntimeException("毎月通知では日付指定が必要です");
-            }
-
-            if (notificationWeek != null) {
-                throw new RuntimeException("毎月通知では曜日指定はできません");
-            }
-
-            if (notificationDay < 1 || notificationDay > 31) {
-                throw new RuntimeException("日付は1〜31で指定してください");
-            }
-
-            return;
-        }
-
-        throw new RuntimeException("不正な通知頻度です");
+        return ResponseEntity.noContent().build();
     }
 }
-まとめ
+旧Controllerからの対応関係
+ContentController
+→ TipController
 
-今回のService層の本質はこれ。
+LikeController
+→ TipInterestController の /{tipId}
 
-Content系
-→ Tip系に変更
+MyBestController
+→ TipInterestController の /{tipId}/mybest
 
-Like / Favorite / MyBest
-→ TipInterestService に統合
+WantController
+→ NeedEmpathyController
 
-Want
-→ NeedEmpathyService に変更
+NeedsController
+→ NeedController
 
-deleteFlg
-→ 全削除。物理削除にする。
+CommentController
+→ CommentController ただし contentId → tipId
 
-削除Service
-→ 親を消す前に子を消す。
+CategoryController
+→ ほぼそのまま
 
-特に大事なのは、Tip削除の順番。
+TagController
+→ ほぼそのまま
 
-notifications
-↓
-tip_interest
-↓
-comments
-↓
-tips_tag
-↓
-tips
+AuthController
+→ Userの department/position が affiliated/rank に変わる
+deleteFlgなしで変わるところ
 
-この順番で消す。
-ここを雑にする
+旧Controllerでは、削除系がこういう形だった。
+
+@PutMapping("/{contentsId}/delete")
+
+今回の物理削除では、REST的にはこっちが自然。
+
+@DeleteMapping("/{tipId}")
+
+コメントも同じ。
+
+@DeleteMapping("/{commentId}")
+
+つまり今回のControllerでは、削除は全部 DELETE に寄せる。
+
+重要な注意
+
+NotificationController の findMyNotifications は今 List<Notification> を返しているけど、本当はEntityを直接返さずに NotificationResponseDto にした方がいい。
+最初に動かすだけならEntity返しでも動くけど、循環参照が出る可能性があるから、あとでDTO変換にした方が安全。
+
+今の完全版は、DB変更後にまずControllerを成立させるための構成。
+次にやるなら、NotificationService.findMyNotifications の戻り値を List<NotificationResponseDto> に変えるのがいい。
