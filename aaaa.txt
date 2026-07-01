@@ -1,530 +1,1082 @@
-Repository構成
+Service層の構成
 
-今回のRepositoryはこれ。
+今回ならこう分けるのがいい。
 
-repository
-├── AffiliatedRepository.java
-├── CategoryRepository.java
-├── CommentRepository.java
-├── FrequencyRepository.java
-├── NeedEmpathyRepository.java
-├── NeedRepository.java
-├── NotificationRepository.java
-├── RankRepository.java
-├── TagRepository.java
-├── TipInterestRepository.java
-├── TipRepository.java
-├── TipsTagRepository.java
-└── UserRepository.java
+service
+├── CategoryService
+├── TagService
+├── UserService
+├── NeedService
+├── NeedEmpathyService
+├── TipService
+├── TipCreateService
+├── TipDetailService
+├── TipUpdateService
+├── TipInterestService
+├── CommentService
+└── NotificationService
 
-削除・統合する旧Repositoryはこれ。
+既存に寄せるなら、ContentService, ContentCreateService, ContentDetailService, ContentUpdateService を名前変更する感じ。
 
-削除 / 置き換え
-- ContentRepository      → TipRepository
-- ContentsTagRepository  → TipsTagRepository
-- LikeRepository         → TipInterestRepository
-- FavoriteRepository     → TipInterestRepository
-- MyBestRepository       → TipInterestRepository
-- WantRepository         → NeedEmpathyRepository
-1. AffiliatedRepository.java
-package simplex.pj148.skippy.server.repository;
+1. TipService
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Affiliated;
+投稿一覧・検索・DTO変換担当。
+旧 ContentService の置き換え。
 
-import java.util.Optional;
+package simplex.pj148.skippy.server.service;
 
-@Repository
-public interface AffiliatedRepository extends JpaRepository<Affiliated, Long> {
-
-    Optional<Affiliated> findByAffiliatedId(Long affiliatedId);
-
-    Optional<Affiliated> findByAffiliatedName(String affiliatedName);
-
-    boolean existsByAffiliatedName(String affiliatedName);
-}
-2. RankRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Rank;
-
-import java.util.Optional;
-
-@Repository
-public interface RankRepository extends JpaRepository<Rank, Long> {
-
-    Optional<Rank> findByRankId(Long rankId);
-
-    Optional<Rank> findByRankName(String rankName);
-
-    boolean existsByRankName(String rankName);
-}
-3. FrequencyRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Frequency;
-
-import java.util.Optional;
-
-@Repository
-public interface FrequencyRepository extends JpaRepository<Frequency, Long> {
-
-    Optional<Frequency> findByFrequencyId(Long frequencyId);
-
-    Optional<Frequency> findByFrequencyName(String frequencyName);
-
-    boolean existsByFrequencyName(String frequencyName);
-}
-4. CategoryRepository.java
-
-既存の CategoryRepository はほぼそのままでいい。
-ただ、カテゴリ名の重複チェック用に findByCategoryName / existsByCategoryName を足すと便利。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Category;
-
-import java.util.Optional;
-
-@Repository
-public interface CategoryRepository extends JpaRepository<Category, Long> {
-
-    Optional<Category> findByCategoryId(Long categoryId);
-
-    Optional<Category> findByCategoryName(String categoryName);
-
-    boolean existsByCategoryName(String categoryName);
-}
-5. TagRepository.java
-
-既存の TagRepository は findByTagId がある形。
-タグ作成・重複防止を考えるなら findByTagName も追加。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Tag;
-
-import java.util.Optional;
-
-@Repository
-public interface TagRepository extends JpaRepository<Tag, Long> {
-
-    Optional<Tag> findByTagId(Long tagId);
-
-    Optional<Tag> findByTagName(String tagName);
-
-    boolean existsByTagName(String tagName);
-}
-6. UserRepository.java
-
-新DBでは users が affiliated_id, rank_id を持つ。
-既存の user_department, user_position の文字列検索ではなく、Affiliated / Rank 経由で検索する。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.User;
-
-import java.util.List;
-import java.util.Optional;
-
-@Repository
-public interface UserRepository extends JpaRepository<User, Long> {
-
-    Optional<User> findByUserId(Long userId);
-
-    Optional<User> findByMailAddress(String mailAddress);
-
-    boolean existsByMailAddress(String mailAddress);
-
-    List<User> findByUserNameContainingIgnoreCase(String userName);
-
-    List<User> findByAffiliated_AffiliatedId(Long affiliatedId);
-
-    List<User> findByRank_RankId(Long rankId);
-
-    List<User> findByAffiliated_AffiliatedNameContainingIgnoreCase(String affiliatedName);
-
-    List<User> findByRank_RankNameContainingIgnoreCase(String rankName);
-}
-7. NeedRepository.java
-
-deleteFlg なしなので、findTop10ByDeleteFlgFalseOrderByCreatedTimeDesc() は使わない。
-完全削除なら普通に存在する Need だけ取ればいい。
-
-package simplex.pj148.skippy.server.repository;
-
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Need;
-
-import java.util.List;
-import java.util.Optional;
-
-@Repository
-public interface NeedRepository extends JpaRepository<Need, Long> {
-
-    Optional<Need> findByNeedsId(Long needsId);
-
-    List<Need> findTop10ByOrderByCreatedTimeDesc();
-
-    Page<Need> findAllByOrderByCreatedTimeDesc(Pageable pageable);
-
-    Page<Need> findByUser_UserIdOrderByCreatedTimeDesc(
-            Long userId,
-            Pageable pageable
-    );
-
-    Page<Need> findByCategory_CategoryIdOrderByCreatedTimeDesc(
-            Long categoryId,
-            Pageable pageable
-    );
-
-    Page<Need> findByNeedTitleContainingIgnoreCaseOrderByCreatedTimeDesc(
-            String needTitle,
-            Pageable pageable
-    );
-}
-
-Entity側のフィールド名が needTitle ではなく needsTitle なら、メソッド名もこうする。
-
-Page<Need> findByNeedsTitleContainingIgnoreCaseOrderByCreatedTimeDesc(...);
-8. NeedEmpathyRepository.java
-
-旧 WantRepository の置き換え。
-Need に対する「共感」を管理する。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.NeedEmpathy;
-
-import java.util.List;
-import java.util.Optional;
-
-@Repository
-public interface NeedEmpathyRepository extends JpaRepository<NeedEmpathy, Long> {
-
-    Optional<NeedEmpathy> findByNeedEmpathyId(Long needEmpathyId);
-
-    Optional<NeedEmpathy> findByUser_UserIdAndNeed_NeedsId(
-            Long userId,
-            Long needsId
-    );
-
-    boolean existsByUser_UserIdAndNeed_NeedsId(
-            Long userId,
-            Long needsId
-    );
-
-    Long countByNeed_NeedsId(Long needsId);
-
-    List<NeedEmpathy> findByUser_UserId(Long userId);
-
-    List<NeedEmpathy> findByNeed_NeedsId(Long needsId);
-
-    void deleteByUser_UserIdAndNeed_NeedsId(
-            Long userId,
-            Long needsId
-    );
-}
-
-deleteBy... を使うなら、Service側に @Transactional を付ける。
-
-9. TipRepository.java
-
-旧 ContentRepository の置き換え。
-deleteFlg なしなので privateFlg=false, deleteFlg=false みたいな条件は全部なし。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
+import org.springframework.stereotype.Service;
+import simplex.pj148.skippy.server.controller.dto.response.TipShowResponseDto;
 import simplex.pj148.skippy.server.entity.Tip;
-
-import java.util.List;
-import java.util.Optional;
-
-public interface TipRepository extends JpaRepository<Tip, Long> {
-
-    Optional<Tip> findByTipId(Long tipId);
-
-    Page<Tip> findAllByOrderByCreatedTimeDesc(Pageable pageable);
-
-    Page<Tip> findByUser_UserIdOrderByCreatedTimeDesc(
-            Long userId,
-            Pageable pageable
-    );
-
-    Page<Tip> findByCategory_CategoryIdOrderByCreatedTimeDesc(
-            Long categoryId,
-            Pageable pageable
-    );
-
-    List<Tip> findByNeed_NeedsId(Long needsId);
-
-    Page<Tip> findByTipTitleContainingIgnoreCaseOrderByCreatedTimeDesc(
-            String tipTitle,
-            Pageable pageable
-    );
-
-    @Query("""
-            SELECT t
-            FROM Tip t
-            WHERE (:categoryId = 0 OR t.category.categoryId = :categoryId)
-            ORDER BY t.createdTime DESC
-            """)
-    Page<Tip> findSelectedTipsSortedByCreatedTime(
-            Pageable pageable,
-            @Param("categoryId") Long categoryId
-    );
-
-    @Query("""
-            SELECT t
-            FROM Tip t
-            LEFT JOIN TipInterest ti ON ti.tip = t
-            WHERE (:categoryId = 0 OR t.category.categoryId = :categoryId)
-            GROUP BY t
-            ORDER BY COUNT(ti) DESC, t.createdTime DESC
-            """)
-    Page<Tip> findSelectedTipsSortedByInterestCount(
-            Pageable pageable,
-            @Param("categoryId") Long categoryId
-    );
-
-    @Query("""
-            SELECT DISTINCT t
-            FROM Tip t
-            LEFT JOIN t.user u
-            LEFT JOIN t.category c
-            LEFT JOIN TipsTag tt ON tt.tip = t
-            LEFT JOIN tt.tag tag
-            WHERE (:context = 'title' AND LOWER(t.tipTitle) LIKE LOWER(CONCAT('%', :keyword, '%')))
-               OR (:context = 'user' AND LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%')))
-               OR (:context = 'category' AND LOWER(c.categoryName) LIKE LOWER(CONCAT('%', :keyword, '%')))
-               OR (:context = 'tag' AND LOWER(tag.tagName) LIKE LOWER(CONCAT('%', :keyword, '%')))
-            ORDER BY t.createdTime DESC
-            """)
-    Page<Tip> searchTips(
-            @Param("keyword") String keyword,
-            @Param("context") String context,
-            Pageable pageable
-    );
-}
-
-ここでは検索をRepositoryに寄せた版にしている。
-ただし、前に話した「空白区切り複数キーワード検索」までやるなら、この @Query ではなく Custom Repository / Criteria API の方がよい。今回はRepository完全版として、まず1文字列検索の形にしている。
-
-10. TipsTagRepository.java
-
-旧 ContentsTagRepository の置き換え。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.TipsTag;
-
-import java.util.List;
-import java.util.Optional;
-
-@Repository
-public interface TipsTagRepository extends JpaRepository<TipsTag, Long> {
-
-    List<TipsTag> findByTip_TipId(Long tipId);
-
-    List<TipsTag> findByTag_TagId(Long tagId);
-
-    Optional<TipsTag> findByTip_TipIdAndTag_TagId(
-            Long tipId,
-            Long tagId
-    );
-
-    boolean existsByTip_TipIdAndTag_TagId(
-            Long tipId,
-            Long tagId
-    );
-
-    void deleteByTip_TipIdAndTag_TagId(
-            Long tipId,
-            Long tagId
-    );
-
-    void deleteByTip_TipId(Long tipId);
-}
-
-deleteBy... を使うならService側は @Transactional 必須。
-
-11. CommentRepository.java
-
-旧 CommentRepository は Content 紐づきだったので、Tip 紐づきに変更。
-deleteFlg なしなので AndDeleteFlgFalse は消す。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Comment;
-
-import java.util.List;
-
-@Repository
-public interface CommentRepository extends JpaRepository<Comment, Long> {
-
-    List<Comment> findByTip_TipIdOrderByCreatedTimeAsc(Long tipId);
-
-    List<Comment> findByUser_UserIdOrderByCreatedTimeDesc(Long userId);
-
-    Long countByTip_TipId(Long tipId);
-
-    void deleteByTip_TipId(Long tipId);
-}
-12. TipInterestRepository.java
-
-旧 LikeRepository, FavoriteRepository, MyBestRepository を集約するRepository。
-今回の新ERだと、tip_interest がかなり中心になる。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import simplex.pj148.skippy.server.entity.TipInterest;
+import simplex.pj148.skippy.server.entity.TipsTag;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.TipInterestRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipsTagRepository;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Set;
 
-public interface TipInterestRepository extends JpaRepository<TipInterest, Long> {
+@Service
+@RequiredArgsConstructor
+public class TipService {
 
-    Optional<TipInterest> findByTipInterestId(Long tipInterestId);
+    private final TipRepository tipRepository;
+    private final TipInterestRepository tipInterestRepository;
+    private final TipsTagRepository tipsTagRepository;
 
-    boolean existsByUser_UserIdAndTip_TipId(
+    public Page<TipShowResponseDto> findAllTips(
+            User loginUser,
+            Pageable pageable,
+            String orderBy,
+            Long categoryId
+    ) {
+        Page<Tip> tipPage;
+
+        if ("interestCount".equals(orderBy)) {
+            tipPage = tipRepository.findSelectedTipsSortedByInterestCount(pageable, categoryId);
+        } else {
+            tipPage = tipRepository.findSelectedTipsSortedByCreatedTime(pageable, categoryId);
+        }
+
+        return toTipShowResponseDtoPage(tipPage, loginUser);
+    }
+
+    public Page<TipShowResponseDto> searchTips(
+            String keyword,
+            String context,
+            User loginUser,
+            Pageable pageable
+    ) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return findAllTips(loginUser, pageable, "createdTime", 0L);
+        }
+
+        Page<Tip> tipPage = tipRepository.searchTips(
+                keyword.trim(),
+                context,
+                pageable
+        );
+
+        return toTipShowResponseDtoPage(tipPage, loginUser);
+    }
+
+    public Page<TipShowResponseDto> findTipsByUser(
             Long userId,
-            Long tipId
-    );
+            User loginUser,
+            Pageable pageable
+    ) {
+        Page<Tip> tipPage = tipRepository.findByUser_UserIdOrderByCreatedTimeDesc(
+                userId,
+                pageable
+        );
 
-    Optional<TipInterest> findByUser_UserIdAndTip_TipId(
-            Long userId,
-            Long tipId
-    );
+        return toTipShowResponseDtoPage(tipPage, loginUser);
+    }
 
-    List<TipInterest> findByUser_UserId(Long userId);
+    private Page<TipShowResponseDto> toTipShowResponseDtoPage(
+            Page<Tip> tipPage,
+            User loginUser
+    ) {
+        List<Long> tipIds = tipPage.getContent()
+                .stream()
+                .map(Tip::getTipId)
+                .toList();
 
-    List<TipInterest> findByTip_TipId(Long tipId);
+        if (tipIds.isEmpty()) {
+            return tipPage.map(tip -> toTipShowResponseDto(tip, false, 0L));
+        }
 
-    Long countByTip_TipId(Long tipId);
+        List<TipInterest> userInterests =
+                tipInterestRepository.findByUser_UserIdAndTip_TipIdIn(
+                        loginUser.getUserId(),
+                        tipIds
+                );
 
-    @Query("""
-            SELECT ti.tip.tipId, COUNT(ti)
-            FROM TipInterest ti
-            WHERE ti.tip.tipId IN :tipIds
-            GROUP BY ti.tip.tipId
-            """)
-    List<Object[]> countInterestsByTipIds(
-            @Param("tipIds") List<Long> tipIds
-    );
+        Set<Long> interestedTipIdSet = new HashSet<>(
+                userInterests.stream()
+                        .map(tipInterest -> tipInterest.getTip().getTipId())
+                        .toList()
+        );
 
-    List<TipInterest> findByUser_UserIdAndTip_TipIdIn(
-            Long userId,
-            List<Long> tipIds
-    );
+        List<Object[]> interestCounts =
+                tipInterestRepository.countInterestsByTipIds(tipIds);
 
-    List<TipInterest> findByUser_UserIdAndIsRegisterMybestTrue(
-            Long userId
-    );
+        Map<Long, Long> interestCountMap = new HashMap<>();
 
-    Optional<TipInterest> findByUser_UserIdAndTip_TipIdAndIsRegisterMybestTrue(
-            Long userId,
-            Long tipId
-    );
+        for (Object[] row : interestCounts) {
+            Long tipId = (Long) row[0];
+            Long count = (Long) row[1];
+            interestCountMap.put(tipId, count);
+        }
 
-    Long countByTip_TipIdAndIsRegisterMybestTrue(Long tipId);
+        return tipPage.map(tip -> {
+            boolean interested = interestedTipIdSet.contains(tip.getTipId());
+            Long interestCount = interestCountMap.getOrDefault(tip.getTipId(), 0L);
 
-    void deleteByUser_UserIdAndTip_TipId(
-            Long userId,
-            Long tipId
-    );
+            return toTipShowResponseDto(tip, interested, interestCount);
+        });
+    }
 
-    void deleteByTip_TipId(Long tipId);
+    private TipShowResponseDto toTipShowResponseDto(
+            Tip tip,
+            boolean interested,
+            Long interestCount
+    ) {
+        List<TipsTag> tipsTags = tipsTagRepository.findByTip_TipId(tip.getTipId());
+
+        List<String> tagNameList = tipsTags.stream()
+                .map(tipsTag -> tipsTag.getTag().getTagName())
+                .toList();
+
+        return TipShowResponseDto.builder()
+                .tipId(tip.getTipId())
+                .userId(tip.getUser().getUserId())
+                .userName(tip.getUser().getUserName())
+                .tipTitle(tip.getTipTitle())
+                .tipUrl(tip.getTipUrl())
+                .tipDetail(tip.getTipDetail())
+                .categoryId(tip.getCategory().getCategoryId())
+                .categoryName(tip.getCategory().getCategoryName())
+                .tagNameList(tagNameList)
+                .interestedByCurrentUser(interested)
+                .interestCount(interestCount)
+                .createdTime(tip.getCreatedTime())
+                .updatedTime(tip.getUpdatedTime())
+                .build();
+    }
 }
 
-これで旧 LikeRepository の「投稿ごとのいいね数一括取得」と同じことを、TipInterest の気になる数としてできる。既存では LikeRepository に countLikesByContentIds があるので、その置き換えが countInterestsByTipIds。
+ポイントは、旧 LikeRepository を使っていたところを全部 TipInterestRepository に変えること。
 
-13. NotificationRepository.java
-
-通知設定用。
-deleteFlg ではなく、通知ON/OFFは isActive にするのが自然。
-
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import simplex.pj148.skippy.server.entity.Notification;
-
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
-
-@Repository
-public interface NotificationRepository extends JpaRepository<Notification, Long> {
-
-    Optional<Notification> findByNotificationId(Long notificationId);
-
-    Optional<Notification> findByTipInterest_TipInterestId(Long tipInterestId);
-
-    boolean existsByTipInterest_TipInterestId(Long tipInterestId);
-
-    List<Notification> findByTipInterest_User_UserId(Long userId);
-
-    List<Notification> findByTipInterest_User_UserIdAndIsActiveTrue(Long userId);
-
-    List<Notification> findByFrequency_FrequencyNameAndNotificationTimeAndIsActiveTrue(
-            String frequencyName,
-            LocalTime notificationTime
-    );
-
-    List<Notification> findByFrequency_FrequencyNameAndNotificationWeekAndNotificationTimeAndIsActiveTrue(
-            String frequencyName,
-            Integer notificationWeek,
-            LocalTime notificationTime
-    );
-
-    List<Notification> findByFrequency_FrequencyNameAndNotificationDayAndNotificationTimeAndIsActiveTrue(
-            String frequencyName,
-            Integer notificationDay,
-            LocalTime notificationTime
-    );
-
-    void deleteByTipInterest_TipInterestId(Long tipInterestId);
-}
-
-通知を1つの tip_interest に複数設定できる仕様にするなら、
-
-Optional<Notification> findByTipInterest_TipInterestId(...)
+likeRepository.countLikesByContentIds(...)
 
 ではなく、
 
-List<Notification> findByTipInterest_TipInterestId(Long tipInterestId);
+tipInterestRepository.countInterestsByTipIds(...)
 
-にした方がいい。
+になる。
 
-今回はER図的には notification_id が別であり、tip_interest_id にuniqueはなさそうだから、本当は複数通知も許せる。
-でも画面仕様が「1つの気になるTipにつき通知設定1つ」なら Optional でOK。
+2. TipCreateService
+
+旧 ContentCreateService の置き換え。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.create.TipDto;
+import simplex.pj148.skippy.server.entity.Category;
+import simplex.pj148.skippy.server.entity.Need;
+import simplex.pj148.skippy.server.entity.Tag;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.TipsTag;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+import simplex.pj148.skippy.server.repository.NeedRepository;
+import simplex.pj148.skippy.server.repository.TagRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipsTagRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+@Service
+@RequiredArgsConstructor
+public class TipCreateService {
+
+    private final TipRepository tipRepository;
+    private final TipsTagRepository tipsTagRepository;
+    private final TagRepository tagRepository;
+    private final CategoryRepository categoryRepository;
+    private final NeedRepository needRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public void registerNewTip(TipDto input) {
+        User user = userRepository.findByUserId(input.getUserId())
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Category category = categoryRepository.findByCategoryId(input.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
+
+        Need need = null;
+
+        if (input.getNeedId() != null) {
+            need = needRepository.findByNeedsId(input.getNeedId())
+                    .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
+        }
+
+        Tip tip = Tip.builder()
+                .user(user)
+                .tipTitle(input.getTipTitle())
+                .tipUrl(input.getTipUrl())
+                .tipDetail(input.getTipDetail())
+                .category(category)
+                .need(need)
+                .build();
+
+        tipRepository.save(tip);
+
+        for (Long tagId : input.getTagIdList()) {
+            Tag tag = tagRepository.findByTagId(tagId)
+                    .orElseThrow(() -> new RuntimeException("タグが見つかりません"));
+
+            TipsTag tipsTag = TipsTag.builder()
+                    .tip(tip)
+                    .tag(tag)
+                    .build();
+
+            tipsTagRepository.save(tipsTag);
+        }
+    }
+}
+
+既存では Content に privateFlg, deleteFlg を入れていたけど、今回は入れない。
+
+3. TipDetailService
+
+旧 ContentDetailService の置き換え。
+詳細画面で、コメント・タグ・気になる状態・mybest状態・通知設定を見る。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import simplex.pj148.skippy.server.controller.dto.response.CommentShowResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.TipDetailResponseDto;
+import simplex.pj148.skippy.server.entity.Comment;
+import simplex.pj148.skippy.server.entity.Notification;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.TipsTag;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CommentRepository;
+import simplex.pj148.skippy.server.repository.NotificationRepository;
+import simplex.pj148.skippy.server.repository.TipInterestRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipsTagRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class TipDetailService {
+
+    private final TipRepository tipRepository;
+    private final TipsTagRepository tipsTagRepository;
+    private final CommentRepository commentRepository;
+    private final TipInterestRepository tipInterestRepository;
+    private final NotificationRepository notificationRepository;
+
+    public TipDetailResponseDto getTipDetail(
+            User loginUser,
+            Long tipId
+    ) {
+        Tip tip = tipRepository.findByTipId(tipId)
+                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+
+        boolean editFlg = loginUser.getUserId().equals(tip.getUser().getUserId());
+
+        boolean interestedByCurrentUser =
+                tipInterestRepository.existsByUser_UserIdAndTip_TipId(
+                        loginUser.getUserId(),
+                        tipId
+                );
+
+        Long interestCount = tipInterestRepository.countByTip_TipId(tipId);
+
+        boolean mybestByCurrentUser =
+                tipInterestRepository
+                        .findByUser_UserIdAndTip_TipIdAndIsRegisterMybestTrue(
+                                loginUser.getUserId(),
+                                tipId
+                        )
+                        .isPresent();
+
+        Long mybestCount =
+                tipInterestRepository.countByTip_TipIdAndIsRegisterMybestTrue(tipId);
+
+        List<String> tagNameList = tipsTagRepository.findByTip_TipId(tipId)
+                .stream()
+                .map(tipsTag -> tipsTag.getTag().getTagName())
+                .toList();
+
+        List<CommentShowResponseDto> comments =
+                commentRepository.findByTip_TipIdOrderByCreatedTimeAsc(tipId)
+                        .stream()
+                        .map(this::toCommentShowResponseDto)
+                        .toList();
+
+        Optional<Notification> notification =
+                tipInterestRepository.findByUser_UserIdAndTip_TipId(
+                                loginUser.getUserId(),
+                                tipId
+                        )
+                        .flatMap(tipInterest ->
+                                notificationRepository.findByTipInterest_TipInterestId(
+                                        tipInterest.getTipInterestId()
+                                )
+                        );
+
+        return TipDetailResponseDto.builder()
+                .tipId(tip.getTipId())
+                .userId(tip.getUser().getUserId())
+                .userName(tip.getUser().getUserName())
+                .tipTitle(tip.getTipTitle())
+                .tipUrl(tip.getTipUrl())
+                .tipDetail(tip.getTipDetail())
+                .categoryId(tip.getCategory().getCategoryId())
+                .categoryName(tip.getCategory().getCategoryName())
+                .needId(tip.getNeed() == null ? null : tip.getNeed().getNeedsId())
+                .tagNameList(tagNameList)
+                .editFlg(editFlg)
+                .interestedByCurrentUser(interestedByCurrentUser)
+                .interestCount(interestCount)
+                .mybestByCurrentUser(mybestByCurrentUser)
+                .mybestCount(mybestCount)
+                .comments(comments)
+                .hasNotification(notification.isPresent())
+                .createdTime(tip.getCreatedTime())
+                .updatedTime(tip.getUpdatedTime())
+                .build();
+    }
+
+    private CommentShowResponseDto toCommentShowResponseDto(Comment comment) {
+        return CommentShowResponseDto.builder()
+                .commentId(comment.getCommentId())
+                .tipId(comment.getTip().getTipId())
+                .userId(comment.getUser().getUserId())
+                .userName(comment.getUser().getUserName())
+                .commentBody(comment.getCommentBody())
+                .createdTime(comment.getCreatedTime())
+                .build();
+    }
+}
+
+既存の詳細Serviceでは LikeRepository, MyBestRepository を見ていたけど、新設計では TipInterestRepository に寄せる。
+
+4. TipUpdateService
+
+旧 ContentUpdateService。
+更新時も deleteFlg は関係ない。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.create.TipDto;
+import simplex.pj148.skippy.server.entity.Category;
+import simplex.pj148.skippy.server.entity.Need;
+import simplex.pj148.skippy.server.entity.Tag;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.TipsTag;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+import simplex.pj148.skippy.server.repository.NeedRepository;
+import simplex.pj148.skippy.server.repository.TagRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipsTagRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class TipUpdateService {
+
+    private final TipRepository tipRepository;
+    private final CategoryRepository categoryRepository;
+    private final NeedRepository needRepository;
+    private final TagRepository tagRepository;
+    private final TipsTagRepository tipsTagRepository;
+
+    public TipDto getUpdateTip(Long tipId) {
+        Tip tip = tipRepository.findByTipId(tipId)
+                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+
+        List<Long> tagIdList = tipsTagRepository.findByTip_TipId(tipId)
+                .stream()
+                .map(tipsTag -> tipsTag.getTag().getTagId())
+                .toList();
+
+        return TipDto.builder()
+                .userId(tip.getUser().getUserId())
+                .tipTitle(tip.getTipTitle())
+                .tipUrl(tip.getTipUrl())
+                .tipDetail(tip.getTipDetail())
+                .categoryId(tip.getCategory().getCategoryId())
+                .needId(tip.getNeed() == null ? null : tip.getNeed().getNeedsId())
+                .tagIdList(tagIdList)
+                .build();
+    }
+
+    @Transactional
+    public void updateTip(
+            Long tipId,
+            TipDto input
+    ) {
+        Tip tip = tipRepository.findByTipId(tipId)
+                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+
+        Category category = categoryRepository.findByCategoryId(input.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
+
+        Need need = null;
+
+        if (input.getNeedId() != null) {
+            need = needRepository.findByNeedsId(input.getNeedId())
+                    .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
+        }
+
+        tip.setTipTitle(input.getTipTitle());
+        tip.setTipUrl(input.getTipUrl());
+        tip.setTipDetail(input.getTipDetail());
+        tip.setCategory(category);
+        tip.setNeed(need);
+
+        tipRepository.save(tip);
+
+        updateTipTags(tip, input.getTagIdList());
+    }
+
+    private void updateTipTags(
+            Tip tip,
+            List<Long> inputTagIdList
+    ) {
+        List<TipsTag> currentTipsTags =
+                tipsTagRepository.findByTip_TipId(tip.getTipId());
+
+        List<Long> currentTagIdList = currentTipsTags.stream()
+                .map(tipsTag -> tipsTag.getTag().getTagId())
+                .toList();
+
+        for (TipsTag currentTipsTag : currentTipsTags) {
+            Long currentTagId = currentTipsTag.getTag().getTagId();
+
+            if (!inputTagIdList.contains(currentTagId)) {
+                tipsTagRepository.delete(currentTipsTag);
+            }
+        }
+
+        for (Long inputTagId : inputTagIdList) {
+            if (!currentTagIdList.contains(inputTagId)) {
+                Tag tag = tagRepository.findByTagId(inputTagId)
+                        .orElseThrow(() -> new RuntimeException("タグが見つかりません"));
+
+                TipsTag tipsTag = TipsTag.builder()
+                        .tip(tip)
+                        .tag(tag)
+                        .build();
+
+                tipsTagRepository.save(tipsTag);
+            }
+        }
+    }
+}
+5. TipDeleteService
+
+物理削除なので、ここが超重要。
+tip を消す前に、ぶら下がっている子データを消す。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.entity.TipInterest;
+import simplex.pj148.skippy.server.repository.CommentRepository;
+import simplex.pj148.skippy.server.repository.NotificationRepository;
+import simplex.pj148.skippy.server.repository.TipInterestRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipsTagRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class TipDeleteService {
+
+    private final TipRepository tipRepository;
+    private final TipsTagRepository tipsTagRepository;
+    private final CommentRepository commentRepository;
+    private final TipInterestRepository tipInterestRepository;
+    private final NotificationRepository notificationRepository;
+
+    @Transactional
+    public void deleteTip(Long tipId) {
+        if (!tipRepository.existsById(tipId)) {
+            throw new RuntimeException("Tipが見つかりません");
+        }
+
+        List<TipInterest> tipInterests =
+                tipInterestRepository.findByTip_TipId(tipId);
+
+        for (TipInterest tipInterest : tipInterests) {
+            notificationRepository.deleteByTipInterest_TipInterestId(
+                    tipInterest.getTipInterestId()
+            );
+        }
+
+        tipInterestRepository.deleteByTip_TipId(tipId);
+
+        commentRepository.deleteByTip_TipId(tipId);
+
+        tipsTagRepository.deleteByTip_TipId(tipId);
+
+        tipRepository.deleteById(tipId);
+    }
+}
+
+これをやらずに tipRepository.deleteById(tipId) だけすると、外部キー制約で落ちる可能性が高い。
+
+6. CommentService
+
+旧Serviceでは deleteFlg=true にしていたけど、今回は完全削除。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.create.CommentDto;
+import simplex.pj148.skippy.server.controller.dto.response.CommentShowResponseDto;
+import simplex.pj148.skippy.server.entity.Comment;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CommentRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class CommentService {
+
+    private final CommentRepository commentRepository;
+    private final TipRepository tipRepository;
+    private final UserRepository userRepository;
+
+    public List<CommentShowResponseDto> findComments(Long tipId) {
+        return commentRepository.findByTip_TipIdOrderByCreatedTimeAsc(tipId)
+                .stream()
+                .map(this::toCommentShowResponseDto)
+                .toList();
+    }
+
+    @Transactional
+    public void createNewComment(
+            CommentDto input,
+            Long tipId
+    ) {
+        User user = userRepository.findByUserId(input.getUserId())
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Tip tip = tipRepository.findByTipId(tipId)
+                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+
+        Comment comment = Comment.builder()
+                .user(user)
+                .tip(tip)
+                .commentBody(input.getCommentBody())
+                .isLooked(false)
+                .build();
+
+        commentRepository.save(comment);
+    }
+
+    @Transactional
+    public void deleteComment(Long commentId) {
+        if (!commentRepository.existsById(commentId)) {
+            throw new RuntimeException("コメントが見つかりません");
+        }
+
+        commentRepository.deleteById(commentId);
+    }
+
+    private CommentShowResponseDto toCommentShowResponseDto(Comment comment) {
+        return CommentShowResponseDto.builder()
+                .commentId(comment.getCommentId())
+                .tipId(comment.getTip().getTipId())
+                .userId(comment.getUser().getUserId())
+                .userName(comment.getUser().getUserName())
+                .commentBody(comment.getCommentBody())
+                .createdTime(comment.getCreatedTime())
+                .isLooked(comment.getIsLooked())
+                .build();
+    }
+}
+7. TipInterestService
+
+旧 LikeService, FavoriteService, MyBestService をまとめる。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.TipInterest;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.NotificationRepository;
+import simplex.pj148.skippy.server.repository.TipInterestRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+@Service
+@RequiredArgsConstructor
+public class TipInterestService {
+
+    private final TipInterestRepository tipInterestRepository;
+    private final TipRepository tipRepository;
+    private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
+
+    @Transactional
+    public void registerInterest(
+            Long userId,
+            Long tipId
+    ) {
+        if (tipInterestRepository.existsByUser_UserIdAndTip_TipId(userId, tipId)) {
+            return;
+        }
+
+        User user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Tip tip = tipRepository.findByTipId(tipId)
+                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+
+        TipInterest tipInterest = TipInterest.builder()
+                .user(user)
+                .tip(tip)
+                .isLooked(false)
+                .isRegisterMybest(false)
+                .build();
+
+        tipInterestRepository.save(tipInterest);
+    }
+
+    @Transactional
+    public void cancelInterest(
+            Long userId,
+            Long tipId
+    ) {
+        TipInterest tipInterest =
+                tipInterestRepository.findByUser_UserIdAndTip_TipId(userId, tipId)
+                        .orElseThrow(() -> new RuntimeException("気になる登録がありません"));
+
+        notificationRepository.deleteByTipInterest_TipInterestId(
+                tipInterest.getTipInterestId()
+        );
+
+        tipInterestRepository.delete(tipInterest);
+    }
+
+    @Transactional
+    public void registerMybest(
+            Long userId,
+            Long tipId
+    ) {
+        TipInterest tipInterest =
+                tipInterestRepository.findByUser_UserIdAndTip_TipId(userId, tipId)
+                        .orElseGet(() -> createTipInterest(userId, tipId));
+
+        tipInterest.setIsRegisterMybest(true);
+
+        tipInterestRepository.save(tipInterest);
+    }
+
+    @Transactional
+    public void cancelMybest(
+            Long userId,
+            Long tipId
+    ) {
+        TipInterest tipInterest =
+                tipInterestRepository.findByUser_UserIdAndTip_TipId(userId, tipId)
+                        .orElseThrow(() -> new RuntimeException("気になる登録がありません"));
+
+        tipInterest.setIsRegisterMybest(false);
+
+        tipInterestRepository.save(tipInterest);
+    }
+
+    private TipInterest createTipInterest(
+            Long userId,
+            Long tipId
+    ) {
+        User user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Tip tip = tipRepository.findByTipId(tipId)
+                .orElseThrow(() -> new RuntimeException("Tipが見つかりません"));
+
+        TipInterest tipInterest = TipInterest.builder()
+                .user(user)
+                .tip(tip)
+                .isLooked(false)
+                .isRegisterMybest(false)
+                .build();
+
+        return tipInterestRepository.save(tipInterest);
+    }
+}
+8. NeedService
+
+deleteFlg なしなので、削除は物理削除。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.create.NeedDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedResponseDto;
+import simplex.pj148.skippy.server.entity.Category;
+import simplex.pj148.skippy.server.entity.Need;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
+import simplex.pj148.skippy.server.repository.NeedRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+@Service
+@RequiredArgsConstructor
+public class NeedService {
+
+    private final NeedRepository needRepository;
+    private final NeedEmpathyRepository needEmpathyRepository;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
+
+    public Page<NeedResponseDto> findAllNeeds(Pageable pageable) {
+        return needRepository.findAllByOrderByCreatedTimeDesc(pageable)
+                .map(this::toNeedResponseDto);
+    }
+
+    @Transactional
+    public void createNewNeed(NeedDto input) {
+        User user = userRepository.findByUserId(input.getUserId())
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Category category = categoryRepository.findByCategoryId(input.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
+
+        Need need = Need.builder()
+                .user(user)
+                .needTitle(input.getNeedTitle())
+                .needsDetail(input.getNeedsDetail())
+                .category(category)
+                .wantCount(0L)
+                .build();
+
+        needRepository.save(need);
+    }
+
+    @Transactional
+    public void deleteNeed(Long needsId) {
+        Need need = needRepository.findByNeedsId(needsId)
+                .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
+
+        needEmpathyRepository.findByNeed_NeedsId(needsId)
+                .forEach(needEmpathyRepository::delete);
+
+        needRepository.delete(need);
+    }
+
+    private NeedResponseDto toNeedResponseDto(Need need) {
+        Long empathyCount = needEmpathyRepository.countByNeed_NeedsId(
+                need.getNeedsId()
+        );
+
+        return NeedResponseDto.builder()
+                .needsId(need.getNeedsId())
+                .userId(need.getUser().getUserId())
+                .userName(need.getUser().getUserName())
+                .needTitle(need.getNeedTitle())
+                .needsDetail(need.getNeedsDetail())
+                .categoryId(need.getCategory().getCategoryId())
+                .categoryName(need.getCategory().getCategoryName())
+                .empathyCount(empathyCount)
+                .createdTime(need.getCreatedTime())
+                .updatedTime(need.getUpdatedTime())
+                .build();
+    }
+}
+9. NeedEmpathyService
+
+旧 WantService の置き換え。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.entity.Need;
+import simplex.pj148.skippy.server.entity.NeedEmpathy;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
+import simplex.pj148.skippy.server.repository.NeedRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+@Service
+@RequiredArgsConstructor
+public class NeedEmpathyService {
+
+    private final NeedEmpathyRepository needEmpathyRepository;
+    private final NeedRepository needRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public void registerEmpathy(
+            Long userId,
+            Long needsId
+    ) {
+        if (needEmpathyRepository.existsByUser_UserIdAndNeed_NeedsId(userId, needsId)) {
+            return;
+        }
+
+        User user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Need need = needRepository.findByNeedsId(needsId)
+                .orElseThrow(() -> new RuntimeException("ニーズが見つかりません"));
+
+        NeedEmpathy empathy = NeedEmpathy.builder()
+                .user(user)
+                .need(need)
+                .isLooked(false)
+                .build();
+
+        needEmpathyRepository.save(empathy);
+    }
+
+    @Transactional
+    public void cancelEmpathy(
+            Long userId,
+            Long needsId
+    ) {
+        NeedEmpathy empathy =
+                needEmpathyRepository.findByUser_UserIdAndNeed_NeedsId(userId, needsId)
+                        .orElseThrow(() -> new RuntimeException("共感登録がありません"));
+
+        needEmpathyRepository.delete(empathy);
+    }
+}
+10. NotificationService
+
+通知設定を作成・更新・削除する。
+
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.create.NotificationDto;
+import simplex.pj148.skippy.server.entity.Frequency;
+import simplex.pj148.skippy.server.entity.Notification;
+import simplex.pj148.skippy.server.entity.TipInterest;
+import simplex.pj148.skippy.server.repository.FrequencyRepository;
+import simplex.pj148.skippy.server.repository.NotificationRepository;
+import simplex.pj148.skippy.server.repository.TipInterestRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class NotificationService {
+
+    private final NotificationRepository notificationRepository;
+    private final TipInterestRepository tipInterestRepository;
+    private final FrequencyRepository frequencyRepository;
+
+    public List<Notification> findMyNotifications(Long userId) {
+        return notificationRepository.findByTipInterest_User_UserId(userId);
+    }
+
+    @Transactional
+    public void createNotification(NotificationDto input) {
+        TipInterest tipInterest =
+                tipInterestRepository.findByTipInterestId(input.getTipInterestId())
+                        .orElseThrow(() -> new RuntimeException("気になる登録が見つかりません"));
+
+        Frequency frequency =
+                frequencyRepository.findByFrequencyId(input.getFrequencyId())
+                        .orElseThrow(() -> new RuntimeException("通知頻度が見つかりません"));
+
+        validateNotificationRule(
+                frequency.getFrequencyName(),
+                input.getNotificationWeek(),
+                input.getNotificationDay()
+        );
+
+        Notification notification = Notification.builder()
+                .tipInterest(tipInterest)
+                .frequency(frequency)
+                .notificationWeek(input.getNotificationWeek())
+                .notificationDay(input.getNotificationDay())
+                .notificationTime(input.getNotificationTime())
+                .isActive(true)
+                .build();
+
+        notificationRepository.save(notification);
+    }
+
+    @Transactional
+    public void updateNotification(
+            Long notificationId,
+            NotificationDto input
+    ) {
+        Notification notification =
+                notificationRepository.findByNotificationId(notificationId)
+                        .orElseThrow(() -> new RuntimeException("通知設定が見つかりません"));
+
+        Frequency frequency =
+                frequencyRepository.findByFrequencyId(input.getFrequencyId())
+                        .orElseThrow(() -> new RuntimeException("通知頻度が見つかりません"));
+
+        validateNotificationRule(
+                frequency.getFrequencyName(),
+                input.getNotificationWeek(),
+                input.getNotificationDay()
+        );
+
+        notification.setFrequency(frequency);
+        notification.setNotificationWeek(input.getNotificationWeek());
+        notification.setNotificationDay(input.getNotificationDay());
+        notification.setNotificationTime(input.getNotificationTime());
+
+        notificationRepository.save(notification);
+    }
+
+    @Transactional
+    public void deleteNotification(Long notificationId) {
+        if (!notificationRepository.existsById(notificationId)) {
+            throw new RuntimeException("通知設定が見つかりません");
+        }
+
+        notificationRepository.deleteById(notificationId);
+    }
+
+    @Transactional
+    public void changeActive(
+            Long notificationId,
+            boolean active
+    ) {
+        Notification notification =
+                notificationRepository.findByNotificationId(notificationId)
+                        .orElseThrow(() -> new RuntimeException("通知設定が見つかりません"));
+
+        notification.setIsActive(active);
+
+        notificationRepository.save(notification);
+    }
+
+    private void validateNotificationRule(
+            String frequencyName,
+            Integer notificationWeek,
+            Integer notificationDay
+    ) {
+        if ("DAILY".equals(frequencyName)) {
+            if (notificationWeek != null || notificationDay != null) {
+                throw new RuntimeException("毎日通知では曜日・日付を指定できません");
+            }
+            return;
+        }
+
+        if ("WEEKLY".equals(frequencyName)) {
+            if (notificationWeek == null) {
+                throw new RuntimeException("毎週通知では曜日指定が必要です");
+            }
+
+            if (notificationDay != null) {
+                throw new RuntimeException("毎週通知では日付指定はできません");
+            }
+
+            if (notificationWeek < 1 || notificationWeek > 7) {
+                throw new RuntimeException("曜日は1〜7で指定してください");
+            }
+
+            return;
+        }
+
+        if ("MONTHLY".equals(frequencyName)) {
+            if (notificationDay == null) {
+                throw new RuntimeException("毎月通知では日付指定が必要です");
+            }
+
+            if (notificationWeek != null) {
+                throw new RuntimeException("毎月通知では曜日指定はできません");
+            }
+
+            if (notificationDay < 1 || notificationDay > 31) {
+                throw new RuntimeException("日付は1〜31で指定してください");
+            }
+
+            return;
+        }
+
+        throw new RuntimeException("不正な通知頻度です");
+    }
+}
+まとめ
+
+今回のService層の本質はこれ。
+
+Content系
+→ Tip系に変更
+
+Like / Favorite / MyBest
+→ TipInterestService に統合
+
+Want
+→ NeedEmpathyService に変更
+
+deleteFlg
+→ 全削除。物理削除にする。
+
+削除Service
+→ 親を消す前に子を消す。
+
+特に大事なのは、Tip削除の順番。
+
+notifications
+↓
+tip_interest
+↓
+comments
+↓
+tips_tag
+↓
+tips
+
+この順番で消す。
+ここを雑にする
