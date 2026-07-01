@@ -1,1 +1,619 @@
 
+2. 新しく追加するEntity
+Affiliated.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "affiliated")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class Affiliated {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "affiliated_id", nullable = false, unique = true)
+    private Long affiliatedId;
+
+    @Column(name = "affiliated_name", nullable = false, unique = true, length = 10)
+    private String affiliatedName;
+}
+Rank.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "rank")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class Rank {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "rank_id", nullable = false, unique = true)
+    private Long rankId;
+
+    @Column(name = "rank_name", nullable = false, unique = true, length = 10)
+    private String rankName;
+}
+Frequency.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "frequency")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class Frequency {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "frequency_id", nullable = false, unique = true)
+    private Long frequencyId;
+
+    @Column(name = "frequency_name", nullable = false, unique = true, length = 10)
+    private String frequencyName;
+}
+3. User.java の変更
+
+既存の User は画像を見る限り、
+
+@Column(name = "user_department")
+private String department;
+
+@Column(name = "user_position")
+private String position;
+
+みたいに、部署・役職を文字列で持っている。
+
+新ERでは users に affiliated_id, rank_id があるから、こう変える。
+
+User.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_id", nullable = false, unique = true)
+    private Long userId;
+
+    @Column(name = "user_name", nullable = false, length = 50)
+    private String userName;
+
+    @Column(name = "self_introduction", length = 100)
+    private String selfIntroduction;
+
+    @Builder.Default
+    @Column(name = "admin_flg", nullable = false)
+    private Boolean adminFlg = false;
+
+    @Column(name = "mail_address", nullable = false, unique = true, length = 50)
+    private String mailAddress;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "affiliated_id", nullable = false)
+    private Affiliated affiliated;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "rank_id", nullable = false)
+    private Rank rank;
+
+    @CreatedDate
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
+    @LastModifiedDate
+    @Column(name = "updated_time", nullable = false)
+    private LocalDateTime updatedTime;
+}
+変更点
+削除：
+- user_department
+- user_position
+- user_description
+- user_profile_image_url
+  ※新ER図にないなら削除
+
+追加：
+- affiliated_id FK
+- rank_id FK
+
+ただし、自己紹介やプロフィール画像をまだ使うなら、selfIntroduction や profileImageUrl は残してOK。
+
+4. Content.java → Tip.java に変更
+
+既存の Content は、新ERでは tips に相当する。
+名前も変えるなら Content.java を Tip.java にする。
+
+Tip.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "tips")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class Tip {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "tip_id", nullable = false, unique = true)
+    private Long tipId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "tip_title", nullable = false, length = 30)
+    private String tipTitle;
+
+    @Column(name = "tip_url", length = 200)
+    private String tipUrl;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
+
+    @Column(name = "tip_detail", nullable = false, length = 1000)
+    private String tipDetail;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "need_id")
+    private Need need;
+
+    @CreatedDate
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
+    @LastModifiedDate
+    @Column(name = "updated_time", nullable = false)
+    private LocalDateTime updatedTime;
+}
+変更点
+Content.contentsId → Tip.tipId
+Content.title      → Tip.tipTitle
+Content.contentsBody → Tip.tipDetail
+Content.recommend  → ER図にないので削除候補
+Content.privateFlg → ER図にないので削除候補
+Content.deleteFlg  → ER図にないので削除候補
+Content.category   → そのまま
+Tip.need           → 追加
+
+ただし、論理削除を続けたいなら deleteFlg は残した方がいい。
+
+@Builder.Default
+@Column(name = "delete_flg", nullable = false)
+private Boolean deleteFlg = false;
+
+これはER図にはないけど、実装上かなり便利。
+
+5. Comment.java の変更
+
+既存の Comment は content_id を持っていたけど、新ERでは tip_id になる。
+
+Comment.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "comments")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class Comment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "comment_id", nullable = false, unique = true)
+    private Long commentId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tip_id", nullable = false)
+    private Tip tip;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "comment_body", nullable = false, length = 250)
+    private String commentBody;
+
+    @CreatedDate
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
+    @Builder.Default
+    @Column(name = "is_looked", nullable = false)
+    private Boolean isLooked = false;
+}
+
+既存Entityには deleteFlg, updatedTime があるけど、新ER図にはなさそう。
+コメント削除をしたいなら deleteFlg は残した方がいい。
+
+6. TipInterest.java を新規作成
+
+これはかなり重要。
+既存の Like, Favorite, MyBest をまとめる役割に近い。
+
+TipInterest.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(
+        name = "tip_interest",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"tip_id", "user_id"})
+        }
+)
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class TipInterest {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "tip_interest_id", nullable = false, unique = true)
+    private Long tipInterestId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tip_id", nullable = false)
+    private Tip tip;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @CreatedDate
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
+    @Builder.Default
+    @Column(name = "is_looked", nullable = false)
+    private Boolean isLooked = false;
+
+    @Builder.Default
+    @Column(name = "is_register_mybest", nullable = false)
+    private Boolean isRegisterMybest = false;
+}
+ここがポイント
+@UniqueConstraint(columnNames = {"tip_id", "user_id"})
+
+これを入れることで、
+
+同じユーザーが同じTipを何回も「気になる」登録する
+
+のを防げる。
+
+7. NeedEmpathy.java を新規作成
+
+これは既存の Want に近い。
+既存の Want は user_id + need_id のユニーク制約があるので、それを NeedEmpathy に変える感じ。
+
+NeedEmpathy.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(
+        name = "need_empathy",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"need_id", "user_id"})
+        }
+)
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class NeedEmpathy {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "need_empathy_id", nullable = false, unique = true)
+    private Long needEmpathyId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "need_id", nullable = false)
+    private Need need;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @CreatedDate
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
+    @Builder.Default
+    @Column(name = "is_looked", nullable = false)
+    private Boolean isLooked = false;
+}
+8. Notification.java を新規作成
+
+通知は Tip に直接つけるより、TipInterest にぶら下げるのがよい。
+君のER図もそうなっている。
+
+Notification.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalTime;
+
+@Entity
+@Table(name = "notifications")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class Notification {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "notification_id", nullable = false, unique = true)
+    private Long notificationId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tip_interest_id", nullable = false)
+    private TipInterest tipInterest;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "frequency_id", nullable = false)
+    private Frequency frequency;
+
+    /**
+     * 毎週通知の曜日
+     * 例：1=月曜, 2=火曜, ..., 7=日曜
+     */
+    @Column(name = "notification_week")
+    private Integer notificationWeek;
+
+    /**
+     * 毎月通知の日付
+     * 例：1〜31
+     */
+    @Column(name = "notification_day")
+    private Integer notificationDay;
+
+    @Column(name = "notification_time", nullable = false)
+    private LocalTime notificationTime;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+}
+timestamp ではなく LocalTime にする理由
+
+ER図では notification_time が timestamp っぽく見えるけど、
+「毎週月曜9時」みたいな通知なら、日付はいらない。
+
+だから Java側は、
+
+private LocalTime notificationTime;
+
+が自然。
+
+DB型もできれば、
+
+notification_time time
+
+がいい。
+
+9. Need.java の変更
+
+既存の Need はだいたいそのまま使える。
+ER図では need_title があるので、既存にないなら追加。
+
+Need.java
+package simplex.pj148.skippy.server.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "needs")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class Need {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "needs_id", nullable = false, unique = true)
+    private Long needsId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "needs_detail", nullable = false, length = 1000)
+    private String needsDetail;
+
+    @Column(name = "need_title", nullable = false, length = 30)
+    private String needTitle;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
+
+    @Builder.Default
+    @Column(name = "want_count", nullable = false)
+    private Long wantCount = 0L;
+
+    @Builder.Default
+    @Column(name = "delete_flg", nullable = false)
+    private Boolean deleteFlg = false;
+
+    @CreatedDate
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
+    @LastModifiedDate
+    @Column(name = "updated_time", nullable = false)
+    private LocalDateTime updatedTime;
+}
+
+ただし、新ER図で want_count を残すならOK。
+でも need_empathy をCOUNTすれば共感数は計算できるので、want_count はキャッシュ値として扱うことになる。
+
+10. 既存Entityで消す/置き換える候補
+消す候補
+Content.java
+Like.java
+Favorite.java
+MyBest.java
+MyBestId.java
+Want.java
+置き換え
+Content.java   → Tip.java
+Like.java      → TipInterest.java
+Favorite.java  → TipInterest.java
+MyBest.java    → TipInterest.isRegisterMybest
+Want.java      → NeedEmpathy.java
+
+ただし、既存コードへの影響を減らしたいなら、一気に削除せず、まずは新Entityを追加して、Service/Repositoryを順番に移行する方が安全。
+
+11. DB変更SQLのイメージ
+
+開発中でデータを消していいなら、正直これが早い。
+
+spring.jpa.hibernate.ddl-auto=create-drop
+
+または、
+
+spring.jpa.hibernate.ddl-auto=create
+
+にして、EntityからDBを作り直す。
+
+でもDB設計書として書くなら、イメージはこう。
+
+CREATE TABLE affiliated (
+    affiliated_id BIGSERIAL PRIMARY KEY,
+    affiliated_name VARCHAR(10) NOT NULL UNIQUE
+);
+
+CREATE TABLE rank (
+    rank_id BIGSERIAL PRIMARY KEY,
+    rank_name VARCHAR(10) NOT NULL UNIQUE
+);
+
+CREATE TABLE frequency (
+    frequency_id BIGSERIAL PRIMARY KEY,
+    frequency_name VARCHAR(10) NOT NULL UNIQUE
+);
+
+ALTER TABLE users
+    DROP COLUMN IF EXISTS user_department,
+    DROP COLUMN IF EXISTS user_position;
+
+ALTER TABLE users
+    ADD COLUMN affiliated_id BIGINT,
+    ADD COLUMN rank_id BIGINT;
+
+ALTER TABLE users
+    ADD CONSTRAINT fk_users_affiliated
+        FOREIGN KEY (affiliated_id)
+        REFERENCES affiliated(affiliated_id);
+
+ALTER TABLE users
+    ADD CONSTRAINT fk_users_rank
+        FOREIGN KEY (rank_id)
+        REFERENCES rank(rank_id);
+
+contents を tips に変えるなら、
+
+ALTER TABLE contents RENAME TO tips;
+
+ALTER TABLE tips RENAME COLUMN contents_id TO tip_id;
+ALTER TABLE tips RENAME COLUMN title TO tip_title;
+ALTER TABLE tips RENAME COLUMN contents_body TO tip_detail;
+
+ALTER TABLE tips ADD COLUMN tip_url VARCHAR(200);
+ALTER TABLE tips ADD COLUMN need_id BIGINT;
+
+ALTER TABLE tips
+    ADD CONSTRAINT fk_tips_need
+        FOREIGN KEY (need_id)
+        REFERENCES needs(needs_id);
+
+ただし、実際のPostgreSQL/H2で SERIAL/BIGSERIAL の扱いが違うことがあるから、研修中なら Entity変更 → DB作り直し の方がかなり楽。
