@@ -1,1 +1,531 @@
 
+まず結論：Repositoryの変更一覧
+残すRepository
+CategoryRepository
+CommentRepository ※中身は content_id → tip_id に変更
+NeedRepository
+NeedsTagRepository
+TagRepository
+UserRepository ※affiliated/rank検索を追加するなら変更
+名前変更・置き換え
+ContentRepository      → TipRepository
+ContentsTagRepository  → TipsTagRepository にするなら変更
+LikeRepository         → TipInterestRepository に統合
+FavoriteRepository     → TipInterestRepository に統合
+MyBestRepository       → TipInterestRepository に統合
+WantRepository         → NeedEmpathyRepository
+新規追加
+AffiliatedRepository
+RankRepository
+FrequencyRepository
+NotificationRepository
+TipInterestRepository
+NeedEmpathyRepository
+TipRepository
+1. AffiliatedRepository
+
+部署マスタ用。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Affiliated;
+
+import java.util.Optional;
+
+@Repository
+public interface AffiliatedRepository extends JpaRepository<Affiliated, Long> {
+
+    Optional<Affiliated> findByAffiliatedId(Long affiliatedId);
+
+    Optional<Affiliated> findByAffiliatedName(String affiliatedName);
+}
+2. RankRepository
+
+役職マスタ用。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Rank;
+
+import java.util.Optional;
+
+@Repository
+public interface RankRepository extends JpaRepository<Rank, Long> {
+
+    Optional<Rank> findByRankId(Long rankId);
+
+    Optional<Rank> findByRankName(String rankName);
+}
+3. FrequencyRepository
+
+通知頻度マスタ用。
+daily, weekly, monthly などをDBに持つならこれ。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Frequency;
+
+import java.util.Optional;
+
+@Repository
+public interface FrequencyRepository extends JpaRepository<Frequency, Long> {
+
+    Optional<Frequency> findByFrequencyId(Long frequencyId);
+
+    Optional<Frequency> findByFrequencyName(String frequencyName);
+}
+4. UserRepository の変更
+
+既存では findByUserId, findByMailAddress, findProfileByUserId みたいなのがある。
+新ERでは users が affiliated_id, rank_id を持つから、必要なら部署・役職検索を追加する。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.User;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    Optional<User> findByUserId(Long userId);
+
+    Optional<User> findByMailAddress(String mailAddress);
+
+    List<User> findByAffiliated_AffiliatedId(Long affiliatedId);
+
+    List<User> findByRank_RankId(Long rankId);
+
+    List<User> findByAffiliated_AffiliatedNameContainingIgnoreCase(String affiliatedName);
+
+    List<User> findByRank_RankNameContainingIgnoreCase(String rankName);
+}
+5. TipRepository
+
+既存の ContentRepository の置き換え。
+今の ContentRepository は JpaSpecificationExecutor<Content> を継承していて、投稿一覧をいいね数順・作成日順で取るQueryも持っている。
+新ERでは contents ではなく tips になるので、ContentRepository を TipRepository に置き換える。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import simplex.pj148.skippy.server.entity.Tip;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface TipRepository extends JpaRepository<Tip, Long> {
+
+    Optional<Tip> findByTipId(Long tipId);
+
+    /**
+     * 公開中のTip一覧
+     * deleteFlgをEntityに残す場合
+     */
+    Page<Tip> findByDeleteFlgFalse(Pageable pageable);
+
+    /**
+     * ユーザーのTip一覧
+     */
+    Page<Tip> findByUser_UserIdAndDeleteFlgFalse(
+            Long userId,
+            Pageable pageable
+    );
+
+    /**
+     * カテゴリ指定あり・なしでTip一覧を作成日順に取得
+     */
+    @Query("""
+            SELECT t
+            FROM Tip t
+            WHERE t.deleteFlg = false
+              AND (:categoryId = 0 OR t.category.categoryId = :categoryId)
+            ORDER BY t.createdTime DESC
+            """)
+    Page<Tip> findSelectedTipsSortedByCreatedTime(
+            Pageable pageable,
+            @Param("categoryId") Long categoryId
+    );
+
+    /**
+     * カテゴリ指定あり・なしでTip一覧を気になる数順に取得
+     */
+    @Query("""
+            SELECT t
+            FROM Tip t
+            LEFT JOIN TipInterest ti ON ti.tip = t
+            WHERE t.deleteFlg = false
+              AND (:categoryId = 0 OR t.category.categoryId = :categoryId)
+            GROUP BY t
+            ORDER BY COUNT(ti) DESC, t.createdTime DESC
+            """)
+    Page<Tip> findSelectedTipsSortedByInterestCount(
+            Pageable pageable,
+            @Param("categoryId") Long categoryId
+    );
+
+    /**
+     * Needに紐づくTip一覧
+     */
+    List<Tip> findByNeed_NeedsIdAndDeleteFlgFalse(Long needsId);
+}
+注意
+
+新ER図に delete_flg がないなら、上の deleteFlg 系は消す。
+でも既存Entityでは Content, Need, Comment に deleteFlg があるので、実装上は残した方が安全。既存のRepositoryにも deleteFlg=false 条件が多い。
+
+6. CommentRepository の変更
+
+既存は findByContent_ContentsIdAndDeleteFlgFalse(Long contentsId) になっている。
+新ERでは content_id ではなく tip_id なので変更。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Comment;
+
+import java.util.List;
+
+@Repository
+public interface CommentRepository extends JpaRepository<Comment, Long> {
+
+    List<Comment> findByTip_TipIdAndDeleteFlgFalse(Long tipId);
+
+    List<Comment> findByUser_UserIdAndDeleteFlgFalse(Long userId);
+}
+
+もし Comment から deleteFlg を消すならこう。
+
+List<Comment> findByTip_TipId(Long tipId);
+7. TipInterestRepository
+
+今回一番重要。
+既存の LikeRepository, FavoriteRepository, MyBestRepository の役割をかなり吸収する。
+
+既存の LikeRepository では、投稿IDごとのいいね数をまとめてCOUNTするQueryがある。
+新設計では「いいね」ではなく「気になる」なので、TipInterestRepository に同じような集計を作る。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import simplex.pj148.skippy.server.entity.TipInterest;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface TipInterestRepository extends JpaRepository<TipInterest, Long> {
+
+    /**
+     * ユーザーがそのTipを気になる登録済みか
+     */
+    boolean existsByUser_UserIdAndTip_TipId(Long userId, Long tipId);
+
+    /**
+     * ユーザーとTipから取得
+     */
+    Optional<TipInterest> findByUser_UserIdAndTip_TipId(Long userId, Long tipId);
+
+    /**
+     * ユーザーの気になる一覧
+     */
+    List<TipInterest> findByUser_UserId(Long userId);
+
+    /**
+     * 指定Tipの気になる一覧
+     */
+    List<TipInterest> findByTip_TipId(Long tipId);
+
+    /**
+     * 指定Tipの気になる数
+     */
+    Long countByTip_TipId(Long tipId);
+
+    /**
+     * 表示中のTip群に対して、Tipごとの気になる数を一括取得
+     *
+     * row[0] = tipId
+     * row[1] = count
+     */
+    @Query("""
+            SELECT ti.tip.tipId, COUNT(ti)
+            FROM TipInterest ti
+            WHERE ti.tip.tipId IN :tipIds
+            GROUP BY ti.tip.tipId
+            """)
+    List<Object[]> countInterestsByTipIds(@Param("tipIds") List<Long> tipIds);
+
+    /**
+     * 表示中のTip群のうち、ログインユーザーが気になる登録しているもの
+     */
+    List<TipInterest> findByUser_UserIdAndTip_TipIdIn(
+            Long userId,
+            List<Long> tipIds
+    );
+
+    /**
+     * mybest登録済みのもの
+     */
+    List<TipInterest> findByUser_UserIdAndIsRegisterMybestTrue(Long userId);
+
+    Optional<TipInterest> findByUser_UserIdAndTip_TipIdAndIsRegisterMybestTrue(
+            Long userId,
+            Long tipId
+    );
+
+    Long countByTip_TipIdAndIsRegisterMybestTrue(Long tipId);
+}
+
+これで既存の、
+
+LikeRepository
+FavoriteRepository
+MyBestRepository
+
+の多くは不要になる。
+
+8. NeedEmpathyRepository
+
+既存の WantRepository の置き換え。
+既存 WantRepository は findByUser_UserIdAndNeed_NeedsId, existsByNeed_NeedsIdAndUser_UserId, countByNeed_NeedsId を持っている。
+それを NeedEmpathy に変える。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.NeedEmpathy;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface NeedEmpathyRepository extends JpaRepository<NeedEmpathy, Long> {
+
+    Optional<NeedEmpathy> findByUser_UserIdAndNeed_NeedsId(
+            Long userId,
+            Long needsId
+    );
+
+    boolean existsByNeed_NeedsIdAndUser_UserId(
+            Long needsId,
+            Long userId
+    );
+
+    Long countByNeed_NeedsId(Long needsId);
+
+    List<NeedEmpathy> findByUser_UserId(Long userId);
+
+    List<NeedEmpathy> findByNeed_NeedsId(Long needsId);
+}
+9. NotificationRepository
+
+通知設定用。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Notification;
+
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface NotificationRepository extends JpaRepository<Notification, Long> {
+
+    /**
+     * 1つのTipInterestに対して通知設定を1つだけ許す場合
+     */
+    Optional<Notification> findByTipInterest_TipInterestId(Long tipInterestId);
+
+    boolean existsByTipInterest_TipInterestId(Long tipInterestId);
+
+    /**
+     * ユーザーの通知設定一覧
+     */
+    List<Notification> findByTipInterest_User_UserIdAndIsActiveTrue(Long userId);
+
+    /**
+     * 毎日通知対象
+     */
+    List<Notification> findByFrequency_FrequencyNameAndNotificationTimeAndIsActiveTrue(
+            String frequencyName,
+            LocalTime notificationTime
+    );
+
+    /**
+     * 毎週通知対象
+     */
+    List<Notification> findByFrequency_FrequencyNameAndNotificationWeekAndNotificationTimeAndIsActiveTrue(
+            String frequencyName,
+            Integer notificationWeek,
+            LocalTime notificationTime
+    );
+
+    /**
+     * 毎月通知対象
+     */
+    List<Notification> findByFrequency_FrequencyNameAndNotificationDayAndNotificationTimeAndIsActiveTrue(
+            String frequencyName,
+            Integer notificationDay,
+            LocalTime notificationTime
+    );
+}
+
+ただ、通知時刻を LocalTime ぴったり一致で検索すると、秒ズレで取り逃がす可能性がある。
+もしDBに 09:00:00 で保存するなら問題ないけど、実装では「分単位」で丸めるのが安全。
+
+10. NeedRepository の変更
+
+既存の NeedRepository は findByNeedsId, findTop10ByDeleteFlgFalseOrderByCreatedTimeDesc がある。
+新ERでもほぼ使える。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Need;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface NeedRepository extends JpaRepository<Need, Long> {
+
+    Optional<Need> findByNeedsId(Long needsId);
+
+    List<Need> findTop10ByDeleteFlgFalseOrderByCreatedTimeDesc();
+
+    Page<Need> findByDeleteFlgFalse(Pageable pageable);
+
+    Page<Need> findByUser_UserIdAndDeleteFlgFalse(Long userId, Pageable pageable);
+
+    Page<Need> findByCategory_CategoryIdAndDeleteFlgFalse(
+            Long categoryId,
+            Pageable pageable
+    );
+}
+11. TipsTagRepository
+
+既存の ContentsTagRepository は findByContent_ContentsId(Long contentsId) を持っている。
+新ERで tips に変えるなら、こう。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.TipsTag;
+
+import java.util.List;
+
+@Repository
+public interface TipsTagRepository extends JpaRepository<TipsTag, Long> {
+
+    List<TipsTag> findByTip_TipId(Long tipId);
+}
+
+もしEntity名を既存の ContentsTag のまま使うなら、最低限メソッドだけ変更。
+
+List<ContentsTag> findByTip_TipId(Long tipId);
+12. CategoryRepository / TagRepository はほぼそのまま
+
+既存では CategoryRepository は findByCategoryId(Long categoryId)、TagRepository は findByTagId(Long tagId) がある。
+これはそのままでOK。
+
+@Repository
+public interface CategoryRepository extends JpaRepository<Category, Long> {
+
+    Optional<Category> findByCategoryId(Long categoryId);
+}
+@Repository
+public interface TagRepository extends JpaRepository<Tag, Long> {
+
+    Optional<Tag> findByTagId(Long tagId);
+
+    Optional<Tag> findByTagName(String tagName);
+}
+
+findByTagName はタグ重複防止で使う可能性が高いから追加しておくといい。
+
+13. 削除候補Repository
+
+新ERに完全移行するなら、これは消す候補。
+
+ContentRepository
+ContentsTagRepository
+LikeRepository
+FavoriteRepository
+MyBestRepository
+WantRepository
+
+ただし、名前だけ変えるならこう。
+
+ContentRepository      → TipRepository
+ContentsTagRepository  → TipsTagRepository
+LikeRepository         → 削除、TipInterestRepositoryへ
+FavoriteRepository     → 削除、TipInterestRepositoryへ
+MyBestRepository       → 削除、TipInterestRepositoryへ
+WantRepository         → 削除、NeedEmpathyRepositoryへ
+14. 重要：Service側の呼び出しも変わる
+
+Repositoryを変えたら、Serviceの呼び出しもこう変わる。
+
+いいね数の旧処理
+likeRepository.countLikesByContentIds(contentIds)
+気になる数の新処理
+tipInterestRepository.countInterestsByTipIds(tipIds)
+いいね済み判定の旧処理
+likeRepository.findByUser_UserIdAndContent_ContentsIdIn(userId, contentIds)
+気になる済み判定の新処理
+tipInterestRepository.findByUser_UserIdAndTip_TipIdIn(userId, tipIds)
+wantの旧処理
+wantRepository.existsByNeed_NeedsIdAndUser_UserId(needsId, userId)
+共感の新処理
+needEmpathyRepository.existsByNeed_NeedsIdAndUser_UserId(needsId, userId)
+まとめ
+
+今回のRepository層は、こう変えるのがいい。
+
+追加：
+- AffiliatedRepository
+- RankRepository
+- FrequencyRepository
+- TipRepository
+- TipInterestRepository
+- NeedEmpathyRepository
+- NotificationRepository
+
+変更：
+- UserRepository
+- CommentRepository
+- NeedRepository
+- TagRepository
+- ContentsTagRepository → TipsTagRepository
+
+削除/統合：
+- ContentRepository
+- LikeRepository
+- FavoriteRepository
+- MyBestRepository
+- WantRepository
