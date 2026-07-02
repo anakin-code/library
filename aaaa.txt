@@ -1,14 +1,5 @@
-1. Need.java
-
-既に deleteFlg があるなら、足りていればそのままでOK。
-なければこれを追加。
-
-@Builder.Default
-@Column(name = "delete_flg", nullable = false)
-private Boolean deleteFlg = false;
-
-完全版イメージ：
-
+Entity
+Need.java
 package simplex.pj148.skippy.server.entity;
 
 import jakarta.persistence.*;
@@ -60,11 +51,7 @@ public class Need {
     @Column(name = "delete_flg", nullable = false)
     private Boolean deleteFlg = false;
 }
-2. Tip.java
-
-Tip は今回 deleteFlg を追加する。
-Tipsは投稿本体なので、Needと同じ扱い。
-
+Tip.java
 package simplex.pj148.skippy.server.entity;
 
 import jakarta.persistence.*;
@@ -123,10 +110,7 @@ public class Tip {
     @Column(name = "delete_flg", nullable = false)
     private Boolean deleteFlg = false;
 }
-3. Comment.java
-
-コメントも物理削除しないので deleteFlg を追加。
-
+Comment.java
 package simplex.pj148.skippy.server.entity;
 
 import jakarta.persistence.*;
@@ -174,11 +158,7 @@ public class Comment {
     @Column(name = "delete_flg", nullable = false)
     private Boolean deleteFlg = false;
 }
-4. NeedEmpathy.java
-
-ここは deleteFlg なし。
-共感解除したらDBから消す。
-
+NeedEmpathy.java
 package simplex.pj148.skippy.server.entity;
 
 import jakarta.persistence.*;
@@ -207,19 +187,17 @@ public class NeedEmpathy {
     @JoinColumn(name = "need_id", nullable = false)
     private Need need;
 
+    // 共感したユーザー
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    // 通知担当が使う想定。今は通知APIは作らない。
+    @Builder.Default
+    @Column(name = "is_looked", nullable = false)
+    private Boolean isLooked = false;
 }
-
-uniqueConstraints は入れておく方がいい。
-これで同じユーザーが同じNeedに二重共感するのをDB側でも防げる。
-
-5. TipInterest.java
-
-これも deleteFlg なし。
-興味あり解除したらDBから消す。
-
+TipInterest.java
 package simplex.pj148.skippy.server.entity;
 
 import jakarta.persistence.*;
@@ -248,14 +226,18 @@ public class TipInterest {
     @JoinColumn(name = "tip_id", nullable = false)
     private Tip tip;
 
+    // 興味ありしたユーザー
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    // 通知担当が使う想定。今は通知APIは作らない。
+    @Builder.Default
+    @Column(name = "is_looked", nullable = false)
+    private Boolean isLooked = false;
 }
-6. NeedRepository.java
-
-人気順でも削除済みNeedを除外する。
-
+Repository
+NeedRepository.java
 package simplex.pj148.skippy.server.repository;
 
 import org.springframework.data.domain.Page;
@@ -270,8 +252,6 @@ import java.util.Optional;
 @Repository
 public interface NeedRepository extends JpaRepository<Need, Long> {
 
-    Optional<Need> findByNeedId(Long needId);
-
     Optional<Need> findByNeedIdAndDeleteFlgFalse(Long needId);
 
     Page<Need> findByDeleteFlgFalse(Pageable pageable);
@@ -280,10 +260,12 @@ public interface NeedRepository extends JpaRepository<Need, Long> {
             value = """
                     SELECT n
                     FROM Need n
-                    LEFT JOIN NeedEmpathy ne ON ne.need = n
                     WHERE n.deleteFlg = false
-                    GROUP BY n
-                    ORDER BY COUNT(ne) DESC, n.createdTime DESC
+                    ORDER BY (
+                        SELECT COUNT(ne)
+                        FROM NeedEmpathy ne
+                        WHERE ne.need = n
+                    ) DESC, n.createdTime DESC
                     """,
             countQuery = """
                     SELECT COUNT(n)
@@ -293,10 +275,7 @@ public interface NeedRepository extends JpaRepository<Need, Long> {
     )
     Page<Need> findSelectedNeedSortedWantCount(Pageable pageable);
 }
-7. TipRepository.java
-
-Tipsも削除済みを除外できるようにする。
-
+TipRepository.java
 package simplex.pj148.skippy.server.repository;
 
 import org.springframework.data.domain.Page;
@@ -311,8 +290,6 @@ import java.util.Optional;
 @Repository
 public interface TipRepository extends JpaRepository<Tip, Long> {
 
-    Optional<Tip> findByTipId(Long tipId);
-
     Optional<Tip> findByTipIdAndDeleteFlgFalse(Long tipId);
 
     Page<Tip> findByDeleteFlgFalse(Pageable pageable);
@@ -321,10 +298,12 @@ public interface TipRepository extends JpaRepository<Tip, Long> {
             value = """
                     SELECT t
                     FROM Tip t
-                    LEFT JOIN TipInterest ti ON ti.tip = t
                     WHERE t.deleteFlg = false
-                    GROUP BY t
-                    ORDER BY COUNT(ti) DESC, t.createdTime DESC
+                    ORDER BY (
+                        SELECT COUNT(ti)
+                        FROM TipInterest ti
+                        WHERE ti.tip = t
+                    ) DESC, t.createdTime DESC
                     """,
             countQuery = """
                     SELECT COUNT(t)
@@ -334,10 +313,7 @@ public interface TipRepository extends JpaRepository<Tip, Long> {
     )
     Page<Tip> findSelectedTipSortedInterestCount(Pageable pageable);
 }
-8. CommentRepository.java
-
-コメント取得時に削除済みを除外する。
-
+CommentRepository.java
 package simplex.pj148.skippy.server.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -354,10 +330,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     Optional<Comment> findByCommentIdAndDeleteFlgFalse(Long commentId);
 }
-9. NeedEmpathyRepository.java
-
-deleteFlg は使わない。
-
+NeedEmpathyRepository.java
 package simplex.pj148.skippy.server.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -375,10 +348,7 @@ public interface NeedEmpathyRepository extends JpaRepository<NeedEmpathy, Long> 
 
     Long countByNeed_NeedId(Long needId);
 }
-10. TipInterestRepository.java
-
-これも deleteFlg は使わない。
-
+TipInterestRepository.java
 package simplex.pj148.skippy.server.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -396,7 +366,8 @@ public interface TipInterestRepository extends JpaRepository<TipInterest, Long> 
 
     Long countByTip_TipId(Long tipId);
 }
-11. NeedEmpathyCreateDto.java
+DTO
+NeedEmpathyCreateDto.java
 package simplex.pj148.skippy.server.controller.dto.create;
 
 import lombok.AllArgsConstructor;
@@ -414,9 +385,7 @@ public class NeedEmpathyCreateDto {
 
     private Long userId;
 }
-
-
-12. TipInterestCreateDto.java
+TipInterestCreateDto.java
 package simplex.pj148.skippy.server.controller.dto.create;
 
 import lombok.AllArgsConstructor;
@@ -434,7 +403,7 @@ public class TipInterestCreateDto {
 
     private Long userId;
 }
-13. CommentDto.java
+CommentDto.java
 package simplex.pj148.skippy.server.controller.dto.create;
 
 import lombok.AllArgsConstructor;
@@ -452,11 +421,110 @@ public class CommentDto {
 
     private String commentBody;
 }
-14. NeedEmpathyService.java
+NeedResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
 
-共感登録は重複チェック。
-解除は物理削除。
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class NeedResponseDto {
+
+    private Long needId;
+
+    private Long userId;
+
+    private String userName;
+
+    private Long categoryId;
+
+    private String categoryName;
+
+    private String needTitle;
+
+    private String needDetail;
+
+    private Boolean empathyFlg;
+
+    private Long empathyCount;
+
+    private LocalDateTime createdTime;
+}
+TipShowResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class TipShowResponseDto {
+
+    private Long tipId;
+
+    private Long userId;
+
+    private String userName;
+
+    private Long categoryId;
+
+    private String categoryName;
+
+    private Long needId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private String tipUrl;
+
+    private Boolean interestFlg;
+
+    private Long interestCount;
+
+    private LocalDateTime createdTime;
+}
+CommentShowResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class CommentShowResponseDto {
+
+    private Long commentId;
+
+    private Long tipId;
+
+    private Long userId;
+
+    private String userName;
+
+    private String commentBody;
+
+    private Boolean editFlg;
+}
+Service
+NeedEmpathyService.java
 package simplex.pj148.skippy.server.service;
 
 import lombok.RequiredArgsConstructor;
@@ -499,6 +567,7 @@ public class NeedEmpathyService {
         NeedEmpathy needEmpathy = NeedEmpathy.builder()
                 .need(need)
                 .user(user)
+                .isLooked(false)
                 .build();
 
         needEmpathyRepository.save(needEmpathy);
@@ -516,11 +585,7 @@ public class NeedEmpathyService {
         needEmpathyRepository.delete(needEmpathy);
     }
 }
-15. TipInterestService.java
-
-興味ありも同じ。
-登録は重複チェック、解除は物理削除。
-
+TipInterestService.java
 package simplex.pj148.skippy.server.service;
 
 import lombok.RequiredArgsConstructor;
@@ -563,6 +628,7 @@ public class TipInterestService {
         TipInterest tipInterest = TipInterest.builder()
                 .tip(tip)
                 .user(user)
+                .isLooked(false)
                 .build();
 
         tipInterestRepository.save(tipInterest);
@@ -580,11 +646,7 @@ public class TipInterestService {
         tipInterestRepository.delete(tipInterest);
     }
 }
-16. CommentService.java
-
-物理削除をやめて、deleteFlg = true にする。
-あと、自分のコメントだけ削除可能にする。
-
+CommentService.java
 package simplex.pj148.skippy.server.service;
 
 import lombok.RequiredArgsConstructor;
@@ -662,11 +724,7 @@ public class CommentService {
         commentRepository.save(comment);
     }
 }
-17. NeedService.java
-
-Need削除は物理削除しない。
-一覧取得も削除済みを除外。
-
+NeedService.java
 package simplex.pj148.skippy.server.service;
 
 import lombok.RequiredArgsConstructor;
@@ -719,10 +777,10 @@ public class NeedService {
                 .needId(need.getNeedId())
                 .userId(need.getUser().getUserId())
                 .userName(need.getUser().getUserName())
-                .needTitle(need.getNeedTitle())
-                .needDetail(need.getNeedDetail())
                 .categoryId(need.getCategory().getCategoryId())
                 .categoryName(need.getCategory().getCategoryName())
+                .needTitle(need.getNeedTitle())
+                .needDetail(need.getNeedDetail())
                 .empathyFlg(empathyFlg)
                 .empathyCount(empathyCount)
                 .createdTime(need.getCreatedTime())
@@ -742,13 +800,7 @@ public class NeedService {
         needRepository.save(need);
     }
 }
-
-
-18. TipService.java
-
-TipsもNeedと同じ。
-削除は deleteFlg = true。
-
+TipService.java
 package simplex.pj148.skippy.server.service;
 
 import lombok.RequiredArgsConstructor;
@@ -801,12 +853,12 @@ public class TipService {
                 .tipId(tip.getTipId())
                 .userId(tip.getUser().getUserId())
                 .userName(tip.getUser().getUserName())
-                .tipTitle(tip.getTipTitle())
-                .tipDetail(tip.getTipDetail())
-                .tipUrl(tip.getTipUrl())
                 .categoryId(tip.getCategory().getCategoryId())
                 .categoryName(tip.getCategory().getCategoryName())
                 .needId(tip.getNeed() == null ? null : tip.getNeed().getNeedId())
+                .tipTitle(tip.getTipTitle())
+                .tipDetail(tip.getTipDetail())
+                .tipUrl(tip.getTipUrl())
                 .interestFlg(interestFlg)
                 .interestCount(interestCount)
                 .createdTime(tip.getCreatedTime())
@@ -826,11 +878,102 @@ public class TipService {
         tipRepository.save(tip);
     }
 }
-19. CommentController.java
+Controller
+NeedEmpathyController.java
+package simplex.pj148.skippy.server.controller;
 
-@PathVariable の名前ズレを防ぐ。
-添付のControllerでは削除系のパス変数名が怪しかったので、明示しておくのが安全。
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.controller.dto.create.NeedEmpathyCreateDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.NeedEmpathyService;
+import simplex.pj148.skippy.server.service.UserInfoService;
 
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/need-empathy")
+public class NeedEmpathyController {
+
+    private final NeedEmpathyService needEmpathyService;
+    private final UserInfoService userInfoService;
+
+    @PostMapping
+    public ResponseEntity<Void> registerNewNeedEmpathy(
+            @RequestBody NeedEmpathyCreateDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        input.setUserId(loginUser.getUserId());
+
+        needEmpathyService.registerNewNeedEmpathy(input);
+
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/delete")
+    public ResponseEntity<Void> deleteNeedEmpathy(
+            @RequestBody NeedEmpathyCreateDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        input.setUserId(loginUser.getUserId());
+
+        needEmpathyService.deleteNeedEmpathy(input);
+
+        return ResponseEntity.ok().build();
+    }
+}
+TipInterestController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.controller.dto.create.TipInterestCreateDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.TipInterestService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/tip-interest")
+public class TipInterestController {
+
+    private final TipInterestService tipInterestService;
+    private final UserInfoService userInfoService;
+
+    @PostMapping
+    public ResponseEntity<Void> registerNewTipInterest(
+            @RequestBody TipInterestCreateDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        input.setUserId(loginUser.getUserId());
+
+        tipInterestService.registerNewTipInterest(input);
+
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/delete")
+    public ResponseEntity<Void> deleteTipInterest(
+            @RequestBody TipInterestCreateDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        input.setUserId(loginUser.getUserId());
+
+        tipInterestService.deleteTipInterest(input);
+
+        return ResponseEntity.ok().build();
+    }
+}
+CommentController.java
 package simplex.pj148.skippy.server.controller;
 
 import lombok.RequiredArgsConstructor;
@@ -889,156 +1032,12 @@ public class CommentController {
         return ResponseEntity.ok().build();
     }
 }
-20. NeedEmpathyController.java
+DB変更SQL
 
-@RequestBody String はやめてDTOで受ける。
-DTOはすでに NeedEmpathyCreateDto があるので、それを使う。DTO構成は添付にもある。
+既存DBにカラムがない場合はこれが必要。
 
-package simplex.pj148.skippy.server.controller;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
-import simplex.pj148.skippy.server.controller.dto.create.NeedEmpathyCreateDto;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.service.NeedEmpathyService;
-import simplex.pj148.skippy.server.service.UserInfoService;
-
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/need-empathy")
-public class NeedEmpathyController {
-
-    private final NeedEmpathyService needEmpathyService;
-    private final UserInfoService userInfoService;
-
-    @PostMapping
-    public ResponseEntity<Void> registerNewNeedEmpathy(
-            @RequestBody NeedEmpathyCreateDto input,
-            @AuthenticationPrincipal Jwt jwt
-    ) {
-        User loginUser = userInfoService.getUserFromJwt(jwt);
-        input.setUserId(loginUser.getUserId());
-
-        needEmpathyService.registerNewNeedEmpathy(input);
-
-        return ResponseEntity.ok().build();
-    }
-
-    @PutMapping("/delete")
-    public ResponseEntity<Void> deleteNeedEmpathy(
-            @RequestBody NeedEmpathyCreateDto input,
-            @AuthenticationPrincipal Jwt jwt
-    ) {
-        User loginUser = userInfoService.getUserFromJwt(jwt);
-        input.setUserId(loginUser.getUserId());
-
-        needEmpathyService.deleteNeedEmpathy(input);
-
-        return ResponseEntity.ok().build();
-    }
-}
-21. TipInterestController.java
-package simplex.pj148.skippy.server.controller;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
-import simplex.pj148.skippy.server.controller.dto.create.TipInterestCreateDto;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.service.TipInterestService;
-import simplex.pj148.skippy.server.service.UserInfoService;
-
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/tip-interest")
-public class TipInterestController {
-
-    private final TipInterestService tipInterestService;
-    private final UserInfoService userInfoService;
-
-    @PostMapping
-    public ResponseEntity<Void> registerNewTipInterest(
-            @RequestBody TipInterestCreateDto input,
-            @AuthenticationPrincipal Jwt jwt
-    ) {
-        User loginUser = userInfoService.getUserFromJwt(jwt);
-        input.setUserId(loginUser.getUserId());
-
-        tipInterestService.registerNewTipInterest(input);
-
-        return ResponseEntity.ok().build();
-    }
-
-    @PutMapping("/delete")
-    public ResponseEntity<Void> deleteTipInterest(
-            @RequestBody TipInterestCreateDto input,
-            @AuthenticationPrincipal Jwt jwt
-    ) {
-        User loginUser = userInfoService.getUserFromJwt(jwt);
-        input.setUserId(loginUser.getUserId());
-
-        tipInterestService.deleteTipInterest(input);
-
-        return ResponseEntity.ok().build();
-    }
-}
-無駄なコードは削除する？
-
-削除していい。
-ただし、いきなり全部消すより、使っていないRepositoryメソッドから削るのが安全。
-
-消していい候補
-
-NeedEmpathy に deleteFlg を持たせないなら、こういうメソッドは不要。
-
-findByUser_UserIdAndNeed_NeedIdAndDeleteFlgFalse
-existsByNeed_NeedIdAndUser_UserIdAndDeleteFlgFalse
-countByNeed_NeedIdAndDeleteFlgFalse
-
-代わりにこれだけでいい。
-
-findByUser_UserIdAndNeed_NeedId
-existsByNeed_NeedIdAndUser_UserId
-countByNeed_NeedId
-
-TipInterest も同じ。
-
-findByUser_UserIdAndTip_TipIdAndDeleteFlgFalse
-existsByTip_TipIdAndUser_UserIdAndDeleteFlgFalse
-countByTip_TipIdAndDeleteFlgFalse
-
-これは不要。
-TipInterest に deleteFlg がないから、残すとコンパイルエラーになる。
-
-CommentRepository のこれは残す。
-
-findByTip_TipIdAndDeleteFlgFalse
-findByCommentIdAndDeleteFlgFalse
-
-コメントは deleteFlg ありだから必要。
-
-TipRepository のこれは残す。
-
-findByTipIdAndDeleteFlgFalse
-findByDeleteFlgFalse
-
-Tipsは deleteFlg ありだから必要。
-
-NeedRepository のこれは残す。
-
-findByNeedIdAndDeleteFlgFalse
-findByDeleteFlgFalse
-
-Needは deleteFlg ありだから必要。
-
-DB変更
-
-既存DBがあるなら、最低これが必要。
+ALTER TABLE needs
+ADD COLUMN delete_flg BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE tips
 ADD COLUMN delete_flg BOOLEAN NOT NULL DEFAULT FALSE;
@@ -1046,32 +1045,40 @@ ADD COLUMN delete_flg BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE comments
 ADD COLUMN delete_flg BOOLEAN NOT NULL DEFAULT FALSE;
 
-Need にまだ delete_flg がないならこれも。
+ALTER TABLE need_empathy
+ADD COLUMN is_looked BOOLEAN NOT NULL DEFAULT FALSE;
 
-ALTER TABLE needs
-ADD COLUMN delete_flg BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE tip_interest
+ADD COLUMN is_looked BOOLEAN NOT NULL DEFAULT FALSE;
 
-NeedEmpathy と TipInterest には追加しない。
+重複防止のユニーク制約も、DBに反映するならこれ。
 
-最終的な考え方
+ALTER TABLE need_empathy
+ADD CONSTRAINT uk_need_empathy_user_need UNIQUE (user_id, need_id);
 
-今回の修正はこう。
+ALTER TABLE tip_interest
+ADD CONSTRAINT uk_tip_interest_user_tip UNIQUE (user_id, tip_id);
+削除していいコード
 
-投稿本体を消す
-↓
-DBから消さずに deleteFlg = true
+NeedEmpathy / TipInterest に deleteFlg はないので、こういうメソッドが残っていたら削除。
 
-投稿一覧を見る
-↓
-deleteFlg = false のものだけ取得
+findByUser_UserIdAndNeed_NeedIdAndDeleteFlgFalse(...)
+existsByNeed_NeedIdAndUser_UserIdAndDeleteFlgFalse(...)
+countByNeed_NeedIdAndDeleteFlgFalse(...)
+findByUser_UserIdAndTip_TipIdAndDeleteFlgFalse(...)
+existsByTip_TipIdAndUser_UserIdAndDeleteFlgFalse(...)
+countByTip_TipIdAndDeleteFlgFalse(...)
 
-リアクションを解除する
-↓
-中間テーブルの行を物理削除
+あと、画面表示用でこれは使わない。
 
-リアクション数を見る
-↓
-残っている行をCOUNTする
+findAll(...)
+findByNeedId(...)
+findByTipId(...)
 
-だから、無駄なコードは削るなら、NeedEmpathy / TipInterest の deleteFlg 系メソッドだけ削除でOK。
-逆に Need / Tip / Comment の deleteFlgFalse 系メソッドは必要。
+使うならこっち。
+
+findByDeleteFlgFalse(...)
+findByNeedIdAndDeleteFlgFalse(...)
+findByTipIdAndDeleteFlgFalse(...)
+
+これで、あなたの担当範囲としては動く形になる。
