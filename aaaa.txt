@@ -1,1 +1,1003 @@
 
+DTO層 完全版
+dto/request/TipCreateRequestDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipCreateRequestDto {
+
+    private Integer categoryId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private String tipUrl;
+}
+dto/request/TipUpdateRequestDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipUpdateRequestDto {
+
+    private String tipDetail;
+}
+dto/request/TipCommentCreateRequestDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipCommentCreateRequestDto {
+
+    private String commentBody;
+}
+dto/request/NeedCreateRequestDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedCreateRequestDto {
+
+    private Integer categoryId;
+
+    private String needTitle;
+
+    private String needDetail;
+}
+dto/request/NeedUpdateRequestDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedUpdateRequestDto {
+
+    private String needDetail;
+}
+dto/request/NeedAnswerCreateRequestDto.java
+
+お悩み詳細から回答ノウハウを投稿する用。
+
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedAnswerCreateRequestDto {
+
+    private Integer categoryId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private String tipUrl;
+}
+dto/request/ProfileUpdateRequestDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProfileUpdateRequestDto {
+
+    private Integer affiliatedId;
+
+    private Integer positionId;
+
+    private String selfIntroduction;
+}
+dto/request/MyBestUpsertRequestDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class MyBestUpsertRequestDto {
+
+    private Integer categoryId;
+
+    private Long tipId;
+}
+Search DTO
+
+RequestBodyではなく、Controllerで @RequestParam をまとめてServiceへ渡すためのDTO。
+
+dto/search/TipSearchConditionDto.java
+package simplex.pj148.skippy.server.controller.dto.search;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipSearchConditionDto {
+
+    private String keyword;
+
+    private Integer affiliatedId;
+
+    private Integer positionId;
+
+    private Integer categoryId;
+
+    private String orderBy;
+}
+dto/search/NeedSearchConditionDto.java
+package simplex.pj148.skippy.server.controller.dto.search;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedSearchConditionDto {
+
+    private String keyword;
+
+    private Integer affiliatedId;
+
+    private Integer positionId;
+
+    private Integer categoryId;
+
+    private String orderBy;
+}
+Response DTO
+dto/response/TipListResponseDto.java
+
+ノウハウ一覧カード用。
+
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipListResponseDto {
+
+    private Long tipId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private String tipUrl;
+
+    private Integer categoryId;
+
+    private String categoryName;
+
+    private Long userId;
+
+    private String userName;
+
+    private String affiliatedName;
+
+    private String positionName;
+
+    private Long interestCount;
+
+    private Long commentCount;
+
+    private Boolean interestByCurrentUser;
+
+    private Boolean editFlg;
+
+    private LocalDateTime createdTime;
+}
+dto/response/TipDetailResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipDetailResponseDto {
+
+    private Long tipId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private String tipUrl;
+
+    private Integer categoryId;
+
+    private String categoryName;
+
+    private Long userId;
+
+    private String userName;
+
+    private String affiliatedName;
+
+    private String positionName;
+
+    private Long interestCount;
+
+    private Boolean interestByCurrentUser;
+
+    private Boolean editFlg;
+
+    private LocalDateTime createdTime;
+
+    private List<TipCommentResponseDto> comments;
+}
+dto/response/TipCommentResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipCommentResponseDto {
+
+    private Long commentId;
+
+    private String commentBody;
+
+    private Long userId;
+
+    private String userName;
+
+    private Boolean editFlg;
+
+    private LocalDateTime createdTime;
+}
+dto/response/NeedListResponseDto.java
+
+お悩み一覧カード用。
+
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedListResponseDto {
+
+    private Long needId;
+
+    private String needTitle;
+
+    private String needDetail;
+
+    private Integer categoryId;
+
+    private String categoryName;
+
+    private Long userId;
+
+    private String userName;
+
+    private String affiliatedName;
+
+    private String positionName;
+
+    private Long empathyCount;
+
+    private Long answerCount;
+
+    private Boolean empathyByCurrentUser;
+
+    private Boolean editFlg;
+
+    private LocalDateTime createdTime;
+}
+dto/response/NeedDetailResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedDetailResponseDto {
+
+    private Long needId;
+
+    private String needTitle;
+
+    private String needDetail;
+
+    private Integer categoryId;
+
+    private String categoryName;
+
+    private Long userId;
+
+    private String userName;
+
+    private String affiliatedName;
+
+    private String positionName;
+
+    private Long empathyCount;
+
+    private Boolean empathyByCurrentUser;
+
+    private Boolean editFlg;
+
+    private LocalDateTime createdTime;
+
+    private List<NeedAnswerResponseDto> answers;
+}
+dto/response/NeedAnswerResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedAnswerResponseDto {
+
+    private Long tipId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private Long interestCount;
+}
+dto/response/ProfileResponseDto.java
+
+マイページ用。
+
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProfileResponseDto {
+
+    private Long userId;
+
+    private String userName;
+
+    private Integer affiliatedId;
+
+    private String affiliatedName;
+
+    private Integer positionId;
+
+    private String positionName;
+
+    private String selfIntroduction;
+
+    private Boolean editFlg;
+
+    private List<MyBestResponseDto> myBestList;
+
+    private List<TipListResponseDto> interestedTips;
+
+    private List<NeedListResponseDto> empathizedNeeds;
+
+    private List<TipListResponseDto> postedTips;
+
+    private List<NeedListResponseDto> postedNeeds;
+}
+dto/response/MyBestResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class MyBestResponseDto {
+
+    private Integer categoryId;
+
+    private String categoryName;
+
+    private Long tipId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private Boolean selected;
+}
+dto/response/CategoryResponseDto.java
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class CategoryResponseDto {
+
+    private Integer categoryId;
+
+    private String categoryName;
+}
+dto/response/AffiliatedResponseDto.java
+
+所属プルダウン用。
+
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AffiliatedResponseDto {
+
+    private Integer affiliatedId;
+
+    private String affiliatedName;
+}
+dto/response/PositionResponseDto.java
+
+職位プルダウン用。
+
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PositionResponseDto {
+
+    private Integer positionId;
+
+    private String positionName;
+}
+Controller層 完全版
+
+Service名・メソッド名はこのControllerに合わせる前提。
+既存Service名と違うなら、そこだけ名前を合わせればOK。
+
+TipController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.request.TipCommentCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.TipCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.TipUpdateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.TipDetailResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.TipListResponseDto;
+import simplex.pj148.skippy.server.controller.dto.search.TipSearchConditionDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.TipService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequestMapping("/api/tips")
+@RequiredArgsConstructor
+public class TipController {
+
+    private final TipService tipService;
+
+    private final UserInfoService userInfoService;
+
+    @GetMapping
+    public Page<TipListResponseDto> searchTips(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer affiliatedId,
+            @RequestParam(required = false) Integer positionId,
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) String orderBy,
+            Pageable pageable
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        TipSearchConditionDto condition = new TipSearchConditionDto(
+                keyword,
+                affiliatedId,
+                positionId,
+                categoryId,
+                orderBy
+        );
+
+        return tipService.searchTips(loginUser.getUserId(), condition, pageable);
+    }
+
+    @GetMapping("/{tipId}")
+    public TipDetailResponseDto findTipDetail(
+            @PathVariable Long tipId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return tipService.findTipDetail(tipId, loginUser.getUserId());
+    }
+
+    @PostMapping
+    public void createTip(
+            @RequestBody TipCreateRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        tipService.createTip(input, loginUser.getUserId());
+    }
+
+    @PutMapping("/{tipId}")
+    public void updateTip(
+            @PathVariable Long tipId,
+            @RequestBody TipUpdateRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        tipService.updateTip(tipId, input, loginUser.getUserId());
+    }
+
+    @DeleteMapping("/{tipId}")
+    public void deleteTip(
+            @PathVariable Long tipId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        tipService.deleteTip(tipId, loginUser.getUserId());
+    }
+
+    @PostMapping("/{tipId}/interest")
+    public void createTipInterest(
+            @PathVariable Long tipId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        tipService.createTipInterest(tipId, loginUser.getUserId());
+    }
+
+    @DeleteMapping("/{tipId}/interest")
+    public void deleteTipInterest(
+            @PathVariable Long tipId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        tipService.deleteTipInterest(tipId, loginUser.getUserId());
+    }
+
+    @PostMapping("/{tipId}/comments")
+    public void createComment(
+            @PathVariable Long tipId,
+            @RequestBody TipCommentCreateRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        tipService.createComment(tipId, input, loginUser.getUserId());
+    }
+
+    @DeleteMapping("/{tipId}/comments/{commentId}")
+    public void deleteComment(
+            @PathVariable Long tipId,
+            @PathVariable Long commentId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        tipService.deleteComment(tipId, commentId, loginUser.getUserId());
+    }
+}
+NeedController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.request.NeedAnswerCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.NeedCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.NeedUpdateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedDetailResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedListResponseDto;
+import simplex.pj148.skippy.server.controller.dto.search.NeedSearchConditionDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.NeedService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequestMapping("/api/needs")
+@RequiredArgsConstructor
+public class NeedController {
+
+    private final NeedService needService;
+
+    private final UserInfoService userInfoService;
+
+    @GetMapping
+    public Page<NeedListResponseDto> searchNeeds(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer affiliatedId,
+            @RequestParam(required = false) Integer positionId,
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) String orderBy,
+            Pageable pageable
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        NeedSearchConditionDto condition = new NeedSearchConditionDto(
+                keyword,
+                affiliatedId,
+                positionId,
+                categoryId,
+                orderBy
+        );
+
+        return needService.searchNeeds(loginUser.getUserId(), condition, pageable);
+    }
+
+    @GetMapping("/{needId}")
+    public NeedDetailResponseDto findNeedDetail(
+            @PathVariable Long needId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return needService.findNeedDetail(needId, loginUser.getUserId());
+    }
+
+    @PostMapping
+    public void createNeed(
+            @RequestBody NeedCreateRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        needService.createNeed(input, loginUser.getUserId());
+    }
+
+    @PutMapping("/{needId}")
+    public void updateNeed(
+            @PathVariable Long needId,
+            @RequestBody NeedUpdateRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        needService.updateNeed(needId, input, loginUser.getUserId());
+    }
+
+    @DeleteMapping("/{needId}")
+    public void deleteNeed(
+            @PathVariable Long needId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        needService.deleteNeed(needId, loginUser.getUserId());
+    }
+
+    @PostMapping("/{needId}/empathy")
+    public void createNeedEmpathy(
+            @PathVariable Long needId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        needService.createNeedEmpathy(needId, loginUser.getUserId());
+    }
+
+    @DeleteMapping("/{needId}/empathy")
+    public void deleteNeedEmpathy(
+            @PathVariable Long needId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        needService.deleteNeedEmpathy(needId, loginUser.getUserId());
+    }
+
+    @PostMapping("/{needId}/answers")
+    public void createAnswerTip(
+            @PathVariable Long needId,
+            @RequestBody NeedAnswerCreateRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        needService.createAnswerTip(needId, input, loginUser.getUserId());
+    }
+}
+ProfileController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.request.ProfileUpdateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.ProfileResponseDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.ProfileService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequestMapping("/api/users")
+@RequiredArgsConstructor
+public class ProfileController {
+
+    private final ProfileService profileService;
+
+    private final UserInfoService userInfoService;
+
+    @GetMapping("/me")
+    public ProfileResponseDto findMyProfile(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return profileService.findProfile(loginUser.getUserId(), loginUser.getUserId());
+    }
+
+    @GetMapping("/{userId}")
+    public ProfileResponseDto findUserProfile(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return profileService.findProfile(userId, loginUser.getUserId());
+    }
+
+    @PutMapping("/me")
+    public void updateMyProfile(
+            @RequestBody ProfileUpdateRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        profileService.updateProfile(loginUser.getUserId(), input);
+    }
+}
+MyBestController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.request.MyBestUpsertRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.MyBestResponseDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.MyBestService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/mybest")
+@RequiredArgsConstructor
+public class MyBestController {
+
+    private final MyBestService myBestService;
+
+    private final UserInfoService userInfoService;
+
+    @GetMapping
+    public List<MyBestResponseDto> findMyBestList(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return myBestService.findMyBestList(loginUser.getUserId());
+    }
+
+    @PutMapping
+    public void upsertMyBest(
+            @RequestBody MyBestUpsertRequestDto input,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        myBestService.upsertMyBest(input, loginUser.getUserId());
+    }
+}
+CategoryController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.response.CategoryResponseDto;
+import simplex.pj148.skippy.server.service.CategoryService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/categories")
+@RequiredArgsConstructor
+public class CategoryController {
+
+    private final CategoryService categoryService;
+
+    @GetMapping
+    public List<CategoryResponseDto> findAllCategory() {
+        return categoryService.findAllCategory();
+    }
+}
+AffiliatedController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.response.AffiliatedResponseDto;
+import simplex.pj148.skippy.server.service.AffiliatedService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/affiliateds")
+@RequiredArgsConstructor
+public class AffiliatedController {
+
+    private final AffiliatedService affiliatedService;
+
+    @GetMapping
+    public List<AffiliatedResponseDto> findAllAffiliated() {
+        return affiliatedService.findAllAffiliated();
+    }
+}
+PositionController.java
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.response.PositionResponseDto;
+import simplex.pj148.skippy.server.service.PositionService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/positions")
+@RequiredArgsConstructor
+public class PositionController {
+
+    private final PositionService positionService;
+
+    @GetMapping
+    public List<PositionResponseDto> findAllPosition() {
+        return positionService.findAllPosition();
+    }
+}
+検索URLの扱い
+
+全部指定するならこれ。
+
+GET /api/tips?keyword=睡眠&affiliatedId=1&positionId=2&categoryId=3&orderBy=interestCount&page=0&size=20
+
+でも、実際は条件なしでもOK。
+
+GET /api/tips
+GET /api/tips?keyword=睡眠
+GET /api/tips?affiliatedId=1
+GET /api/tips?categoryId=3
+GET /api/tips?keyword=睡眠&categoryId=3
+
+Controllerで全部 required = false にしているから、検索欄なし・所属なし・職位なし・カテゴリなしでも動く。
