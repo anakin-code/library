@@ -1,5 +1,99 @@
+了解。Search に関係するところだけ抜き出す。
+Entity に合わせて、positionId ではなく rankId を使う形。Tip / Need は user.affiliated と user.rank を見て絞り込む。Entityでは User が Affiliated affiliated と Rank rank を持っているから、この名前に合わせる。
 
-Repository層
+1. Search DTO
+TipSearchConditionDto.java
+package simplex.pj148.skippy.server.controller.dto.search;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipSearchConditionDto {
+
+    private String keyword;
+
+    private Long affiliatedId;
+
+    private Long rankId;
+
+    private Long categoryId;
+
+    private String orderBy;
+}
+NeedSearchConditionDto.java
+package simplex.pj148.skippy.server.controller.dto.search;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NeedSearchConditionDto {
+
+    private String keyword;
+
+    private Long affiliatedId;
+
+    private Long rankId;
+
+    private Long categoryId;
+
+    private String orderBy;
+}
+2. Controller の Search 部分だけ
+TipController.java
+@GetMapping
+public Page<TipListResponseDto> searchTips(
+        @AuthenticationPrincipal Jwt jwt,
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) Long affiliatedId,
+        @RequestParam(required = false) Long rankId,
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) String orderBy,
+        Pageable pageable
+) {
+    User loginUser = userInfoService.getUserFromJwt(jwt);
+
+    TipSearchConditionDto condition = new TipSearchConditionDto(
+            keyword,
+            affiliatedId,
+            rankId,
+            categoryId,
+            orderBy
+    );
+
+    return tipService.searchTips(loginUser.getUserId(), condition, pageable);
+}
+NeedController.java
+@GetMapping
+public Page<NeedListResponseDto> searchNeeds(
+        @AuthenticationPrincipal Jwt jwt,
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) Long affiliatedId,
+        @RequestParam(required = false) Long rankId,
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) String orderBy,
+        Pageable pageable
+) {
+    User loginUser = userInfoService.getUserFromJwt(jwt);
+
+    NeedSearchConditionDto condition = new NeedSearchConditionDto(
+            keyword,
+            affiliatedId,
+            rankId,
+            categoryId,
+            orderBy
+    );
+
+    return needService.searchNeeds(loginUser.getUserId(), condition, pageable);
+}
+3. Repository の Search 部分だけ
 TipRepository.java
 package simplex.pj148.skippy.server.repository;
 
@@ -9,8 +103,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import simplex.pj148.skippy.server.entity.Tip;
-
-import java.util.List;
 
 public interface TipRepository extends JpaRepository<Tip, Long> {
 
@@ -61,10 +153,6 @@ public interface TipRepository extends JpaRepository<Tip, Long> {
             @Param("orderBy") String orderBy,
             Pageable pageable
     );
-
-    List<Tip> findByNeedNeedIdAndDeleteFlgFalseOrderByCreatedTimeDesc(Long needId);
-
-    Long countByNeedNeedIdAndDeleteFlgFalse(Long needId);
 }
 NeedRepository.java
 package simplex.pj148.skippy.server.repository;
@@ -126,894 +214,379 @@ public interface NeedRepository extends JpaRepository<Need, Long> {
             Pageable pageable
     );
 }
-CommentRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import simplex.pj148.skippy.server.entity.Comment;
-
-import java.util.List;
-
-public interface CommentRepository extends JpaRepository<Comment, Long> {
-
-    List<Comment> findByTipTipIdAndDeleteFlgFalseOrderByCreatedTimeAsc(Long tipId);
-
-    Long countByTipTipIdAndDeleteFlgFalse(Long tipId);
-}
-TipinterestRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import simplex.pj148.skippy.server.entity.Tipinterest;
-
-import java.util.List;
-import java.util.Optional;
-
-public interface TipinterestRepository extends JpaRepository<Tipinterest, Long> {
-
-    Optional<Tipinterest> findByTipTipIdAndUserUserId(Long tipId, Long userId);
-
-    boolean existsByTipTipIdAndUserUserId(Long tipId, Long userId);
-
-    Long countByTipTipId(Long tipId);
-
-    List<Tipinterest> findByUserUserIdAndIsMyBestTrue(Long userId);
-
-    Optional<Tipinterest> findByUserUserIdAndTipCategoryCategoryIdAndIsMyBestTrue(
-            Long userId,
-            Long categoryId
-    );
-}
-NeedEmpathyRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import simplex.pj148.skippy.server.entity.NeedEmpathy;
-
-import java.util.Optional;
-
-public interface NeedEmpathyRepository extends JpaRepository<NeedEmpathy, Long> {
-
-    Optional<NeedEmpathy> findByNeedNeedIdAndUserUserId(Long needId, Long userId);
-
-    boolean existsByNeedNeedIdAndUserUserId(Long needId, Long userId);
-
-    Long countByNeedNeedId(Long needId);
-}
-UserRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import simplex.pj148.skippy.server.entity.User;
-
-public interface UserRepository extends JpaRepository<User, Long> {
-}
-CategoryRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import simplex.pj148.skippy.server.entity.Category;
-
-public interface CategoryRepository extends JpaRepository<Category, Long> {
-}
-AffiliatedRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import simplex.pj148.skippy.server.entity.Affiliated;
-
-public interface AffiliatedRepository extends JpaRepository<Affiliated, Long> {
-}
-RankRepository.java
-package simplex.pj148.skippy.server.repository;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import simplex.pj148.skippy.server.entity.Rank;
-
-public interface RankRepository extends JpaRepository<Rank, Long> {
-}
-Service層
+4. Service の Search 部分だけ
 TipService.java
-package simplex.pj148.skippy.server.service;
+@Transactional(readOnly = true)
+public Page<TipListResponseDto> searchTips(
+        Long loginUserId,
+        TipSearchConditionDto condition,
+        Pageable pageable
+) {
+    Page<Tip> tips = tipRepository.searchTips(
+            condition.getKeyword(),
+            condition.getAffiliatedId(),
+            condition.getRankId(),
+            condition.getCategoryId(),
+            condition.getOrderBy(),
+            pageable
+    );
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.request.TipCommentCreateRequestDto;
-import simplex.pj148.skippy.server.controller.dto.request.TipCreateRequestDto;
-import simplex.pj148.skippy.server.controller.dto.request.TipUpdateRequestDto;
-import simplex.pj148.skippy.server.controller.dto.response.TipCommentResponseDto;
-import simplex.pj148.skippy.server.controller.dto.response.TipDetailResponseDto;
-import simplex.pj148.skippy.server.controller.dto.response.TipListResponseDto;
-import simplex.pj148.skippy.server.controller.dto.search.TipSearchConditionDto;
-import simplex.pj148.skippy.server.entity.Category;
-import simplex.pj148.skippy.server.entity.Comment;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.Tipinterest;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.CategoryRepository;
-import simplex.pj148.skippy.server.repository.CommentRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipinterestRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-@Transactional
-public class TipService {
-
-    private final TipRepository tipRepository;
-
-    private final TipinterestRepository tipinterestRepository;
-
-    private final CommentRepository commentRepository;
-
-    private final UserRepository userRepository;
-
-    private final CategoryRepository categoryRepository;
-
-    @Transactional(readOnly = true)
-    public Page<TipListResponseDto> searchTips(
-            Long loginUserId,
-            TipSearchConditionDto condition,
-            Pageable pageable
-    ) {
-        Page<Tip> tips = tipRepository.searchTips(
-                condition.getKeyword(),
-                condition.getAffiliatedId(),
-                condition.getRankId(),
-                condition.getCategoryId(),
-                condition.getOrderBy(),
-                pageable
-        );
-
-        return tips.map(tip -> toTipListResponseDto(tip, loginUserId));
-    }
-
-    @Transactional(readOnly = true)
-    public TipDetailResponseDto findTipDetail(Long tipId, Long loginUserId) {
-        Tip tip = findActiveTipById(tipId);
-
-        List<TipCommentResponseDto> comments = commentRepository
-                .findByTipTipIdAndDeleteFlgFalseOrderByCreatedTimeAsc(tipId)
-                .stream()
-                .map(comment -> toTipCommentResponseDto(comment, loginUserId))
-                .toList();
-
-        Long interestCount = tipinterestRepository.countByTipTipId(tipId);
-        Boolean interestByCurrentUser =
-                tipinterestRepository.existsByTipTipIdAndUserUserId(tipId, loginUserId);
-        Boolean editFlg = tip.getUser().getUserId().equals(loginUserId);
-
-        return new TipDetailResponseDto(
-                tip.getTipId(),
-                tip.getTipTitle(),
-                tip.getTipDetail(),
-                tip.getTipUrl(),
-                tip.getCategory().getCategoryId(),
-                tip.getCategory().getCategoryName(),
-                tip.getUser().getUserId(),
-                tip.getUser().getUserName(),
-                tip.getUser().getAffiliated().getAffiliatedName(),
-                tip.getUser().getRank().getRankName(),
-                interestCount,
-                interestByCurrentUser,
-                editFlg,
-                tip.getCreatedTime(),
-                comments
-        );
-    }
-
-    public void createTip(TipCreateRequestDto input, Long loginUserId) {
-        User user = findUserById(loginUserId);
-        Category category = findCategoryById(input.getCategoryId());
-
-        Tip tip = new Tip();
-        tip.setUser(user);
-        tip.setCategory(category);
-        tip.setNeed(null);
-        tip.setTipTitle(input.getTipTitle());
-        tip.setTipDetail(input.getTipDetail());
-        tip.setTipUrl(input.getTipUrl());
-        tip.setDeleteFlg(false);
-        tip.setCreatedTime(LocalDateTime.now());
-        tip.setUpdatedTime(LocalDateTime.now());
-
-        tipRepository.save(tip);
-    }
-
-    public void updateTip(Long tipId, TipUpdateRequestDto input, Long loginUserId) {
-        Tip tip = findActiveTipById(tipId);
-
-        checkTipOwner(tip, loginUserId);
-
-        tip.setTipDetail(input.getTipDetail());
-        tip.setUpdatedTime(LocalDateTime.now());
-
-        tipRepository.save(tip);
-    }
-
-    public void deleteTip(Long tipId, Long loginUserId) {
-        Tip tip = findActiveTipById(tipId);
-
-        checkTipOwner(tip, loginUserId);
-
-        tip.setDeleteFlg(true);
-        tip.setUpdatedTime(LocalDateTime.now());
-
-        tipRepository.save(tip);
-    }
-
-    public void createTipInterest(Long tipId, Long loginUserId) {
-        Tip tip = findActiveTipById(tipId);
-        User user = findUserById(loginUserId);
-
-        boolean alreadyExists =
-                tipinterestRepository.existsByTipTipIdAndUserUserId(tipId, loginUserId);
-
-        if (alreadyExists) {
-            return;
-        }
-
-        Tipinterest tipinterest = new Tipinterest();
-        tipinterest.setTip(tip);
-        tipinterest.setUser(user);
-        tipinterest.setIsLooked(false);
-        tipinterest.setIsMyBest(false);
-        tipinterest.setCreatedTime(LocalDateTime.now());
-
-        tipinterestRepository.save(tipinterest);
-    }
-
-    public void deleteTipInterest(Long tipId, Long loginUserId) {
-        Tipinterest tipinterest = tipinterestRepository
-                .findByTipTipIdAndUserUserId(tipId, loginUserId)
-                .orElseThrow(() -> new RuntimeException("気になるが見つかりません"));
-
-        if (Boolean.TRUE.equals(tipinterest.getIsMyBest())) {
-            tipinterest.setIsMyBest(false);
-            tipinterestRepository.save(tipinterest);
-            return;
-        }
-
-        tipinterestRepository.delete(tipinterest);
-    }
-
-    public void createComment(
-            Long tipId,
-            TipCommentCreateRequestDto input,
-            Long loginUserId
-    ) {
-        Tip tip = findActiveTipById(tipId);
-        User user = findUserById(loginUserId);
-
-        Comment comment = new Comment();
-        comment.setTip(tip);
-        comment.setUser(user);
-        comment.setCommentBody(input.getCommentBody());
-        comment.setIsLooked(false);
-        comment.setDeleteFlg(false);
-        comment.setCreatedTime(LocalDateTime.now());
-
-        commentRepository.save(comment);
-    }
-
-    public void deleteComment(Long tipId, Long commentId, Long loginUserId) {
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("コメントが見つかりません"));
-
-        if (Boolean.TRUE.equals(comment.getDeleteFlg())) {
-            throw new RuntimeException("削除済みのコメントです");
-        }
-
-        if (!comment.getTip().getTipId().equals(tipId)) {
-            throw new RuntimeException("ノウハウとコメントの組み合わせが不正です");
-        }
-
-        if (!comment.getUser().getUserId().equals(loginUserId)) {
-            throw new RuntimeException("このコメントを削除する権限がありません");
-        }
-
-        comment.setDeleteFlg(true);
-
-        commentRepository.save(comment);
-    }
-
-    private TipListResponseDto toTipListResponseDto(Tip tip, Long loginUserId) {
-        Long interestCount = tipinterestRepository.countByTipTipId(tip.getTipId());
-        Long commentCount = commentRepository.countByTipTipIdAndDeleteFlgFalse(tip.getTipId());
-        Boolean interestByCurrentUser =
-                tipinterestRepository.existsByTipTipIdAndUserUserId(tip.getTipId(), loginUserId);
-        Boolean editFlg = tip.getUser().getUserId().equals(loginUserId);
-
-        return new TipListResponseDto(
-                tip.getTipId(),
-                tip.getTipTitle(),
-                tip.getTipDetail(),
-                tip.getTipUrl(),
-                tip.getCategory().getCategoryId(),
-                tip.getCategory().getCategoryName(),
-                tip.getUser().getUserId(),
-                tip.getUser().getUserName(),
-                tip.getUser().getAffiliated().getAffiliatedName(),
-                tip.getUser().getRank().getRankName(),
-                interestCount,
-                commentCount,
-                interestByCurrentUser,
-                editFlg,
-                tip.getCreatedTime()
-        );
-    }
-
-    private TipCommentResponseDto toTipCommentResponseDto(Comment comment, Long loginUserId) {
-        Boolean editFlg = comment.getUser().getUserId().equals(loginUserId);
-
-        return new TipCommentResponseDto(
-                comment.getCommentId(),
-                comment.getCommentBody(),
-                comment.getUser().getUserId(),
-                comment.getUser().getUserName(),
-                editFlg,
-                comment.getCreatedTime()
-        );
-    }
-
-    private Tip findActiveTipById(Long tipId) {
-        Tip tip = tipRepository.findById(tipId)
-                .orElseThrow(() -> new RuntimeException("ノウハウが見つかりません"));
-
-        if (Boolean.TRUE.equals(tip.getDeleteFlg())) {
-            throw new RuntimeException("削除済みのノウハウです");
-        }
-
-        return tip;
-    }
-
-    private User findUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-    }
-
-    private Category findCategoryById(Long categoryId) {
-        return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
-    }
-
-    private void checkTipOwner(Tip tip, Long loginUserId) {
-        if (!tip.getUser().getUserId().equals(loginUserId)) {
-            throw new RuntimeException("このノウハウを操作する権限がありません");
-        }
-    }
+    return tips.map(tip -> toTipListResponseDto(tip, loginUserId));
 }
 NeedService.java
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.request.NeedAnswerCreateRequestDto;
-import simplex.pj148.skippy.server.controller.dto.request.NeedCreateRequestDto;
-import simplex.pj148.skippy.server.controller.dto.request.NeedUpdateRequestDto;
-import simplex.pj148.skippy.server.controller.dto.response.NeedAnswerResponseDto;
-import simplex.pj148.skippy.server.controller.dto.response.NeedDetailResponseDto;
-import simplex.pj148.skippy.server.controller.dto.response.NeedListResponseDto;
-import simplex.pj148.skippy.server.controller.dto.search.NeedSearchConditionDto;
-import simplex.pj148.skippy.server.entity.Category;
-import simplex.pj148.skippy.server.entity.Need;
-import simplex.pj148.skippy.server.entity.NeedEmpathy;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.CategoryRepository;
-import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
-import simplex.pj148.skippy.server.repository.NeedRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipinterestRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-@Transactional
-public class NeedService {
-
-    private final NeedRepository needRepository;
-
-    private final NeedEmpathyRepository needEmpathyRepository;
-
-    private final TipRepository tipRepository;
-
-    private final TipinterestRepository tipinterestRepository;
-
-    private final UserRepository userRepository;
-
-    private final CategoryRepository categoryRepository;
-
-    @Transactional(readOnly = true)
-    public Page<NeedListResponseDto> searchNeeds(
-            Long loginUserId,
-            NeedSearchConditionDto condition,
-            Pageable pageable
-    ) {
-        Page<Need> needs = needRepository.searchNeeds(
-                condition.getKeyword(),
-                condition.getAffiliatedId(),
-                condition.getRankId(),
-                condition.getCategoryId(),
-                condition.getOrderBy(),
-                pageable
-        );
-
-        return needs.map(need -> toNeedListResponseDto(need, loginUserId));
-    }
-
-    @Transactional(readOnly = true)
-    public NeedDetailResponseDto findNeedDetail(Long needId, Long loginUserId) {
-        Need need = findActiveNeedById(needId);
-
-        List<NeedAnswerResponseDto> answers = tipRepository
-                .findByNeedNeedIdAndDeleteFlgFalseOrderByCreatedTimeDesc(needId)
-                .stream()
-                .map(this::toNeedAnswerResponseDto)
-                .toList();
-
-        Long empathyCount = needEmpathyRepository.countByNeedNeedId(needId);
-        Boolean empathyByCurrentUser =
-                needEmpathyRepository.existsByNeedNeedIdAndUserUserId(needId, loginUserId);
-        Boolean editFlg = need.getUser().getUserId().equals(loginUserId);
-
-        return new NeedDetailResponseDto(
-                need.getNeedId(),
-                need.getNeedTitle(),
-                need.getNeedDetail(),
-                need.getCategory().getCategoryId(),
-                need.getCategory().getCategoryName(),
-                need.getUser().getUserId(),
-                need.getUser().getUserName(),
-                need.getUser().getAffiliated().getAffiliatedName(),
-                need.getUser().getRank().getRankName(),
-                empathyCount,
-                empathyByCurrentUser,
-                editFlg,
-                need.getCreatedTime(),
-                answers
-        );
-    }
-
-    public void createNeed(NeedCreateRequestDto input, Long loginUserId) {
-        User user = findUserById(loginUserId);
-        Category category = findCategoryById(input.getCategoryId());
-
-        Need need = new Need();
-        need.setUser(user);
-        need.setCategory(category);
-        need.setNeedTitle(input.getNeedTitle());
-        need.setNeedDetail(input.getNeedDetail());
-        need.setDeleteFlg(false);
-        need.setCreatedTime(LocalDateTime.now());
-        need.setUpdatedTime(LocalDateTime.now());
-
-        needRepository.save(need);
-    }
-
-    public void updateNeed(Long needId, NeedUpdateRequestDto input, Long loginUserId) {
-        Need need = findActiveNeedById(needId);
-
-        checkNeedOwner(need, loginUserId);
-
-        need.setNeedDetail(input.getNeedDetail());
-        need.setUpdatedTime(LocalDateTime.now());
-
-        needRepository.save(need);
-    }
-
-    public void deleteNeed(Long needId, Long loginUserId) {
-        Need need = findActiveNeedById(needId);
-
-        checkNeedOwner(need, loginUserId);
-
-        need.setDeleteFlg(true);
-        need.setUpdatedTime(LocalDateTime.now());
-
-        needRepository.save(need);
-    }
-
-    public void createNeedEmpathy(Long needId, Long loginUserId) {
-        Need need = findActiveNeedById(needId);
-        User user = findUserById(loginUserId);
-
-        boolean alreadyExists =
-                needEmpathyRepository.existsByNeedNeedIdAndUserUserId(needId, loginUserId);
-
-        if (alreadyExists) {
-            return;
-        }
-
-        NeedEmpathy needEmpathy = new NeedEmpathy();
-        needEmpathy.setNeed(need);
-        needEmpathy.setUser(user);
-        needEmpathy.setIsLooked(false);
-        needEmpathy.setCreatedTime(LocalDateTime.now());
-
-        needEmpathyRepository.save(needEmpathy);
-    }
-
-    public void deleteNeedEmpathy(Long needId, Long loginUserId) {
-        NeedEmpathy needEmpathy = needEmpathyRepository
-                .findByNeedNeedIdAndUserUserId(needId, loginUserId)
-                .orElseThrow(() -> new RuntimeException("共感が見つかりません"));
-
-        needEmpathyRepository.delete(needEmpathy);
-    }
-
-    public void createAnswerTip(
-            Long needId,
-            NeedAnswerCreateRequestDto input,
-            Long loginUserId
-    ) {
-        Need need = findActiveNeedById(needId);
-        User user = findUserById(loginUserId);
-        Category category = findCategoryById(input.getCategoryId());
-
-        Tip tip = new Tip();
-        tip.setUser(user);
-        tip.setCategory(category);
-        tip.setNeed(need);
-        tip.setTipTitle(input.getTipTitle());
-        tip.setTipDetail(input.getTipDetail());
-        tip.setTipUrl(input.getTipUrl());
-        tip.setDeleteFlg(false);
-        tip.setCreatedTime(LocalDateTime.now());
-        tip.setUpdatedTime(LocalDateTime.now());
-
-        tipRepository.save(tip);
-    }
-
-    private NeedListResponseDto toNeedListResponseDto(Need need, Long loginUserId) {
-        Long empathyCount = needEmpathyRepository.countByNeedNeedId(need.getNeedId());
-        Long answerCount = tipRepository.countByNeedNeedIdAndDeleteFlgFalse(need.getNeedId());
-        Boolean empathyByCurrentUser =
-                needEmpathyRepository.existsByNeedNeedIdAndUserUserId(need.getNeedId(), loginUserId);
-        Boolean editFlg = need.getUser().getUserId().equals(loginUserId);
-
-        return new NeedListResponseDto(
-                need.getNeedId(),
-                need.getNeedTitle(),
-                need.getNeedDetail(),
-                need.getCategory().getCategoryId(),
-                need.getCategory().getCategoryName(),
-                need.getUser().getUserId(),
-                need.getUser().getUserName(),
-                need.getUser().getAffiliated().getAffiliatedName(),
-                need.getUser().getRank().getRankName(),
-                empathyCount,
-                answerCount,
-                empathyByCurrentUser,
-                editFlg,
-                need.getCreatedTime()
-        );
-    }
-
-    private NeedAnswerResponseDto toNeedAnswerResponseDto(Tip tip) {
-        Long interestCount = tipinterestRepository.countByTipTipId(tip.getTipId());
-
-        return new NeedAnswerResponseDto(
-                tip.getTipId(),
-                tip.getTipTitle(),
-                tip.getTipDetail(),
-                interestCount
-        );
-    }
-
-    private Need findActiveNeedById(Long needId) {
-        Need need = needRepository.findById(needId)
-                .orElseThrow(() -> new RuntimeException("お悩みが見つかりません"));
-
-        if (Boolean.TRUE.equals(need.getDeleteFlg())) {
-            throw new RuntimeException("削除済みのお悩みです");
-        }
-
-        return need;
-    }
-
-    private User findUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-    }
-
-    private Category findCategoryById(Long categoryId) {
-        return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
-    }
-
-    private void checkNeedOwner(Need need, Long loginUserId) {
-        if (!need.getUser().getUserId().equals(loginUserId)) {
-            throw new RuntimeException("このお悩みを操作する権限がありません");
-        }
-    }
-}
-MyBestService.java
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.request.MyBestUpsertRequestDto;
-import simplex.pj148.skippy.server.controller.dto.response.MyBestResponseDto;
-import simplex.pj148.skippy.server.entity.Category;
-import simplex.pj148.skippy.server.entity.Tip;
-import simplex.pj148.skippy.server.entity.Tipinterest;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.CategoryRepository;
-import simplex.pj148.skippy.server.repository.TipRepository;
-import simplex.pj148.skippy.server.repository.TipinterestRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-@Transactional
-public class MyBestService {
-
-    private final TipinterestRepository tipinterestRepository;
-
-    private final TipRepository tipRepository;
-
-    private final UserRepository userRepository;
-
-    private final CategoryRepository categoryRepository;
-
-    @Transactional(readOnly = true)
-    public List<MyBestResponseDto> findMyBestList(Long loginUserId) {
-        List<Category> categories = categoryRepository.findAll();
-        List<Tipinterest> myBests =
-                tipinterestRepository.findByUserUserIdAndIsMyBestTrue(loginUserId);
-
-        return categories.stream()
-                .map(category -> {
-                    Tipinterest myBest = myBests.stream()
-                            .filter(tipinterest -> tipinterest.getTip().getCategory().getCategoryId()
-                                    .equals(category.getCategoryId()))
-                            .findFirst()
-                            .orElse(null);
-
-                    if (myBest == null) {
-                        return new MyBestResponseDto(
-                                category.getCategoryId(),
-                                category.getCategoryName(),
-                                null,
-                                "未選択",
-                                null,
-                                false
-                        );
-                    }
-
-                    Tip tip = myBest.getTip();
-
-                    return new MyBestResponseDto(
-                            category.getCategoryId(),
-                            category.getCategoryName(),
-                            tip.getTipId(),
-                            tip.getTipTitle(),
-                            tip.getTipDetail(),
-                            true
-                    );
-                })
-                .toList();
-    }
-
-    public void upsertMyBest(MyBestUpsertRequestDto input, Long loginUserId) {
-        User user = userRepository.findById(loginUserId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-
-        Tip tip = tipRepository.findById(input.getTipId())
-                .orElseThrow(() -> new RuntimeException("ノウハウが見つかりません"));
-
-        if (Boolean.TRUE.equals(tip.getDeleteFlg())) {
-            throw new RuntimeException("削除済みのノウハウです");
-        }
-
-        if (!tip.getCategory().getCategoryId().equals(input.getCategoryId())) {
-            throw new RuntimeException("カテゴリとノウハウが一致していません");
-        }
-
-        tipinterestRepository
-                .findByUserUserIdAndTipCategoryCategoryIdAndIsMyBestTrue(
-                        loginUserId,
-                        input.getCategoryId()
-                )
-                .ifPresent(oldMyBest -> {
-                    oldMyBest.setIsMyBest(false);
-                    tipinterestRepository.save(oldMyBest);
-                });
-
-        Tipinterest target = tipinterestRepository
-                .findByTipTipIdAndUserUserId(input.getTipId(), loginUserId)
-                .orElseGet(() -> {
-                    Tipinterest newTipinterest = new Tipinterest();
-                    newTipinterest.setTip(tip);
-                    newTipinterest.setUser(user);
-                    newTipinterest.setIsLooked(false);
-                    newTipinterest.setCreatedTime(LocalDateTime.now());
-                    return newTipinterest;
-                });
-
-        target.setIsMyBest(true);
-
-        tipinterestRepository.save(target);
-    }
-}
-ProfileService.java
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.request.ProfileUpdateRequestDto;
-import simplex.pj148.skippy.server.controller.dto.response.MyBestResponseDto;
-import simplex.pj148.skippy.server.controller.dto.response.NeedListResponseDto;
-import simplex.pj148.skippy.server.controller.dto.response.ProfileResponseDto;
-import simplex.pj148.skippy.server.controller.dto.response.TipListResponseDto;
-import simplex.pj148.skippy.server.entity.Affiliated;
-import simplex.pj148.skippy.server.entity.Rank;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.AffiliatedRepository;
-import simplex.pj148.skippy.server.repository.RankRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
-
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-@Transactional
-public class ProfileService {
-
-    private final UserRepository userRepository;
-
-    private final AffiliatedRepository affiliatedRepository;
-
-    private final RankRepository rankRepository;
-
-    private final MyBestService myBestService;
-
-    @Transactional(readOnly = true)
-    public ProfileResponseDto findProfile(Long targetUserId, Long loginUserId) {
-        User targetUser = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-
-        Boolean editFlg = targetUser.getUserId().equals(loginUserId);
-
-        List<MyBestResponseDto> myBestList = myBestService.findMyBestList(targetUserId);
-
-        return new ProfileResponseDto(
-                targetUser.getUserId(),
-                targetUser.getUserName(),
-                targetUser.getAffiliated().getAffiliatedId(),
-                targetUser.getAffiliated().getAffiliatedName(),
-                targetUser.getRank().getRankId(),
-                targetUser.getRank().getRankName(),
-                targetUser.getSelfIntroduction(),
-                editFlg,
-                myBestList,
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of()
-        );
-    }
-
-    public void updateProfile(Long loginUserId, ProfileUpdateRequestDto input) {
-        User user = userRepository.findById(loginUserId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
-
-        Affiliated affiliated = affiliatedRepository.findById(input.getAffiliatedId())
-                .orElseThrow(() -> new RuntimeException("所属が見つかりません"));
-
-        Rank rank = rankRepository.findById(input.getRankId())
-                .orElseThrow(() -> new RuntimeException("職位が見つかりません"));
-
-        user.setAffiliated(affiliated);
-        user.setRank(rank);
-        user.setSelfIntroduction(input.getSelfIntroduction());
-
-        userRepository.save(user);
-    }
-}
-
-ここで interestedTips、empathizedNeeds、postedTips、postedNeeds はいったん List.of() にしている。
-この4つまで完全に埋めるには、追加で TipRepository / NeedRepository に「ユーザー別投稿」「ユーザー別気になる」「ユーザー別共感」のメソッドを足す必要がある。まずマイページのプロフィール・マイベストだけならこれで動く。
-
-CategoryService.java
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.response.CategoryResponseDto;
-import simplex.pj148.skippy.server.repository.CategoryRepository;
-
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class CategoryService {
+public Page<NeedListResponseDto> searchNeeds(
+        Long loginUserId,
+        NeedSearchConditionDto condition,
+        Pageable pageable
+) {
+    Page<Need> needs = needRepository.searchNeeds(
+            condition.getKeyword(),
+            condition.getAffiliatedId(),
+            condition.getRankId(),
+            condition.getCategoryId(),
+            condition.getOrderBy(),
+            pageable
+    );
 
-    private final CategoryRepository categoryRepository;
-
-    public List<CategoryResponseDto> findAllCategory() {
-        return categoryRepository.findAll()
-                .stream()
-                .map(category -> new CategoryResponseDto(
-                        category.getCategoryId(),
-                        category.getCategoryName()
-                ))
-                .toList();
-    }
+    return needs.map(need -> toNeedListResponseDto(need, loginUserId));
 }
-AffiliatedService.java
-package simplex.pj148.skippy.server.service;
+5. URL例
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.response.AffiliatedResponseDto;
-import simplex.pj148.skippy.server.repository.AffiliatedRepository;
+全部なしでもOK。
 
-import java.util.List;
+GET /api/tips
+GET /api/needs
 
-@Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
-public class AffiliatedService {
+キーワードだけでもOK。
 
-    private final AffiliatedRepository affiliatedRepository;
+GET /api/tips?keyword=睡眠
+GET /api/needs?keyword=睡眠
 
-    public List<AffiliatedResponseDto> findAllAffiliated() {
-        return affiliatedRepository.findAll()
-                .stream()
-                .map(affiliated -> new AffiliatedResponseDto(
-                        affiliated.getAffiliatedId(),
-                        affiliated.getAffiliatedName()
-                ))
-                .toList();
-    }
-}
-RankService.java
-package simplex.pj148.skippy.server.service;
+絞り込みだけでもOK。
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import simplex.pj148.skippy.server.controller.dto.response.RankResponseDto;
-import simplex.pj148.skippy.server.repository.RankRepository;
+GET /api/tips?affiliatedId=1
+GET /api/tips?rankId=2
+GET /api/tips?categoryId=3
 
-import java.util.List;
+全部指定もOK。
 
-@Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
-public class RankService {
+GET /api/tips?keyword=睡眠&affiliatedId=1&rankId=2&categoryId=3&orderBy=interestCount&page=0&size=20
 
-    private final RankRepository rankRepository;
+検索条件の意味はこれ。
 
-    public List<RankResponseDto> findAllRank() {
-        return rankRepository.findAll()
-                .stream()
-                .map(rank -> new RankResponseDto(
-                        rank.getRankId(),
-                        rank.getRankName()
-                ))
-                .toList();
-    }
-}
+Tip:
+(tipTitle OR tipDetail OR userName に keyword を含む)
+AND affiliatedId
+AND rankId
+AND categoryId
+
+Need:
+(needTitle OR needDetail OR userName に keyword を含む)
+AND affiliatedId
+AND rankId
+AND categoryId
+
+keyword・affiliatedId・rankId・categoryId がない場合は、その条件は無視される。
+
+
+
+
+1. 検索条件の型を作る
+
+まず client 側で search params の型を作る。
+
+export type TipSearchParams = {
+  keyword?: string;
+  affiliatedId?: number;
+  rankId?: number;
+  categoryId?: number;
+  orderBy?: string;
+  page?: number;
+  size?: number;
+};
+
+export type NeedSearchParams = {
+  keyword?: string;
+  affiliatedId?: number;
+  rankId?: number;
+  categoryId?: number;
+  orderBy?: string;
+  page?: number;
+  size?: number;
+};
+
+ここで大事なのは、positionId ではなく rankId にすること。
+Server 側の Entity が Rank だから。
+
+2. fetch関数を作る
+ノウハウ検索
+export const fetchTips = async (params: TipSearchParams = {}) => {
+  const searchParams = new URLSearchParams();
+
+  if (params.keyword && params.keyword.trim() !== "") {
+    searchParams.append("keyword", params.keyword.trim());
+  }
+
+  if (params.affiliatedId != null) {
+    searchParams.append("affiliatedId", String(params.affiliatedId));
+  }
+
+  if (params.rankId != null) {
+    searchParams.append("rankId", String(params.rankId));
+  }
+
+  if (params.categoryId != null) {
+    searchParams.append("categoryId", String(params.categoryId));
+  }
+
+  if (params.orderBy && params.orderBy !== "") {
+    searchParams.append("orderBy", params.orderBy);
+  }
+
+  if (params.page != null) {
+    searchParams.append("page", String(params.page));
+  }
+
+  if (params.size != null) {
+    searchParams.append("size", String(params.size));
+  }
+
+  const query = searchParams.toString();
+  const url = query ? `/api/tips?${query}` : "/api/tips";
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("ノウハウ一覧の取得に失敗しました");
+  }
+
+  return response.json();
+};
+お悩み検索
+export const fetchNeeds = async (params: NeedSearchParams = {}) => {
+  const searchParams = new URLSearchParams();
+
+  if (params.keyword && params.keyword.trim() !== "") {
+    searchParams.append("keyword", params.keyword.trim());
+  }
+
+  if (params.affiliatedId != null) {
+    searchParams.append("affiliatedId", String(params.affiliatedId));
+  }
+
+  if (params.rankId != null) {
+    searchParams.append("rankId", String(params.rankId));
+  }
+
+  if (params.categoryId != null) {
+    searchParams.append("categoryId", String(params.categoryId));
+  }
+
+  if (params.orderBy && params.orderBy !== "") {
+    searchParams.append("orderBy", params.orderBy);
+  }
+
+  if (params.page != null) {
+    searchParams.append("page", String(params.page));
+  }
+
+  if (params.size != null) {
+    searchParams.append("size", String(params.size));
+  }
+
+  const query = searchParams.toString();
+  const url = query ? `/api/needs?${query}` : "/api/needs";
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("お悩み一覧の取得に失敗しました");
+  }
+
+  return response.json();
+};
+3. 検索フォームの state を作る
+
+たとえばノウハウ一覧ならこう。
+
+const [keyword, setKeyword] = useState("");
+const [affiliatedId, setAffiliatedId] = useState<number | undefined>();
+const [rankId, setRankId] = useState<number | undefined>();
+const [categoryId, setCategoryId] = useState<number | undefined>();
+const [orderBy, setOrderBy] = useState("createdTime");
+const [page, setPage] = useState(0);
+const size = 20;
+
+検索実行時にこうする。
+
+const handleSearch = async () => {
+  const data = await fetchTips({
+    keyword,
+    affiliatedId,
+    rankId,
+    categoryId,
+    orderBy,
+    page: 0,
+    size,
+  });
+
+  setTips(data.content);
+  setTotalPages(data.totalPages);
+  setPage(0);
+};
+
+ページ変更時はこう。
+
+const handlePageChange = async (nextPage: number) => {
+  const data = await fetchTips({
+    keyword,
+    affiliatedId,
+    rankId,
+    categoryId,
+    orderBy,
+    page: nextPage,
+    size,
+  });
+
+  setTips(data.content);
+  setTotalPages(data.totalPages);
+  setPage(nextPage);
+};
+4. 「指定なし」は undefined にする
+
+ここかなり大事。
+
+select で「指定なし」を選んだときに、
+
+affiliatedId = ""
+
+のまま API に送ると変なことになる。
+
+なので、select の変更時にこうする。
+
+const handleAffiliatedChange = (value: string) => {
+  setAffiliatedId(value === "" ? undefined : Number(value));
+};
+
+const handleRankChange = (value: string) => {
+  setRankId(value === "" ? undefined : Number(value));
+};
+
+const handleCategoryChange = (value: string) => {
+  setCategoryId(value === "" ? undefined : Number(value));
+};
+
+MUI の Select ならイメージはこう。
+
+<Select
+  value={affiliatedId ?? ""}
+  onChange={(e) => handleAffiliatedChange(String(e.target.value))}
+>
+  <MenuItem value="">指定なし</MenuItem>
+  {affiliateds.map((a) => (
+    <MenuItem key={a.affiliatedId} value={a.affiliatedId}>
+      {a.affiliatedName}
+    </MenuItem>
+  ))}
+</Select>
+
+rank も同じ。
+
+<Select
+  value={rankId ?? ""}
+  onChange={(e) => handleRankChange(String(e.target.value))}
+>
+  <MenuItem value="">指定なし</MenuItem>
+  {ranks.map((r) => (
+    <MenuItem key={r.rankId} value={r.rankId}>
+      {r.rankName}
+    </MenuItem>
+  ))}
+</Select>
+5. 初回表示では条件なしで fetch
+
+一覧画面を開いたときは、条件なしで取ればいい。
+
+useEffect(() => {
+  const init = async () => {
+    const data = await fetchTips({
+      page: 0,
+      size: 20,
+      orderBy: "createdTime",
+    });
+
+    setTips(data.content);
+    setTotalPages(data.totalPages);
+  };
+
+  init();
+}, []);
+
+これで Server にはこう飛ぶ。
+
+GET /api/tips?page=0&size=20&orderBy=createdTime
+
+検索条件がないから、全部のノウハウ一覧になる。
+
+6. リセットボタン
+
+画面に「リセット」があるなら、clientではこう。
+
+const handleReset = async () => {
+  setKeyword("");
+  setAffiliatedId(undefined);
+  setRankId(undefined);
+  setCategoryId(undefined);
+  setOrderBy("createdTime");
+  setPage(0);
+
+  const data = await fetchTips({
+    page: 0,
+    size,
+    orderBy: "createdTime",
+  });
+
+  setTips(data.content);
+  setTotalPages(data.totalPages);
+};
+7. 並び替え
+
+Server 側の orderBy に合わせるなら、client 側はこういう値を送る。
+
+ノウハウなら、
+
+"createdTime"
+"interestCount"
+"commentCount"
+
+お悩みなら、
+
+"createdTime"
+"empathyCount"
+"answerCount"
+
+たとえば、
+
+setOrderBy("interestCount");
+
+として検索実行すると、
+
+GET /api/tips?orderBy=interestCount&page=0&size=20
+
+になる。
+
+8. client が最終的にやること一覧
+
+まとめると、client側はこれ。
+
+1. positionId を rankId に直す
+2. 検索欄 keyword の state を作る
+3. 所属 affiliatedId の state を作る
+4. 職位 rankId の state を作る
+5. カテゴリ categoryId の state を作る
+6. orderBy の state を作る
+7. page / size の state を作る
+8. URLSearchParams で、値があるものだけ query に付ける
+9. GET /api/tips または GET /api/needs を叩く
+10. response の data.content を一覧カードに表示する
