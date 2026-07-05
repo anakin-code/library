@@ -1,1 +1,1019 @@
 
+Repository層
+TipRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import simplex.pj148.skippy.server.entity.Tip;
+
+import java.util.List;
+
+public interface TipRepository extends JpaRepository<Tip, Long> {
+
+    @Query(
+            value = """
+                    SELECT t
+                    FROM Tip t
+                    LEFT JOIN Tipinterest ti ON ti.tip = t
+                    LEFT JOIN Comment c ON c.tip = t AND c.deleteFlg = false
+                    WHERE t.deleteFlg = false
+                      AND (
+                            :keyword IS NULL
+                            OR :keyword = ''
+                            OR LOWER(t.tipTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.tipDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          )
+                      AND (:affiliatedId IS NULL OR t.user.affiliated.affiliatedId = :affiliatedId)
+                      AND (:rankId IS NULL OR t.user.rank.rankId = :rankId)
+                      AND (:categoryId IS NULL OR t.category.categoryId = :categoryId)
+                    GROUP BY t
+                    ORDER BY
+                      CASE WHEN :orderBy = 'interestCount' THEN COUNT(DISTINCT ti) END DESC,
+                      CASE WHEN :orderBy = 'commentCount' THEN COUNT(DISTINCT c) END DESC,
+                      t.createdTime DESC
+                    """,
+            countQuery = """
+                    SELECT COUNT(t)
+                    FROM Tip t
+                    WHERE t.deleteFlg = false
+                      AND (
+                            :keyword IS NULL
+                            OR :keyword = ''
+                            OR LOWER(t.tipTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.tipDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          )
+                      AND (:affiliatedId IS NULL OR t.user.affiliated.affiliatedId = :affiliatedId)
+                      AND (:rankId IS NULL OR t.user.rank.rankId = :rankId)
+                      AND (:categoryId IS NULL OR t.category.categoryId = :categoryId)
+                    """
+    )
+    Page<Tip> searchTips(
+            @Param("keyword") String keyword,
+            @Param("affiliatedId") Long affiliatedId,
+            @Param("rankId") Long rankId,
+            @Param("categoryId") Long categoryId,
+            @Param("orderBy") String orderBy,
+            Pageable pageable
+    );
+
+    List<Tip> findByNeedNeedIdAndDeleteFlgFalseOrderByCreatedTimeDesc(Long needId);
+
+    Long countByNeedNeedIdAndDeleteFlgFalse(Long needId);
+}
+NeedRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import simplex.pj148.skippy.server.entity.Need;
+
+public interface NeedRepository extends JpaRepository<Need, Long> {
+
+    @Query(
+            value = """
+                    SELECT n
+                    FROM Need n
+                    LEFT JOIN NeedEmpathy ne ON ne.need = n
+                    LEFT JOIN Tip t ON t.need = n AND t.deleteFlg = false
+                    WHERE n.deleteFlg = false
+                      AND (
+                            :keyword IS NULL
+                            OR :keyword = ''
+                            OR LOWER(n.needTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(n.needDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(n.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          )
+                      AND (:affiliatedId IS NULL OR n.user.affiliated.affiliatedId = :affiliatedId)
+                      AND (:rankId IS NULL OR n.user.rank.rankId = :rankId)
+                      AND (:categoryId IS NULL OR n.category.categoryId = :categoryId)
+                    GROUP BY n
+                    ORDER BY
+                      CASE WHEN :orderBy = 'empathyCount' THEN COUNT(DISTINCT ne) END DESC,
+                      CASE WHEN :orderBy = 'answerCount' THEN COUNT(DISTINCT t) END DESC,
+                      n.createdTime DESC
+                    """,
+            countQuery = """
+                    SELECT COUNT(n)
+                    FROM Need n
+                    WHERE n.deleteFlg = false
+                      AND (
+                            :keyword IS NULL
+                            OR :keyword = ''
+                            OR LOWER(n.needTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(n.needDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(n.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          )
+                      AND (:affiliatedId IS NULL OR n.user.affiliated.affiliatedId = :affiliatedId)
+                      AND (:rankId IS NULL OR n.user.rank.rankId = :rankId)
+                      AND (:categoryId IS NULL OR n.category.categoryId = :categoryId)
+                    """
+    )
+    Page<Need> searchNeeds(
+            @Param("keyword") String keyword,
+            @Param("affiliatedId") Long affiliatedId,
+            @Param("rankId") Long rankId,
+            @Param("categoryId") Long categoryId,
+            @Param("orderBy") String orderBy,
+            Pageable pageable
+    );
+}
+CommentRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Comment;
+
+import java.util.List;
+
+public interface CommentRepository extends JpaRepository<Comment, Long> {
+
+    List<Comment> findByTipTipIdAndDeleteFlgFalseOrderByCreatedTimeAsc(Long tipId);
+
+    Long countByTipTipIdAndDeleteFlgFalse(Long tipId);
+}
+TipinterestRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Tipinterest;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface TipinterestRepository extends JpaRepository<Tipinterest, Long> {
+
+    Optional<Tipinterest> findByTipTipIdAndUserUserId(Long tipId, Long userId);
+
+    boolean existsByTipTipIdAndUserUserId(Long tipId, Long userId);
+
+    Long countByTipTipId(Long tipId);
+
+    List<Tipinterest> findByUserUserIdAndIsMyBestTrue(Long userId);
+
+    Optional<Tipinterest> findByUserUserIdAndTipCategoryCategoryIdAndIsMyBestTrue(
+            Long userId,
+            Long categoryId
+    );
+}
+NeedEmpathyRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.NeedEmpathy;
+
+import java.util.Optional;
+
+public interface NeedEmpathyRepository extends JpaRepository<NeedEmpathy, Long> {
+
+    Optional<NeedEmpathy> findByNeedNeedIdAndUserUserId(Long needId, Long userId);
+
+    boolean existsByNeedNeedIdAndUserUserId(Long needId, Long userId);
+
+    Long countByNeedNeedId(Long needId);
+}
+UserRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.User;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+}
+CategoryRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Category;
+
+public interface CategoryRepository extends JpaRepository<Category, Long> {
+}
+AffiliatedRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Affiliated;
+
+public interface AffiliatedRepository extends JpaRepository<Affiliated, Long> {
+}
+RankRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Rank;
+
+public interface RankRepository extends JpaRepository<Rank, Long> {
+}
+Service層
+TipService.java
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.request.TipCommentCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.TipCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.TipUpdateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.TipCommentResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.TipDetailResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.TipListResponseDto;
+import simplex.pj148.skippy.server.controller.dto.search.TipSearchConditionDto;
+import simplex.pj148.skippy.server.entity.Category;
+import simplex.pj148.skippy.server.entity.Comment;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.Tipinterest;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+import simplex.pj148.skippy.server.repository.CommentRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipinterestRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class TipService {
+
+    private final TipRepository tipRepository;
+
+    private final TipinterestRepository tipinterestRepository;
+
+    private final CommentRepository commentRepository;
+
+    private final UserRepository userRepository;
+
+    private final CategoryRepository categoryRepository;
+
+    @Transactional(readOnly = true)
+    public Page<TipListResponseDto> searchTips(
+            Long loginUserId,
+            TipSearchConditionDto condition,
+            Pageable pageable
+    ) {
+        Page<Tip> tips = tipRepository.searchTips(
+                condition.getKeyword(),
+                condition.getAffiliatedId(),
+                condition.getRankId(),
+                condition.getCategoryId(),
+                condition.getOrderBy(),
+                pageable
+        );
+
+        return tips.map(tip -> toTipListResponseDto(tip, loginUserId));
+    }
+
+    @Transactional(readOnly = true)
+    public TipDetailResponseDto findTipDetail(Long tipId, Long loginUserId) {
+        Tip tip = findActiveTipById(tipId);
+
+        List<TipCommentResponseDto> comments = commentRepository
+                .findByTipTipIdAndDeleteFlgFalseOrderByCreatedTimeAsc(tipId)
+                .stream()
+                .map(comment -> toTipCommentResponseDto(comment, loginUserId))
+                .toList();
+
+        Long interestCount = tipinterestRepository.countByTipTipId(tipId);
+        Boolean interestByCurrentUser =
+                tipinterestRepository.existsByTipTipIdAndUserUserId(tipId, loginUserId);
+        Boolean editFlg = tip.getUser().getUserId().equals(loginUserId);
+
+        return new TipDetailResponseDto(
+                tip.getTipId(),
+                tip.getTipTitle(),
+                tip.getTipDetail(),
+                tip.getTipUrl(),
+                tip.getCategory().getCategoryId(),
+                tip.getCategory().getCategoryName(),
+                tip.getUser().getUserId(),
+                tip.getUser().getUserName(),
+                tip.getUser().getAffiliated().getAffiliatedName(),
+                tip.getUser().getRank().getRankName(),
+                interestCount,
+                interestByCurrentUser,
+                editFlg,
+                tip.getCreatedTime(),
+                comments
+        );
+    }
+
+    public void createTip(TipCreateRequestDto input, Long loginUserId) {
+        User user = findUserById(loginUserId);
+        Category category = findCategoryById(input.getCategoryId());
+
+        Tip tip = new Tip();
+        tip.setUser(user);
+        tip.setCategory(category);
+        tip.setNeed(null);
+        tip.setTipTitle(input.getTipTitle());
+        tip.setTipDetail(input.getTipDetail());
+        tip.setTipUrl(input.getTipUrl());
+        tip.setDeleteFlg(false);
+        tip.setCreatedTime(LocalDateTime.now());
+        tip.setUpdatedTime(LocalDateTime.now());
+
+        tipRepository.save(tip);
+    }
+
+    public void updateTip(Long tipId, TipUpdateRequestDto input, Long loginUserId) {
+        Tip tip = findActiveTipById(tipId);
+
+        checkTipOwner(tip, loginUserId);
+
+        tip.setTipDetail(input.getTipDetail());
+        tip.setUpdatedTime(LocalDateTime.now());
+
+        tipRepository.save(tip);
+    }
+
+    public void deleteTip(Long tipId, Long loginUserId) {
+        Tip tip = findActiveTipById(tipId);
+
+        checkTipOwner(tip, loginUserId);
+
+        tip.setDeleteFlg(true);
+        tip.setUpdatedTime(LocalDateTime.now());
+
+        tipRepository.save(tip);
+    }
+
+    public void createTipInterest(Long tipId, Long loginUserId) {
+        Tip tip = findActiveTipById(tipId);
+        User user = findUserById(loginUserId);
+
+        boolean alreadyExists =
+                tipinterestRepository.existsByTipTipIdAndUserUserId(tipId, loginUserId);
+
+        if (alreadyExists) {
+            return;
+        }
+
+        Tipinterest tipinterest = new Tipinterest();
+        tipinterest.setTip(tip);
+        tipinterest.setUser(user);
+        tipinterest.setIsLooked(false);
+        tipinterest.setIsMyBest(false);
+        tipinterest.setCreatedTime(LocalDateTime.now());
+
+        tipinterestRepository.save(tipinterest);
+    }
+
+    public void deleteTipInterest(Long tipId, Long loginUserId) {
+        Tipinterest tipinterest = tipinterestRepository
+                .findByTipTipIdAndUserUserId(tipId, loginUserId)
+                .orElseThrow(() -> new RuntimeException("気になるが見つかりません"));
+
+        if (Boolean.TRUE.equals(tipinterest.getIsMyBest())) {
+            tipinterest.setIsMyBest(false);
+            tipinterestRepository.save(tipinterest);
+            return;
+        }
+
+        tipinterestRepository.delete(tipinterest);
+    }
+
+    public void createComment(
+            Long tipId,
+            TipCommentCreateRequestDto input,
+            Long loginUserId
+    ) {
+        Tip tip = findActiveTipById(tipId);
+        User user = findUserById(loginUserId);
+
+        Comment comment = new Comment();
+        comment.setTip(tip);
+        comment.setUser(user);
+        comment.setCommentBody(input.getCommentBody());
+        comment.setIsLooked(false);
+        comment.setDeleteFlg(false);
+        comment.setCreatedTime(LocalDateTime.now());
+
+        commentRepository.save(comment);
+    }
+
+    public void deleteComment(Long tipId, Long commentId, Long loginUserId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("コメントが見つかりません"));
+
+        if (Boolean.TRUE.equals(comment.getDeleteFlg())) {
+            throw new RuntimeException("削除済みのコメントです");
+        }
+
+        if (!comment.getTip().getTipId().equals(tipId)) {
+            throw new RuntimeException("ノウハウとコメントの組み合わせが不正です");
+        }
+
+        if (!comment.getUser().getUserId().equals(loginUserId)) {
+            throw new RuntimeException("このコメントを削除する権限がありません");
+        }
+
+        comment.setDeleteFlg(true);
+
+        commentRepository.save(comment);
+    }
+
+    private TipListResponseDto toTipListResponseDto(Tip tip, Long loginUserId) {
+        Long interestCount = tipinterestRepository.countByTipTipId(tip.getTipId());
+        Long commentCount = commentRepository.countByTipTipIdAndDeleteFlgFalse(tip.getTipId());
+        Boolean interestByCurrentUser =
+                tipinterestRepository.existsByTipTipIdAndUserUserId(tip.getTipId(), loginUserId);
+        Boolean editFlg = tip.getUser().getUserId().equals(loginUserId);
+
+        return new TipListResponseDto(
+                tip.getTipId(),
+                tip.getTipTitle(),
+                tip.getTipDetail(),
+                tip.getTipUrl(),
+                tip.getCategory().getCategoryId(),
+                tip.getCategory().getCategoryName(),
+                tip.getUser().getUserId(),
+                tip.getUser().getUserName(),
+                tip.getUser().getAffiliated().getAffiliatedName(),
+                tip.getUser().getRank().getRankName(),
+                interestCount,
+                commentCount,
+                interestByCurrentUser,
+                editFlg,
+                tip.getCreatedTime()
+        );
+    }
+
+    private TipCommentResponseDto toTipCommentResponseDto(Comment comment, Long loginUserId) {
+        Boolean editFlg = comment.getUser().getUserId().equals(loginUserId);
+
+        return new TipCommentResponseDto(
+                comment.getCommentId(),
+                comment.getCommentBody(),
+                comment.getUser().getUserId(),
+                comment.getUser().getUserName(),
+                editFlg,
+                comment.getCreatedTime()
+        );
+    }
+
+    private Tip findActiveTipById(Long tipId) {
+        Tip tip = tipRepository.findById(tipId)
+                .orElseThrow(() -> new RuntimeException("ノウハウが見つかりません"));
+
+        if (Boolean.TRUE.equals(tip.getDeleteFlg())) {
+            throw new RuntimeException("削除済みのノウハウです");
+        }
+
+        return tip;
+    }
+
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+    }
+
+    private Category findCategoryById(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
+    }
+
+    private void checkTipOwner(Tip tip, Long loginUserId) {
+        if (!tip.getUser().getUserId().equals(loginUserId)) {
+            throw new RuntimeException("このノウハウを操作する権限がありません");
+        }
+    }
+}
+NeedService.java
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.request.NeedAnswerCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.NeedCreateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.request.NeedUpdateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedAnswerResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedDetailResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedListResponseDto;
+import simplex.pj148.skippy.server.controller.dto.search.NeedSearchConditionDto;
+import simplex.pj148.skippy.server.entity.Category;
+import simplex.pj148.skippy.server.entity.Need;
+import simplex.pj148.skippy.server.entity.NeedEmpathy;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
+import simplex.pj148.skippy.server.repository.NeedRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipinterestRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class NeedService {
+
+    private final NeedRepository needRepository;
+
+    private final NeedEmpathyRepository needEmpathyRepository;
+
+    private final TipRepository tipRepository;
+
+    private final TipinterestRepository tipinterestRepository;
+
+    private final UserRepository userRepository;
+
+    private final CategoryRepository categoryRepository;
+
+    @Transactional(readOnly = true)
+    public Page<NeedListResponseDto> searchNeeds(
+            Long loginUserId,
+            NeedSearchConditionDto condition,
+            Pageable pageable
+    ) {
+        Page<Need> needs = needRepository.searchNeeds(
+                condition.getKeyword(),
+                condition.getAffiliatedId(),
+                condition.getRankId(),
+                condition.getCategoryId(),
+                condition.getOrderBy(),
+                pageable
+        );
+
+        return needs.map(need -> toNeedListResponseDto(need, loginUserId));
+    }
+
+    @Transactional(readOnly = true)
+    public NeedDetailResponseDto findNeedDetail(Long needId, Long loginUserId) {
+        Need need = findActiveNeedById(needId);
+
+        List<NeedAnswerResponseDto> answers = tipRepository
+                .findByNeedNeedIdAndDeleteFlgFalseOrderByCreatedTimeDesc(needId)
+                .stream()
+                .map(this::toNeedAnswerResponseDto)
+                .toList();
+
+        Long empathyCount = needEmpathyRepository.countByNeedNeedId(needId);
+        Boolean empathyByCurrentUser =
+                needEmpathyRepository.existsByNeedNeedIdAndUserUserId(needId, loginUserId);
+        Boolean editFlg = need.getUser().getUserId().equals(loginUserId);
+
+        return new NeedDetailResponseDto(
+                need.getNeedId(),
+                need.getNeedTitle(),
+                need.getNeedDetail(),
+                need.getCategory().getCategoryId(),
+                need.getCategory().getCategoryName(),
+                need.getUser().getUserId(),
+                need.getUser().getUserName(),
+                need.getUser().getAffiliated().getAffiliatedName(),
+                need.getUser().getRank().getRankName(),
+                empathyCount,
+                empathyByCurrentUser,
+                editFlg,
+                need.getCreatedTime(),
+                answers
+        );
+    }
+
+    public void createNeed(NeedCreateRequestDto input, Long loginUserId) {
+        User user = findUserById(loginUserId);
+        Category category = findCategoryById(input.getCategoryId());
+
+        Need need = new Need();
+        need.setUser(user);
+        need.setCategory(category);
+        need.setNeedTitle(input.getNeedTitle());
+        need.setNeedDetail(input.getNeedDetail());
+        need.setDeleteFlg(false);
+        need.setCreatedTime(LocalDateTime.now());
+        need.setUpdatedTime(LocalDateTime.now());
+
+        needRepository.save(need);
+    }
+
+    public void updateNeed(Long needId, NeedUpdateRequestDto input, Long loginUserId) {
+        Need need = findActiveNeedById(needId);
+
+        checkNeedOwner(need, loginUserId);
+
+        need.setNeedDetail(input.getNeedDetail());
+        need.setUpdatedTime(LocalDateTime.now());
+
+        needRepository.save(need);
+    }
+
+    public void deleteNeed(Long needId, Long loginUserId) {
+        Need need = findActiveNeedById(needId);
+
+        checkNeedOwner(need, loginUserId);
+
+        need.setDeleteFlg(true);
+        need.setUpdatedTime(LocalDateTime.now());
+
+        needRepository.save(need);
+    }
+
+    public void createNeedEmpathy(Long needId, Long loginUserId) {
+        Need need = findActiveNeedById(needId);
+        User user = findUserById(loginUserId);
+
+        boolean alreadyExists =
+                needEmpathyRepository.existsByNeedNeedIdAndUserUserId(needId, loginUserId);
+
+        if (alreadyExists) {
+            return;
+        }
+
+        NeedEmpathy needEmpathy = new NeedEmpathy();
+        needEmpathy.setNeed(need);
+        needEmpathy.setUser(user);
+        needEmpathy.setIsLooked(false);
+        needEmpathy.setCreatedTime(LocalDateTime.now());
+
+        needEmpathyRepository.save(needEmpathy);
+    }
+
+    public void deleteNeedEmpathy(Long needId, Long loginUserId) {
+        NeedEmpathy needEmpathy = needEmpathyRepository
+                .findByNeedNeedIdAndUserUserId(needId, loginUserId)
+                .orElseThrow(() -> new RuntimeException("共感が見つかりません"));
+
+        needEmpathyRepository.delete(needEmpathy);
+    }
+
+    public void createAnswerTip(
+            Long needId,
+            NeedAnswerCreateRequestDto input,
+            Long loginUserId
+    ) {
+        Need need = findActiveNeedById(needId);
+        User user = findUserById(loginUserId);
+        Category category = findCategoryById(input.getCategoryId());
+
+        Tip tip = new Tip();
+        tip.setUser(user);
+        tip.setCategory(category);
+        tip.setNeed(need);
+        tip.setTipTitle(input.getTipTitle());
+        tip.setTipDetail(input.getTipDetail());
+        tip.setTipUrl(input.getTipUrl());
+        tip.setDeleteFlg(false);
+        tip.setCreatedTime(LocalDateTime.now());
+        tip.setUpdatedTime(LocalDateTime.now());
+
+        tipRepository.save(tip);
+    }
+
+    private NeedListResponseDto toNeedListResponseDto(Need need, Long loginUserId) {
+        Long empathyCount = needEmpathyRepository.countByNeedNeedId(need.getNeedId());
+        Long answerCount = tipRepository.countByNeedNeedIdAndDeleteFlgFalse(need.getNeedId());
+        Boolean empathyByCurrentUser =
+                needEmpathyRepository.existsByNeedNeedIdAndUserUserId(need.getNeedId(), loginUserId);
+        Boolean editFlg = need.getUser().getUserId().equals(loginUserId);
+
+        return new NeedListResponseDto(
+                need.getNeedId(),
+                need.getNeedTitle(),
+                need.getNeedDetail(),
+                need.getCategory().getCategoryId(),
+                need.getCategory().getCategoryName(),
+                need.getUser().getUserId(),
+                need.getUser().getUserName(),
+                need.getUser().getAffiliated().getAffiliatedName(),
+                need.getUser().getRank().getRankName(),
+                empathyCount,
+                answerCount,
+                empathyByCurrentUser,
+                editFlg,
+                need.getCreatedTime()
+        );
+    }
+
+    private NeedAnswerResponseDto toNeedAnswerResponseDto(Tip tip) {
+        Long interestCount = tipinterestRepository.countByTipTipId(tip.getTipId());
+
+        return new NeedAnswerResponseDto(
+                tip.getTipId(),
+                tip.getTipTitle(),
+                tip.getTipDetail(),
+                interestCount
+        );
+    }
+
+    private Need findActiveNeedById(Long needId) {
+        Need need = needRepository.findById(needId)
+                .orElseThrow(() -> new RuntimeException("お悩みが見つかりません"));
+
+        if (Boolean.TRUE.equals(need.getDeleteFlg())) {
+            throw new RuntimeException("削除済みのお悩みです");
+        }
+
+        return need;
+    }
+
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+    }
+
+    private Category findCategoryById(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new RuntimeException("カテゴリが見つかりません"));
+    }
+
+    private void checkNeedOwner(Need need, Long loginUserId) {
+        if (!need.getUser().getUserId().equals(loginUserId)) {
+            throw new RuntimeException("このお悩みを操作する権限がありません");
+        }
+    }
+}
+MyBestService.java
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.request.MyBestUpsertRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.MyBestResponseDto;
+import simplex.pj148.skippy.server.entity.Category;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.Tipinterest;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipinterestRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class MyBestService {
+
+    private final TipinterestRepository tipinterestRepository;
+
+    private final TipRepository tipRepository;
+
+    private final UserRepository userRepository;
+
+    private final CategoryRepository categoryRepository;
+
+    @Transactional(readOnly = true)
+    public List<MyBestResponseDto> findMyBestList(Long loginUserId) {
+        List<Category> categories = categoryRepository.findAll();
+        List<Tipinterest> myBests =
+                tipinterestRepository.findByUserUserIdAndIsMyBestTrue(loginUserId);
+
+        return categories.stream()
+                .map(category -> {
+                    Tipinterest myBest = myBests.stream()
+                            .filter(tipinterest -> tipinterest.getTip().getCategory().getCategoryId()
+                                    .equals(category.getCategoryId()))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (myBest == null) {
+                        return new MyBestResponseDto(
+                                category.getCategoryId(),
+                                category.getCategoryName(),
+                                null,
+                                "未選択",
+                                null,
+                                false
+                        );
+                    }
+
+                    Tip tip = myBest.getTip();
+
+                    return new MyBestResponseDto(
+                            category.getCategoryId(),
+                            category.getCategoryName(),
+                            tip.getTipId(),
+                            tip.getTipTitle(),
+                            tip.getTipDetail(),
+                            true
+                    );
+                })
+                .toList();
+    }
+
+    public void upsertMyBest(MyBestUpsertRequestDto input, Long loginUserId) {
+        User user = userRepository.findById(loginUserId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Tip tip = tipRepository.findById(input.getTipId())
+                .orElseThrow(() -> new RuntimeException("ノウハウが見つかりません"));
+
+        if (Boolean.TRUE.equals(tip.getDeleteFlg())) {
+            throw new RuntimeException("削除済みのノウハウです");
+        }
+
+        if (!tip.getCategory().getCategoryId().equals(input.getCategoryId())) {
+            throw new RuntimeException("カテゴリとノウハウが一致していません");
+        }
+
+        tipinterestRepository
+                .findByUserUserIdAndTipCategoryCategoryIdAndIsMyBestTrue(
+                        loginUserId,
+                        input.getCategoryId()
+                )
+                .ifPresent(oldMyBest -> {
+                    oldMyBest.setIsMyBest(false);
+                    tipinterestRepository.save(oldMyBest);
+                });
+
+        Tipinterest target = tipinterestRepository
+                .findByTipTipIdAndUserUserId(input.getTipId(), loginUserId)
+                .orElseGet(() -> {
+                    Tipinterest newTipinterest = new Tipinterest();
+                    newTipinterest.setTip(tip);
+                    newTipinterest.setUser(user);
+                    newTipinterest.setIsLooked(false);
+                    newTipinterest.setCreatedTime(LocalDateTime.now());
+                    return newTipinterest;
+                });
+
+        target.setIsMyBest(true);
+
+        tipinterestRepository.save(target);
+    }
+}
+ProfileService.java
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.request.ProfileUpdateRequestDto;
+import simplex.pj148.skippy.server.controller.dto.response.MyBestResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.NeedListResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.ProfileResponseDto;
+import simplex.pj148.skippy.server.controller.dto.response.TipListResponseDto;
+import simplex.pj148.skippy.server.entity.Affiliated;
+import simplex.pj148.skippy.server.entity.Rank;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.AffiliatedRepository;
+import simplex.pj148.skippy.server.repository.RankRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class ProfileService {
+
+    private final UserRepository userRepository;
+
+    private final AffiliatedRepository affiliatedRepository;
+
+    private final RankRepository rankRepository;
+
+    private final MyBestService myBestService;
+
+    @Transactional(readOnly = true)
+    public ProfileResponseDto findProfile(Long targetUserId, Long loginUserId) {
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Boolean editFlg = targetUser.getUserId().equals(loginUserId);
+
+        List<MyBestResponseDto> myBestList = myBestService.findMyBestList(targetUserId);
+
+        return new ProfileResponseDto(
+                targetUser.getUserId(),
+                targetUser.getUserName(),
+                targetUser.getAffiliated().getAffiliatedId(),
+                targetUser.getAffiliated().getAffiliatedName(),
+                targetUser.getRank().getRankId(),
+                targetUser.getRank().getRankName(),
+                targetUser.getSelfIntroduction(),
+                editFlg,
+                myBestList,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+    }
+
+    public void updateProfile(Long loginUserId, ProfileUpdateRequestDto input) {
+        User user = userRepository.findById(loginUserId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません"));
+
+        Affiliated affiliated = affiliatedRepository.findById(input.getAffiliatedId())
+                .orElseThrow(() -> new RuntimeException("所属が見つかりません"));
+
+        Rank rank = rankRepository.findById(input.getRankId())
+                .orElseThrow(() -> new RuntimeException("職位が見つかりません"));
+
+        user.setAffiliated(affiliated);
+        user.setRank(rank);
+        user.setSelfIntroduction(input.getSelfIntroduction());
+
+        userRepository.save(user);
+    }
+}
+
+ここで interestedTips、empathizedNeeds、postedTips、postedNeeds はいったん List.of() にしている。
+この4つまで完全に埋めるには、追加で TipRepository / NeedRepository に「ユーザー別投稿」「ユーザー別気になる」「ユーザー別共感」のメソッドを足す必要がある。まずマイページのプロフィール・マイベストだけならこれで動く。
+
+CategoryService.java
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.response.CategoryResponseDto;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class CategoryService {
+
+    private final CategoryRepository categoryRepository;
+
+    public List<CategoryResponseDto> findAllCategory() {
+        return categoryRepository.findAll()
+                .stream()
+                .map(category -> new CategoryResponseDto(
+                        category.getCategoryId(),
+                        category.getCategoryName()
+                ))
+                .toList();
+    }
+}
+AffiliatedService.java
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.response.AffiliatedResponseDto;
+import simplex.pj148.skippy.server.repository.AffiliatedRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class AffiliatedService {
+
+    private final AffiliatedRepository affiliatedRepository;
+
+    public List<AffiliatedResponseDto> findAllAffiliated() {
+        return affiliatedRepository.findAll()
+                .stream()
+                .map(affiliated -> new AffiliatedResponseDto(
+                        affiliated.getAffiliatedId(),
+                        affiliated.getAffiliatedName()
+                ))
+                .toList();
+    }
+}
+RankService.java
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.response.RankResponseDto;
+import simplex.pj148.skippy.server.repository.RankRepository;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class RankService {
+
+    private final RankRepository rankRepository;
+
+    public List<RankResponseDto> findAllRank() {
+        return rankRepository.findAll()
+                .stream()
+                .map(rank -> new RankResponseDto(
+                        rank.getRankId(),
+                        rank.getRankName()
+                ))
+                .toList();
+    }
+}
