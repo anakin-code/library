@@ -29,35 +29,32 @@ export type NeedPageResponse = {
   first: boolean;
   last: boolean;
 };
-2. src/models/Master.ts
 
-所属・職位・カテゴリの一覧用。
-
-export type AffiliatedOption = {
+export type NeedInput = {
+  categoryId: number | "";
+  needTitle: string;
+  needDetail: string;
+};
+2. src/models/Affiliated.ts
+export type Affiliated = {
   affiliatedId: number;
   affiliatedName: string;
 };
-
-export type PositionOption = {
-  positionId: number;
-  positionName: string;
-};
-
-export type CategoryOption = {
-  categoryId: number;
-  categoryName: string;
-};
-
-ただし、server側のDTOが rankId / rankName で返ってくるなら、client側も合わせてこうする。
-
-export type PositionOption = {
+3. src/models/Rank.ts
+export type Rank = {
   rankId: number;
   rankName: string;
 };
+4. src/models/Category.ts
+export type Category = {
+  categoryId: number;
+  categoryName: string;
+};
+5. src/components/NeedCard.tsx
 
-今の検索パラメータ名は positionId で投げるけど、server内部では rankId として扱う、という理解でOK。
+カード押下で詳細画面に行く版。
+ルーティングが違うなら、navigate(/needs/${need.needId}) のところだけ変えればいい。
 
-3. src/components/NeedCard.tsx
 import {
   Box,
   Card,
@@ -128,7 +125,7 @@ export default function NeedCard({ need }: Props): JSX.Element {
             fontWeight: 700,
           }}
         >
-          悩みカテゴリ
+          {need.categoryName}
         </Typography>
 
         <Typography
@@ -222,51 +219,43 @@ export default function NeedCard({ need }: Props): JSX.Element {
     </Card>
   );
 }
-4. src/pages/SubmitForm.tsx
+6. src/components/SubmitNeeds.tsx
 
-投稿モーダル。
-Dialogの外にボタンを出さないのが大事。
+ここでは Dialogを書かない。
+Dialogは親の NeedsList.tsx 側で持つ。
 
 import {
   Box,
   Button,
-  Dialog,
-  DialogContent,
   MenuItem,
   TextField,
   Typography,
 } from "@mui/material";
 import { useState } from "react";
-import type { CategoryOption } from "../models/Master";
-import { useApi } from "../lib/api";
+import { useApi } from "../lib/useApi";
+import type { Category } from "../models/Category";
+import type { NeedInput } from "../models/Need";
 
 type Props = {
-  open: boolean;
+  categories: Category[];
   onClose: () => void;
-  categories: CategoryOption[];
   onCreated: () => void;
 };
 
-type NeedCreateForm = {
-  categoryId: string;
-  needTitle: string;
-  needDetail: string;
+const initialValues: NeedInput = {
+  categoryId: "",
+  needTitle: "",
+  needDetail: "",
 };
 
-export default function SubmitForm({
-  open,
-  onClose,
+export default function SubmitNeeds({
   categories,
+  onClose,
   onCreated,
 }: Props): JSX.Element {
   const api = useApi();
 
-  const [formData, setFormData] = useState<NeedCreateForm>({
-    categoryId: "",
-    needTitle: "",
-    needDetail: "",
-  });
-
+  const [formData, setFormData] = useState<NeedInput>(initialValues);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const titleCount = formData.needTitle.length;
@@ -281,25 +270,39 @@ export default function SubmitForm({
     !isSubmitting;
 
   const resetForm = (): void => {
-    setFormData({
-      categoryId: "",
-      needTitle: "",
-      needDetail: "",
-    });
+    setFormData(initialValues);
   };
 
-  const handleClose = (): void => {
+  const handleCancel = (): void => {
     if (isSubmitting) return;
+    resetForm();
     onClose();
   };
 
-  const handleSubmit = async (): Promise<void> => {
-    if (!canSubmit) return;
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
+    event.preventDefault();
+
+    if (formData.categoryId === "") {
+      alert("悩みカテゴリを選択してください。");
+      return;
+    }
+
+    if (!formData.needTitle.trim()) {
+      alert("タイトルを入力してください。");
+      return;
+    }
+
+    if (!formData.needDetail.trim()) {
+      alert("詳細を入力してください。");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
 
-      const res = await api.fetch("/api/needs", {
+      const response = await api.fetch("/api/needs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -311,13 +314,13 @@ export default function SubmitForm({
         }),
       });
 
-      if (!res.ok) {
-        throw new Error("お悩み投稿に失敗しました");
+      if (!response.ok) {
+        throw new Error("投稿に失敗しました");
       }
 
       resetForm();
-      onClose();
       onCreated();
+      onClose();
     } catch (error) {
       console.error(error);
       alert("投稿に失敗しました。入力内容やサーバーを確認してください。");
@@ -327,220 +330,221 @@ export default function SubmitForm({
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      fullWidth
-      maxWidth="sm"
-      slotProps={{
-        paper: {
-          sx: {
-            borderRadius: 4,
-            width: 420,
-            maxWidth: "calc(100% - 32px)",
-          },
-        },
-      }}
-    >
-      <DialogContent
+    <Box component="form" onSubmit={handleSubmit}>
+      <Typography
+        component="h2"
         sx={{
-          px: 6,
-          py: 4,
-          backgroundColor: "#fff7e8",
+          fontSize: 24,
+          fontWeight: 800,
+          textAlign: "center",
+          mb: 3,
+          color: "black",
         }}
       >
-        <Typography
-          component="h2"
-          sx={{
-            fontSize: 24,
-            fontWeight: 800,
-            textAlign: "center",
-            mb: 3,
-            color: "black",
-          }}
-        >
-          お悩み投稿
-        </Typography>
+        お悩み投稿
+      </Typography>
+
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 2.5,
+        }}
+      >
+        <Box>
+          <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={formData.categoryId}
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                categoryId:
+                  event.target.value === "" ? "" : Number(event.target.value),
+              }))
+            }
+            SelectProps={{
+              displayEmpty: true,
+            }}
+            sx={{
+              backgroundColor: "white",
+              borderRadius: 2,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          >
+            <MenuItem value="" disabled>
+              悩みカテゴリ
+            </MenuItem>
+
+            {categories.map((category) => (
+              <MenuItem
+                key={category.categoryId}
+                value={category.categoryId}
+              >
+                {category.categoryName}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
+
+        <Box>
+          <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="タイトル"
+            value={formData.needTitle}
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                needTitle: event.target.value,
+              }))
+            }
+            inputProps={{
+              maxLength: 30,
+            }}
+            sx={{
+              backgroundColor: "white",
+              borderRadius: 2,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          />
+
+          <Typography
+            sx={{
+              mt: 0.3,
+              textAlign: "right",
+              fontSize: 12,
+              color: titleCount > 30 ? "error.main" : "text.secondary",
+            }}
+          >
+            {titleCount}/30
+          </Typography>
+        </Box>
+
+        <Box>
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            placeholder="詳細"
+            value={formData.needDetail}
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                needDetail: event.target.value,
+              }))
+            }
+            inputProps={{
+              maxLength: 1000,
+            }}
+            sx={{
+              backgroundColor: "white",
+              borderRadius: 2,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          />
+
+          <Typography
+            sx={{
+              mt: 0.3,
+              textAlign: "right",
+              fontSize: 12,
+              color: detailCount > 1000 ? "error.main" : "text.secondary",
+            }}
+          >
+            {detailCount}/1000
+          </Typography>
+
+          <Typography
+            sx={{
+              mt: 0.5,
+              textAlign: "center",
+              fontSize: 11,
+              color: "text.secondary",
+            }}
+          >
+            ※投稿後の編集はできません。
+          </Typography>
+        </Box>
 
         <Box
           sx={{
             display: "flex",
-            flexDirection: "column",
-            gap: 2.5,
+            justifyContent: "center",
+            gap: 2,
+            mt: 1,
           }}
         >
-          <Box>
-            <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              value={formData.categoryId}
-              onChange={(event) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  categoryId: event.target.value,
-                }))
-              }
-              placeholder="悩みカテゴリ"
-              SelectProps={{
-                displayEmpty: true,
-              }}
-              sx={{
-                backgroundColor: "white",
-                borderRadius: 2,
-              }}
-            >
-              <MenuItem value="" disabled>
-                悩みカテゴリ
-              </MenuItem>
-              {categories.map((category) => (
-                <MenuItem
-                  key={category.categoryId}
-                  value={String(category.categoryId)}
-                >
-                  {category.categoryName}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Box>
-
-          <Box>
-            <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="タイトル"
-              value={formData.needTitle}
-              onChange={(event) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  needTitle: event.target.value,
-                }))
-              }
-              inputProps={{
-                maxLength: 30,
-              }}
-              sx={{
-                backgroundColor: "white",
-                borderRadius: 2,
-              }}
-            />
-            <Typography
-              sx={{
-                mt: 0.3,
-                textAlign: "right",
-                fontSize: 12,
-                color: titleCount > 30 ? "error.main" : "text.secondary",
-              }}
-            >
-              {titleCount}/30
-            </Typography>
-          </Box>
-
-          <Box>
-            <TextField
-              fullWidth
-              multiline
-              minRows={4}
-              placeholder="詳細"
-              value={formData.needDetail}
-              onChange={(event) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  needDetail: event.target.value,
-                }))
-              }
-              inputProps={{
-                maxLength: 1000,
-              }}
-              sx={{
-                backgroundColor: "white",
-                borderRadius: 2,
-              }}
-            />
-            <Typography
-              sx={{
-                mt: 0.3,
-                textAlign: "right",
-                fontSize: 12,
-                color: detailCount > 1000 ? "error.main" : "text.secondary",
-              }}
-            >
-              {detailCount}/1000
-            </Typography>
-
-            <Typography
-              sx={{
-                mt: 0.5,
-                textAlign: "center",
-                fontSize: 11,
-                color: "text.secondary",
-              }}
-            >
-              ※投稿後の編集はできません。
-            </Typography>
-          </Box>
-
-          <Box
+          <Button
+            type="button"
+            variant="contained"
+            onClick={handleCancel}
+            disabled={isSubmitting}
             sx={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 2,
-              mt: 1,
+              backgroundColor: "#ead9b8",
+              color: "black",
+              borderRadius: 3,
+              px: 4,
+              fontWeight: 700,
+              "&:hover": {
+                backgroundColor: "#dfc99d",
+              },
             }}
           >
-            <Button
-              variant="contained"
-              onClick={handleClose}
-              disabled={isSubmitting}
-              sx={{
-                backgroundColor: "#ead9b8",
-                color: "black",
-                borderRadius: 3,
-                px: 4,
-                fontWeight: 700,
-                "&:hover": {
-                  backgroundColor: "#dfc99d",
-                },
-              }}
-            >
-              キャンセル
-            </Button>
+            キャンセル
+          </Button>
 
-            <Button
-              variant="contained"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              sx={{
-                backgroundColor: "#0068a8",
-                color: "white",
-                borderRadius: 3,
-                px: 4,
-                fontWeight: 700,
-                "&:hover": {
-                  backgroundColor: "#005486",
-                },
-              }}
-            >
-              投稿する
-            </Button>
-          </Box>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={!canSubmit}
+            sx={{
+              backgroundColor: "#0068a8",
+              color: "white",
+              borderRadius: 3,
+              px: 4,
+              fontWeight: 700,
+              "&:hover": {
+                backgroundColor: "#005486",
+              },
+            }}
+          >
+            投稿する
+          </Button>
         </Box>
-      </DialogContent>
-    </Dialog>
+      </Box>
+    </Box>
   );
 }
-5. src/pages/NeedsList.tsx
 
-これが本体。
-画像みたいに、右側に検索・絞り込みを置く版。
+ここで setOpen は完全に消している。
+キャンセル時はこれ。
+
+onClick={handleCancel}
+
+中でこれを呼ぶ。
+
+onClose();
+7. src/pages/NeedsList.tsx
+
+検索・絞り込み・並び順・Fab・Dialog全部入り。
 
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogContent,
   Fab,
   FormControl,
   Grid,
@@ -554,14 +558,12 @@ import {
 import type { SelectChangeEvent } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import NeedCard from "../components/NeedCard";
-import SubmitForm from "./SubmitForm";
+import SubmitNeeds from "../components/SubmitNeeds";
+import { useApi } from "../lib/useApi";
+import type { Affiliated } from "../models/Affiliated";
+import type { Category } from "../models/Category";
 import type { Need, NeedPageResponse } from "../models/Need";
-import type {
-  AffiliatedOption,
-  CategoryOption,
-  PositionOption,
-} from "../models/Master";
-import { useApi } from "../lib/api";
+import type { Rank } from "../models/Rank";
 
 type SortBy = "new" | "empathy";
 
@@ -570,6 +572,13 @@ type SearchCondition = {
   affiliatedId: string;
   positionId: string;
   categoryId: string;
+};
+
+const emptySearchCondition: SearchCondition = {
+  keyword: "",
+  affiliatedId: "",
+  positionId: "",
+  categoryId: "",
 };
 
 export default function NeedsList(): JSX.Element {
@@ -583,23 +592,15 @@ export default function NeedsList(): JSX.Element {
   const [totalPage, setTotalPage] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
-  const [searchCondition, setSearchCondition] = useState<SearchCondition>({
-    keyword: "",
-    affiliatedId: "",
-    positionId: "",
-    categoryId: "",
-  });
+  const [searchCondition, setSearchCondition] =
+    useState<SearchCondition>(emptySearchCondition);
 
-  const [appliedCondition, setAppliedCondition] = useState<SearchCondition>({
-    keyword: "",
-    affiliatedId: "",
-    positionId: "",
-    categoryId: "",
-  });
+  const [appliedCondition, setAppliedCondition] =
+    useState<SearchCondition>(emptySearchCondition);
 
-  const [affiliateds, setAffiliateds] = useState<AffiliatedOption[]>([]);
-  const [positions, setPositions] = useState<PositionOption[]>([]);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [affiliateds, setAffiliateds] = useState<Affiliated[]>([]);
+  const [ranks, setRanks] = useState<Rank[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isMasterLoading, setIsMasterLoading] = useState(true);
@@ -638,13 +639,13 @@ export default function NeedsList(): JSX.Element {
       setIsLoading(true);
       setIsServerStopping(false);
 
-      const res = await api.fetch(requestUrl);
+      const response = await api.fetch(requestUrl);
 
-      if (!res.ok) {
-        throw new Error("Error fetching needs");
+      if (!response.ok) {
+        throw new Error("お悩み一覧の取得に失敗しました");
       }
 
-      const data: NeedPageResponse = await res.json();
+      const data: NeedPageResponse = await response.json();
 
       setNeedList(data.content ?? []);
       setTotalPage(data.totalPages ?? 0);
@@ -664,27 +665,32 @@ export default function NeedsList(): JSX.Element {
     try {
       setIsMasterLoading(true);
 
-      const [affiliatedRes, positionRes, categoryRes] = await Promise.all([
-        api.fetch("/api/affiliateds"),
-        api.fetch("/api/positions"),
-        api.fetch("/api/categories"),
-      ]);
+      const [affiliatedResponse, rankResponse, categoryResponse] =
+        await Promise.all([
+          api.fetch("/api/affiliateds"),
+          api.fetch("/api/ranks"),
+          api.fetch("/api/categories"),
+        ]);
 
-      if (!affiliatedRes.ok || !positionRes.ok || !categoryRes.ok) {
-        throw new Error("Error fetching master data");
+      if (
+        !affiliatedResponse.ok ||
+        !rankResponse.ok ||
+        !categoryResponse.ok
+      ) {
+        throw new Error("マスタ取得に失敗しました");
       }
 
-      const affiliatedData: AffiliatedOption[] = await affiliatedRes.json();
-      const positionData: PositionOption[] = await positionRes.json();
-      const categoryData: CategoryOption[] = await categoryRes.json();
+      const affiliatedData: Affiliated[] = await affiliatedResponse.json();
+      const rankData: Rank[] = await rankResponse.json();
+      const categoryData: Category[] = await categoryResponse.json();
 
       setAffiliateds(affiliatedData);
-      setPositions(positionData);
+      setRanks(rankData);
       setCategories(categoryData);
     } catch (error) {
       console.error(error);
       setAffiliateds([]);
-      setPositions([]);
+      setRanks([]);
       setCategories([]);
     } finally {
       setIsMasterLoading(false);
@@ -704,14 +710,14 @@ export default function NeedsList(): JSX.Element {
     setPage(0);
   };
 
-  const handleSearchChange =
-    (field: keyof SearchCondition) =>
-    (event: React.ChangeEvent<HTMLInputElement>): void => {
-      setSearchCondition((prev) => ({
-        ...prev,
-        [field]: event.target.value,
-      }));
-    };
+  const handleKeywordChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    setSearchCondition((prev) => ({
+      ...prev,
+      keyword: event.target.value,
+    }));
+  };
 
   const handleSelectSearchChange =
     (field: keyof SearchCondition) =>
@@ -728,15 +734,8 @@ export default function NeedsList(): JSX.Element {
   };
 
   const handleReset = (): void => {
-    const emptyCondition: SearchCondition = {
-      keyword: "",
-      affiliatedId: "",
-      positionId: "",
-      categoryId: "",
-    };
-
-    setSearchCondition(emptyCondition);
-    setAppliedCondition(emptyCondition);
+    setSearchCondition(emptySearchCondition);
+    setAppliedCondition(emptySearchCondition);
     setSortBy("new");
     setPage(0);
   };
@@ -883,11 +882,17 @@ export default function NeedsList(): JSX.Element {
                       flexWrap: "wrap",
                     }}
                   >
-                    <Button disabled={page <= 0} onClick={() => setPage(0)}>
+                    <Button
+                      disabled={page <= 0}
+                      onClick={() => setPage(0)}
+                    >
                       First
                     </Button>
 
-                    <Button disabled={page <= 0} onClick={() => setPage(page - 1)}>
+                    <Button
+                      disabled={page <= 0}
+                      onClick={() => setPage(page - 1)}
+                    >
                       前へ
                     </Button>
 
@@ -946,6 +951,7 @@ export default function NeedsList(): JSX.Element {
                 <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
                   所属
                 </Typography>
+
                 <FormControl fullWidth size="small">
                   <Select
                     value={searchCondition.affiliatedId}
@@ -955,6 +961,7 @@ export default function NeedsList(): JSX.Element {
                     sx={{ backgroundColor: "white" }}
                   >
                     <MenuItem value="">指定なし▼</MenuItem>
+
                     {affiliateds.map((affiliated) => (
                       <MenuItem
                         key={affiliated.affiliatedId}
@@ -971,6 +978,7 @@ export default function NeedsList(): JSX.Element {
                 <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
                   職位
                 </Typography>
+
                 <FormControl fullWidth size="small">
                   <Select
                     value={searchCondition.positionId}
@@ -980,12 +988,13 @@ export default function NeedsList(): JSX.Element {
                     sx={{ backgroundColor: "white" }}
                   >
                     <MenuItem value="">指定なし▼</MenuItem>
-                    {positions.map((position) => (
+
+                    {ranks.map((rank) => (
                       <MenuItem
-                        key={position.positionId}
-                        value={String(position.positionId)}
+                        key={rank.rankId}
+                        value={String(rank.rankId)}
                       >
-                        {position.positionName}
+                        {rank.rankName}
                       </MenuItem>
                     ))}
                   </Select>
@@ -996,6 +1005,7 @@ export default function NeedsList(): JSX.Element {
                 <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
                   悩みカテゴリ
                 </Typography>
+
                 <FormControl fullWidth size="small">
                   <Select
                     value={searchCondition.categoryId}
@@ -1005,6 +1015,7 @@ export default function NeedsList(): JSX.Element {
                     sx={{ backgroundColor: "white" }}
                   >
                     <MenuItem value="">指定なし▼</MenuItem>
+
                     {categories.map((category) => (
                       <MenuItem
                         key={category.categoryId}
@@ -1033,7 +1044,7 @@ export default function NeedsList(): JSX.Element {
                 fullWidth
                 placeholder="人名/キーワード/投稿タイトル"
                 value={searchCondition.keyword}
-                onChange={handleSearchChange("keyword")}
+                onChange={handleKeywordChange}
                 sx={{ backgroundColor: "white" }}
               />
 
@@ -1117,104 +1128,75 @@ export default function NeedsList(): JSX.Element {
         投稿
       </Fab>
 
-      <SubmitForm
+      <Dialog
         open={postOpen}
         onClose={() => setPostOpen(false)}
-        categories={categories}
-        onCreated={handleCreated}
-      />
+        fullWidth
+        maxWidth="sm"
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 4,
+              width: 420,
+              maxWidth: "calc(100% - 32px)",
+              backgroundColor: "#fff7e8",
+            },
+          },
+        }}
+      >
+        <DialogContent
+          sx={{
+            px: 6,
+            py: 4,
+            backgroundColor: "#fff7e8",
+          }}
+        >
+          <SubmitNeeds
+            categories={categories}
+            onClose={() => setPostOpen(false)}
+            onCreated={handleCreated}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
-6. serverから一覧を取るAPI
+もし useApi の場所が違う場合
 
-client側はこの3つを叩く想定にしてる。
+PDFでは SubmitNeeds.tsx がこうなっていた。
 
-GET /api/affiliateds
-GET /api/positions
-GET /api/categories
+import { useApi } from "../lib/useApi.ts";
 
-ただ、今のserverで名前が違う可能性はある。
+だから上の完全版もこれに合わせた。
 
-たとえば既存がこうなら、
+でも、あなたの今のプロジェクトで実際に
 
-GET /api/affiliated
-GET /api/ranks
-GET /api/category
+src/lib/api.ts
 
-client側のここを変えればいい。
+なら、全部こっちに直す。
 
-const [affiliatedRes, positionRes, categoryRes] = await Promise.all([
-  api.fetch("/api/affiliateds"),
-  api.fetch("/api/positions"),
-  api.fetch("/api/categories"),
-]);
+import { useApi } from "../lib/api";
+API名だけ確認して
 
-もしまだserverに一覧APIがないなら、追加するならこういうイメージ。
+この完全版は、serverにこのAPIがある前提。
 
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api")
-public class MasterController {
+GET  /api/needs/search
+POST /api/needs
+GET  /api/affiliateds
+GET  /api/ranks
+GET  /api/categories
 
-    private final AffiliatedRepository affiliatedRepository;
-    private final RankRepository rankRepository;
-    private final CategoryRepository categoryRepository;
+もしserver側の一覧API名が違うなら、NeedsList.tsx のここだけ変える。
 
-    @GetMapping("/affiliateds")
-    public List<AffiliatedOptionDto> getAffiliateds() {
-        return affiliatedRepository.findAll()
-                .stream()
-                .map(a -> new AffiliatedOptionDto(
-                        a.getAffiliatedId(),
-                        a.getAffiliatedName()
-                ))
-                .toList();
-    }
+api.fetch("/api/affiliateds"),
+api.fetch("/api/ranks"),
+api.fetch("/api/categories"),
 
-    @GetMapping("/positions")
-    public List<PositionOptionDto> getPositions() {
-        return rankRepository.findAll()
-                .stream()
-                .map(r -> new PositionOptionDto(
-                        r.getRankId(),
-                        r.getRankName()
-                ))
-                .toList();
-    }
+ここまで入れれば、少なくとも今回の目的である、
 
-    @GetMapping("/categories")
-    public List<CategoryOptionDto> getCategories() {
-        return categoryRepository.findAll()
-                .stream()
-                .map(c -> new CategoryOptionDto(
-                        c.getCategoryId(),
-                        c.getCategoryName()
-                ))
-                .toList();
-    }
-}
-
-DTOはこれ。
-
-public record AffiliatedOptionDto(
-        Long affiliatedId,
-        String affiliatedName
-) {
-}
-public record PositionOptionDto(
-        Long positionId,
-        String positionName
-) {
-}
-public record CategoryOptionDto(
-        Long categoryId,
-        String categoryName
-) {
-}
-
-PositionOptionDto は中身では rankId / rankName を positionId / positionName に変換して返す。
-こうしておくと、client側は「職位 = position」として扱えて分かりやすい。
-
-結論としては、昔のコードをベースにするなら、NeedsListに右サイドバーを追加して、マスタ取得useEffectを追加するのが本命。
-投稿モーダルは SubmitForm の中に Dialog を持たせる形に統一すれば、Fabを押す前からボタンが見える問題も消える。
+setOpenエラー解消
+右側絞り込み
+serverから所属・職位・カテゴリ取得
+/api/needs/searchに統一
+Fab押下で投稿モーダル
+モーダル外クリックで閉じる
