@@ -29,17 +29,42 @@ export type NeedPageResponse = {
   first: boolean;
   last: boolean;
 };
-2. src/components/NeedCard.tsx
+2. src/models/Master.ts
 
-react-icons と @mui/icons-material は使わない安全版。
-つまり、インストール不足で落ちない。
+所属・職位・カテゴリの一覧用。
 
+export type AffiliatedOption = {
+  affiliatedId: number;
+  affiliatedName: string;
+};
+
+export type PositionOption = {
+  positionId: number;
+  positionName: string;
+};
+
+export type CategoryOption = {
+  categoryId: number;
+  categoryName: string;
+};
+
+ただし、server側のDTOが rankId / rankName で返ってくるなら、client側も合わせてこうする。
+
+export type PositionOption = {
+  rankId: number;
+  rankName: string;
+};
+
+今の検索パラメータ名は positionId で投げるけど、server内部では rankId として扱う、という理解でOK。
+
+3. src/components/NeedCard.tsx
 import {
   Box,
   Card,
   CardContent,
   Typography,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import type { Need } from "../models/Need";
 
 type Props = {
@@ -47,17 +72,24 @@ type Props = {
 };
 
 export default function NeedCard({ need }: Props): JSX.Element {
+  const navigate = useNavigate();
+
   const shortDetail =
-    need.needDetail && need.needDetail.length > 40
-      ? `${need.needDetail.slice(0, 40)}...`
+    need.needDetail && need.needDetail.length > 45
+      ? `${need.needDetail.slice(0, 45)}...`
       : need.needDetail;
+
+  const handleClick = (): void => {
+    navigate(`/needs/${need.needId}`);
+  };
 
   return (
     <Card
       elevation={0}
+      onClick={handleClick}
       sx={{
         width: "100%",
-        height: "100%",
+        height: 210,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -68,15 +100,15 @@ export default function NeedCard({ need }: Props): JSX.Element {
         cursor: "pointer",
         "&:hover": {
           transform: "translateY(-3px)",
-          boxShadow: "0 8px 20px rgba(0, 0, 0, 0.08)",
+          boxShadow: "0 8px 20px rgba(0, 0, 0, 0.10)",
         },
       }}
     >
       <CardContent
         sx={{
+          height: "100%",
           display: "flex",
           flexDirection: "column",
-          height: "100%",
           p: 2,
           "&:last-child": {
             pb: 2,
@@ -85,29 +117,29 @@ export default function NeedCard({ need }: Props): JSX.Element {
       >
         <Typography
           sx={{
-            alignSelf: "flex-start",
+            alignSelf: "center",
             px: 1.5,
-            py: 0.5,
+            py: 0.4,
             mb: 1.5,
-            borderRadius: 2,
+            borderRadius: 1,
             backgroundColor: "#114C88",
             color: "white",
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 700,
-            maxWidth: "100%",
           }}
         >
-          {need.categoryName}
+          悩みカテゴリ
         </Typography>
 
         <Typography
           variant="h6"
           sx={{
             color: "black",
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: 700,
-            lineHeight: 1.4,
+            lineHeight: 1.45,
             mb: 1,
+            textAlign: "center",
             wordBreak: "break-word",
           }}
         >
@@ -118,8 +150,8 @@ export default function NeedCard({ need }: Props): JSX.Element {
           variant="body2"
           sx={{
             color: "text.secondary",
-            fontSize: 14,
-            lineHeight: 1.7,
+            fontSize: 13,
+            lineHeight: 1.6,
             flexGrow: 1,
             wordBreak: "break-word",
           }}
@@ -129,7 +161,7 @@ export default function NeedCard({ need }: Props): JSX.Element {
 
         <Box
           sx={{
-            mt: 2,
+            mt: 1.5,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -139,14 +171,13 @@ export default function NeedCard({ need }: Props): JSX.Element {
           <Typography
             variant="body2"
             sx={{
-              color: "text.secondary",
-              fontSize: 13,
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "black",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              maxWidth: "55%",
+              maxWidth: "45%",
             }}
           >
             {need.userName}
@@ -156,39 +187,355 @@ export default function NeedCard({ need }: Props): JSX.Element {
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: 1.5,
+              gap: 1,
               flexShrink: 0,
             }}
           >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
               <span>💬</span>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 700 }}>
                 {need.answerCount}
               </Typography>
             </Box>
 
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
               <span style={{ color: "#FFD700" }}>✋</span>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 700 }}>
                 {need.empathyCount}
               </Typography>
             </Box>
           </Box>
         </Box>
+
+        <Typography
+          variant="body2"
+          sx={{
+            mt: 0.5,
+            fontSize: 11,
+            color: "text.secondary",
+            textAlign: "right",
+          }}
+        >
+          {need.createdTime?.slice(0, 10)}
+        </Typography>
       </CardContent>
     </Card>
   );
 }
-3. src/pages/NeedsList.tsx
+4. src/pages/SubmitForm.tsx
 
-これは、昔の NeedsList.tsx を今の仕様に合わせた完全版。
+投稿モーダル。
+Dialogの外にボタンを出さないのが大事。
 
-ポイントはここ。
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogContent,
+  MenuItem,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { useState } from "react";
+import type { CategoryOption } from "../models/Master";
+import { useApi } from "../lib/api";
 
-/api/needs/search
-orderBy=new | empathy
-page=0始まり
-size=18
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  categories: CategoryOption[];
+  onCreated: () => void;
+};
+
+type NeedCreateForm = {
+  categoryId: string;
+  needTitle: string;
+  needDetail: string;
+};
+
+export default function SubmitForm({
+  open,
+  onClose,
+  categories,
+  onCreated,
+}: Props): JSX.Element {
+  const api = useApi();
+
+  const [formData, setFormData] = useState<NeedCreateForm>({
+    categoryId: "",
+    needTitle: "",
+    needDetail: "",
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const titleCount = formData.needTitle.length;
+  const detailCount = formData.needDetail.length;
+
+  const canSubmit =
+    formData.categoryId !== "" &&
+    formData.needTitle.trim() !== "" &&
+    formData.needDetail.trim() !== "" &&
+    titleCount <= 30 &&
+    detailCount <= 1000 &&
+    !isSubmitting;
+
+  const resetForm = (): void => {
+    setFormData({
+      categoryId: "",
+      needTitle: "",
+      needDetail: "",
+    });
+  };
+
+  const handleClose = (): void => {
+    if (isSubmitting) return;
+    onClose();
+  };
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!canSubmit) return;
+
+    try {
+      setIsSubmitting(true);
+
+      const res = await api.fetch("/api/needs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          categoryId: Number(formData.categoryId),
+          needTitle: formData.needTitle.trim(),
+          needDetail: formData.needDetail.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("お悩み投稿に失敗しました");
+      }
+
+      resetForm();
+      onClose();
+      onCreated();
+    } catch (error) {
+      console.error(error);
+      alert("投稿に失敗しました。入力内容やサーバーを確認してください。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      fullWidth
+      maxWidth="sm"
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 4,
+            width: 420,
+            maxWidth: "calc(100% - 32px)",
+          },
+        },
+      }}
+    >
+      <DialogContent
+        sx={{
+          px: 6,
+          py: 4,
+          backgroundColor: "#fff7e8",
+        }}
+      >
+        <Typography
+          component="h2"
+          sx={{
+            fontSize: 24,
+            fontWeight: 800,
+            textAlign: "center",
+            mb: 3,
+            color: "black",
+          }}
+        >
+          お悩み投稿
+        </Typography>
+
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2.5,
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              value={formData.categoryId}
+              onChange={(event) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  categoryId: event.target.value,
+                }))
+              }
+              placeholder="悩みカテゴリ"
+              SelectProps={{
+                displayEmpty: true,
+              }}
+              sx={{
+                backgroundColor: "white",
+                borderRadius: 2,
+              }}
+            >
+              <MenuItem value="" disabled>
+                悩みカテゴリ
+              </MenuItem>
+              {categories.map((category) => (
+                <MenuItem
+                  key={category.categoryId}
+                  value={String(category.categoryId)}
+                >
+                  {category.categoryName}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+
+          <Box>
+            <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="タイトル"
+              value={formData.needTitle}
+              onChange={(event) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  needTitle: event.target.value,
+                }))
+              }
+              inputProps={{
+                maxLength: 30,
+              }}
+              sx={{
+                backgroundColor: "white",
+                borderRadius: 2,
+              }}
+            />
+            <Typography
+              sx={{
+                mt: 0.3,
+                textAlign: "right",
+                fontSize: 12,
+                color: titleCount > 30 ? "error.main" : "text.secondary",
+              }}
+            >
+              {titleCount}/30
+            </Typography>
+          </Box>
+
+          <Box>
+            <TextField
+              fullWidth
+              multiline
+              minRows={4}
+              placeholder="詳細"
+              value={formData.needDetail}
+              onChange={(event) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  needDetail: event.target.value,
+                }))
+              }
+              inputProps={{
+                maxLength: 1000,
+              }}
+              sx={{
+                backgroundColor: "white",
+                borderRadius: 2,
+              }}
+            />
+            <Typography
+              sx={{
+                mt: 0.3,
+                textAlign: "right",
+                fontSize: 12,
+                color: detailCount > 1000 ? "error.main" : "text.secondary",
+              }}
+            >
+              {detailCount}/1000
+            </Typography>
+
+            <Typography
+              sx={{
+                mt: 0.5,
+                textAlign: "center",
+                fontSize: 11,
+                color: "text.secondary",
+              }}
+            >
+              ※投稿後の編集はできません。
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 2,
+              mt: 1,
+            }}
+          >
+            <Button
+              variant="contained"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              sx={{
+                backgroundColor: "#ead9b8",
+                color: "black",
+                borderRadius: 3,
+                px: 4,
+                fontWeight: 700,
+                "&:hover": {
+                  backgroundColor: "#dfc99d",
+                },
+              }}
+            >
+              キャンセル
+            </Button>
+
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              sx={{
+                backgroundColor: "#0068a8",
+                color: "white",
+                borderRadius: 3,
+                px: 4,
+                fontWeight: 700,
+                "&:hover": {
+                  backgroundColor: "#005486",
+                },
+              }}
+            >
+              投稿する
+            </Button>
+          </Box>
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+}
+5. src/pages/NeedsList.tsx
+
+これが本体。
+画像みたいに、右側に検索・絞り込みを置く版。
+
 import {
   Alert,
   Box,
@@ -201,16 +548,29 @@ import {
   Pagination,
   Select,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import NeedCard from "../components/NeedCard";
 import SubmitForm from "./SubmitForm";
 import type { Need, NeedPageResponse } from "../models/Need";
+import type {
+  AffiliatedOption,
+  CategoryOption,
+  PositionOption,
+} from "../models/Master";
 import { useApi } from "../lib/api";
 
 type SortBy = "new" | "empathy";
+
+type SearchCondition = {
+  keyword: string;
+  affiliatedId: string;
+  positionId: string;
+  categoryId: string;
+};
 
 export default function NeedsList(): JSX.Element {
   const api = useApi();
@@ -223,7 +583,26 @@ export default function NeedsList(): JSX.Element {
   const [totalPage, setTotalPage] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
+  const [searchCondition, setSearchCondition] = useState<SearchCondition>({
+    keyword: "",
+    affiliatedId: "",
+    positionId: "",
+    categoryId: "",
+  });
+
+  const [appliedCondition, setAppliedCondition] = useState<SearchCondition>({
+    keyword: "",
+    affiliatedId: "",
+    positionId: "",
+    categoryId: "",
+  });
+
+  const [affiliateds, setAffiliateds] = useState<AffiliatedOption[]>([]);
+  const [positions, setPositions] = useState<PositionOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
+  const [isMasterLoading, setIsMasterLoading] = useState(true);
   const [isServerStopping, setIsServerStopping] = useState(false);
 
   const size = 18;
@@ -235,55 +614,130 @@ export default function NeedsList(): JSX.Element {
     params.set("size", String(size));
     params.set("orderBy", sortBy);
 
+    if (appliedCondition.keyword.trim() !== "") {
+      params.set("keyword", appliedCondition.keyword.trim());
+    }
+
+    if (appliedCondition.affiliatedId !== "") {
+      params.set("affiliatedId", appliedCondition.affiliatedId);
+    }
+
+    if (appliedCondition.positionId !== "") {
+      params.set("positionId", appliedCondition.positionId);
+    }
+
+    if (appliedCondition.categoryId !== "") {
+      params.set("categoryId", appliedCondition.categoryId);
+    }
+
     return `/api/needs/search?${params.toString()}`;
-  }, [page, sortBy]);
+  }, [page, sortBy, appliedCondition]);
+
+  const fetchNeeds = useCallback(async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      setIsServerStopping(false);
+
+      const res = await api.fetch(requestUrl);
+
+      if (!res.ok) {
+        throw new Error("Error fetching needs");
+      }
+
+      const data: NeedPageResponse = await res.json();
+
+      setNeedList(data.content ?? []);
+      setTotalPage(data.totalPages ?? 0);
+      setTotalElements(data.totalElements ?? 0);
+    } catch (error) {
+      console.error(error);
+      setNeedList([]);
+      setTotalPage(0);
+      setTotalElements(0);
+      setIsServerStopping(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [api, requestUrl]);
+
+  const fetchMasters = useCallback(async (): Promise<void> => {
+    try {
+      setIsMasterLoading(true);
+
+      const [affiliatedRes, positionRes, categoryRes] = await Promise.all([
+        api.fetch("/api/affiliateds"),
+        api.fetch("/api/positions"),
+        api.fetch("/api/categories"),
+      ]);
+
+      if (!affiliatedRes.ok || !positionRes.ok || !categoryRes.ok) {
+        throw new Error("Error fetching master data");
+      }
+
+      const affiliatedData: AffiliatedOption[] = await affiliatedRes.json();
+      const positionData: PositionOption[] = await positionRes.json();
+      const categoryData: CategoryOption[] = await categoryRes.json();
+
+      setAffiliateds(affiliatedData);
+      setPositions(positionData);
+      setCategories(categoryData);
+    } catch (error) {
+      console.error(error);
+      setAffiliateds([]);
+      setPositions([]);
+      setCategories([]);
+    } finally {
+      setIsMasterLoading(false);
+    }
+  }, [api]);
 
   useEffect(() => {
-    let ignore = false;
+    fetchMasters();
+  }, [fetchMasters]);
 
-    const fetchNeeds = async (): Promise<void> => {
-      try {
-        setIsLoading(true);
-        setIsServerStopping(false);
-
-        const res: Response = await api.fetch(requestUrl);
-
-        if (!res.ok) {
-          throw new Error("Error fetching needs");
-        }
-
-        const data: NeedPageResponse = await res.json();
-
-        if (ignore) return;
-
-        setNeedList(data.content ?? []);
-        setTotalPage(data.totalPages ?? 0);
-        setTotalElements(data.totalElements ?? 0);
-      } catch (err) {
-        console.error(err);
-
-        if (!ignore) {
-          setNeedList([]);
-          setTotalPage(0);
-          setTotalElements(0);
-          setIsServerStopping(true);
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    };
-
+  useEffect(() => {
     fetchNeeds();
-
-    return () => {
-      ignore = true;
-    };
-  }, [api, requestUrl]);
+  }, [fetchNeeds]);
 
   const handleSortChange = (event: SelectChangeEvent): void => {
     setSortBy(event.target.value as SortBy);
+    setPage(0);
+  };
+
+  const handleSearchChange =
+    (field: keyof SearchCondition) =>
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
+      setSearchCondition((prev) => ({
+        ...prev,
+        [field]: event.target.value,
+      }));
+    };
+
+  const handleSelectSearchChange =
+    (field: keyof SearchCondition) =>
+    (event: SelectChangeEvent): void => {
+      setSearchCondition((prev) => ({
+        ...prev,
+        [field]: event.target.value,
+      }));
+    };
+
+  const handleSearchSubmit = (): void => {
+    setAppliedCondition(searchCondition);
+    setPage(0);
+  };
+
+  const handleReset = (): void => {
+    const emptyCondition: SearchCondition = {
+      keyword: "",
+      affiliatedId: "",
+      positionId: "",
+      categoryId: "",
+    };
+
+    setSearchCondition(emptyCondition);
+    setAppliedCondition(emptyCondition);
+    setSortBy("new");
     setPage(0);
   };
 
@@ -295,12 +749,8 @@ export default function NeedsList(): JSX.Element {
   };
 
   const handleCreated = (): void => {
-    setPostOpen(false);
     setPage(0);
-
-    // 投稿後に再取得したいので、sortByが同じでもuseEffectを動かすための簡易対応
-    // 一番きれいにするなら fetchNeeds を useCallback で外に出す。
-    window.location.reload();
+    fetchNeeds();
   };
 
   return (
@@ -309,264 +759,336 @@ export default function NeedsList(): JSX.Element {
         sx={{
           width: "100%",
           minHeight: "100vh",
-          px: { xs: 2, sm: 4, md: 6 },
-          py: 4,
-          backgroundColor: "#f8fbff",
+          px: { xs: 2, md: 5 },
+          py: 3,
+          backgroundColor: "#fff7e8",
         }}
       >
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
-            mb: 4,
-            gap: 2,
-            flexWrap: "wrap",
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "1fr 230px" },
+            gap: 3,
+            alignItems: "start",
           }}
         >
           <Box>
-            <Typography
-              variant="caption"
+            <Box
               sx={{
-                color: "primary.main",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.15rem",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                position: "relative",
+                mb: 3,
               }}
             >
-              worries
-            </Typography>
+              <Typography
+                component="h1"
+                sx={{
+                  fontSize: 30,
+                  fontWeight: 800,
+                  color: "black",
+                  textAlign: "center",
+                }}
+              >
+                お悩み一覧
+              </Typography>
 
-            <Typography
-              component="h1"
-              variant="h3"
-              sx={{
-                color: "#1a1a1a",
-                fontWeight: 800,
-                textAlign: "left",
-                letterSpacing: "-0.03em",
-                fontSize: { xs: "2rem", sm: "2.5rem" },
-                mt: 0.5,
-              }}
-            >
-              お悩み一覧
-            </Typography>
+              <FormControl
+                size="small"
+                sx={{
+                  position: { xs: "static", md: "absolute" },
+                  right: 0,
+                  minWidth: 110,
+                  ml: { xs: 2, md: 0 },
+                }}
+              >
+                <Select
+                  value={sortBy}
+                  onChange={handleSortChange}
+                  sx={{
+                    backgroundColor: "white",
+                    borderRadius: 1,
+                    fontSize: 13,
+                    fontWeight: 700,
+                  }}
+                >
+                  <MenuItem value="new">新着順</MenuItem>
+                  <MenuItem value="empathy">共感数順</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
 
-            <Typography
-              variant="body2"
-              sx={{
-                mt: 1,
-                color: "text.secondary",
-              }}
-            >
-              {totalElements}件のお悩み
-            </Typography>
+            {isServerStopping && (
+              <Alert
+                severity="error"
+                sx={{
+                  mb: 3,
+                  justifyContent: "center",
+                  maxWidth: 600,
+                  mx: "auto",
+                }}
+              >
+                サーバーが起動していません。しばらくたってからお試しください。
+              </Alert>
+            )}
+
+            {isLoading ? (
+              <CircularProgress
+                aria-label="Loading"
+                sx={{
+                  display: "block",
+                  mx: "auto",
+                  my: 8,
+                }}
+              />
+            ) : (
+              <>
+                {needList.length === 0 ? (
+                  <Box
+                    sx={{
+                      textAlign: "center",
+                      py: 8,
+                      color: "text.secondary",
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      お悩みがありません
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {needList.map((need, index) => (
+                      <Grid
+                        item
+                        xs={12}
+                        sm={6}
+                        md={4}
+                        key={need.needId ?? index}
+                      >
+                        <NeedCard need={need} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+
+                {totalPage > 1 && (
+                  <Stack
+                    direction="row"
+                    sx={{
+                      mt: 4,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: 1,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <Button disabled={page <= 0} onClick={() => setPage(0)}>
+                      First
+                    </Button>
+
+                    <Button disabled={page <= 0} onClick={() => setPage(page - 1)}>
+                      前へ
+                    </Button>
+
+                    <Pagination
+                      count={totalPage}
+                      page={page + 1}
+                      onChange={handlePageChange}
+                      hidePrevButton
+                      hideNextButton
+                      color="primary"
+                      shape="rounded"
+                    />
+
+                    <Button
+                      disabled={totalPage <= 1 || page >= totalPage - 1}
+                      onClick={() => setPage(page + 1)}
+                    >
+                      次へ
+                    </Button>
+
+                    <Button
+                      disabled={totalPage <= 1 || page >= totalPage - 1}
+                      onClick={() => setPage(totalPage - 1)}
+                    >
+                      Last
+                    </Button>
+                  </Stack>
+                )}
+              </>
+            )}
           </Box>
 
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <Select
-              value={sortBy}
-              onChange={handleSortChange}
-              displayEmpty
-              sx={{
-                borderRadius: "10px",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                backgroundColor: "#fff",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgba(0, 0, 0, 0.08)",
-                },
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgba(0, 0, 0, 0.15)",
-                },
-                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "primary.main",
-                },
-              }}
-            >
-              <MenuItem value="new">新着順</MenuItem>
-              <MenuItem value="empathy">共感数順</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-
-        {isServerStopping && (
-          <Alert
-            severity="error"
+          <Box
             sx={{
-              mb: 4,
-              justifyContent: "center",
-              maxWidth: 600,
-              mx: "auto",
+              backgroundColor: "#e7e1c9",
+              borderRadius: 3,
+              px: 2,
+              py: 2.5,
+              position: { md: "sticky" },
+              top: { md: 24 },
             }}
           >
-            サーバーが起動していません。しばらくたってからお試しください。
-          </Alert>
-        )}
+            <Typography
+              sx={{
+                fontSize: 18,
+                fontWeight: 800,
+                textAlign: "center",
+                mb: 2,
+              }}
+            >
+              絞り込み
+            </Typography>
 
-        {isLoading ? (
-          <CircularProgress
-            aria-label="Loading"
-            sx={{
-              display: "block",
-              mx: "auto",
-              my: 8,
-            }}
-          />
-        ) : (
-          <>
-            {needList.length === 0 ? (
+            <Stack spacing={1.5}>
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                  所属
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={searchCondition.affiliatedId}
+                    onChange={handleSelectSearchChange("affiliatedId")}
+                    displayEmpty
+                    disabled={isMasterLoading}
+                    sx={{ backgroundColor: "white" }}
+                  >
+                    <MenuItem value="">指定なし▼</MenuItem>
+                    {affiliateds.map((affiliated) => (
+                      <MenuItem
+                        key={affiliated.affiliatedId}
+                        value={String(affiliated.affiliatedId)}
+                      >
+                        {affiliated.affiliatedName}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                  職位
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={searchCondition.positionId}
+                    onChange={handleSelectSearchChange("positionId")}
+                    displayEmpty
+                    disabled={isMasterLoading}
+                    sx={{ backgroundColor: "white" }}
+                  >
+                    <MenuItem value="">指定なし▼</MenuItem>
+                    {positions.map((position) => (
+                      <MenuItem
+                        key={position.positionId}
+                        value={String(position.positionId)}
+                      >
+                        {position.positionName}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                  悩みカテゴリ
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={searchCondition.categoryId}
+                    onChange={handleSelectSearchChange("categoryId")}
+                    displayEmpty
+                    disabled={isMasterLoading}
+                    sx={{ backgroundColor: "white" }}
+                  >
+                    <MenuItem value="">指定なし▼</MenuItem>
+                    {categories.map((category) => (
+                      <MenuItem
+                        key={category.categoryId}
+                        value={String(category.categoryId)}
+                      >
+                        {category.categoryName}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              <Typography
+                sx={{
+                  fontSize: 16,
+                  fontWeight: 800,
+                  textAlign: "center",
+                  pt: 1,
+                }}
+              >
+                検索
+              </Typography>
+
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="人名/キーワード/投稿タイトル"
+                value={searchCondition.keyword}
+                onChange={handleSearchChange("keyword")}
+                sx={{ backgroundColor: "white" }}
+              />
+
               <Box
                 sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 1,
+                  pt: 1,
+                }}
+              >
+                <Button
+                  variant="contained"
+                  onClick={handleReset}
+                  sx={{
+                    backgroundColor: "#d8ccb0",
+                    color: "black",
+                    fontWeight: 700,
+                    "&:hover": {
+                      backgroundColor: "#c9b990",
+                    },
+                  }}
+                >
+                  リセット
+                </Button>
+
+                <Button
+                  variant="contained"
+                  onClick={handleSearchSubmit}
+                  sx={{
+                    backgroundColor: "#005b96",
+                    color: "white",
+                    fontWeight: 700,
+                    "&:hover": {
+                      backgroundColor: "#004a7c",
+                    },
+                  }}
+                >
+                  実行
+                </Button>
+              </Box>
+
+              <Typography
+                sx={{
+                  pt: 1,
                   textAlign: "center",
-                  py: 8,
+                  fontSize: 12,
                   color: "text.secondary",
                 }}
               >
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  お悩みがありません
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  条件を変えるか、最初のお悩みを投稿してみてください。
-                </Typography>
-              </Box>
-            ) : (
-              <Grid
-                container
-                spacing={2}
-                sx={{
-                  mb: 5,
-                  mx: "auto",
-                  justifyContent: "flex-start",
-                }}
-              >
-                {needList.map((need, index) => (
-                  <Grid
-                    item
-                    xs={12}
-                    sm={6}
-                    md={4}
-                    key={need.needId ?? index}
-                  >
-                    <NeedCard need={need} />
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-
-            {totalPage > 1 && (
-              <Stack
-                direction="row"
-                sx={{
-                  pt: 2,
-                  borderTop: "1px solid",
-                  borderColor: "rgba(0, 0, 0, 0.08)",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 2,
-                  flexWrap: "wrap",
-                }}
-              >
-                <Button
-                  variant="text"
-                  disabled={page <= 0}
-                  onClick={() => setPage(0)}
-                  sx={{
-                    borderRadius: 3,
-                    textTransform: "none",
-                    fontWeight: 600,
-                    px: 2,
-                    color: "text.primary",
-                    "&:disabled": {
-                      color: "text.disabled",
-                    },
-                  }}
-                >
-                  First
-                </Button>
-
-                <Button
-                  variant="text"
-                  disabled={page <= 0}
-                  onClick={() => setPage(page - 1)}
-                  sx={{
-                    borderRadius: 3,
-                    textTransform: "none",
-                    fontWeight: 600,
-                    px: 2,
-                    color: "text.primary",
-                    "&:disabled": {
-                      color: "text.disabled",
-                    },
-                  }}
-                >
-                  前へ
-                </Button>
-
-                <Pagination
-                  count={totalPage}
-                  page={page + 1}
-                  onChange={handlePageChange}
-                  hidePrevButton
-                  hideNextButton
-                  color="primary"
-                  variant="text"
-                  shape="rounded"
-                  sx={{
-                    "& .MuiPaginationItem-root": {
-                      fontWeight: 600,
-                      borderRadius: 2,
-                    },
-                    "& .Mui-selected": {
-                      backgroundColor: "primary.main",
-                      color: "white",
-                      "&:hover": {
-                        backgroundColor: "primary.dark",
-                      },
-                    },
-                  }}
-                />
-
-                <Button
-                  variant="text"
-                  disabled={totalPage <= 1 || page >= totalPage - 1}
-                  onClick={() => setPage(page + 1)}
-                  sx={{
-                    borderRadius: 3,
-                    textTransform: "none",
-                    fontWeight: 600,
-                    px: 2,
-                    color: "text.primary",
-                    "&:disabled": {
-                      color: "text.disabled",
-                    },
-                  }}
-                >
-                  次へ
-                </Button>
-
-                <Button
-                  variant="text"
-                  disabled={totalPage <= 1 || page >= totalPage - 1}
-                  onClick={() => setPage(totalPage - 1)}
-                  sx={{
-                    borderRadius: 3,
-                    textTransform: "none",
-                    fontWeight: 600,
-                    px: 2,
-                    color: "text.primary",
-                    "&:disabled": {
-                      color: "text.disabled",
-                    },
-                  }}
-                >
-                  Last
-                </Button>
-              </Stack>
-            )}
-          </>
-        )}
+                {totalElements}件
+              </Typography>
+            </Stack>
+          </Box>
+        </Box>
       </Box>
 
       <Fab
@@ -577,19 +1099,122 @@ export default function NeedsList(): JSX.Element {
           right: 32,
           bottom: 32,
           zIndex: 1000,
-          fontSize: 28,
-          fontWeight: 700,
+          width: 88,
+          height: 64,
+          borderRadius: 4,
+          fontSize: 18,
+          fontWeight: 800,
+          lineHeight: 1.2,
+          backgroundColor: "#005b96",
+          "&:hover": {
+            backgroundColor: "#004a7c",
+          },
         }}
         disabled={isServerStopping}
       >
-        +
+        お悩み
+        <br />
+        投稿
       </Fab>
 
       <SubmitForm
         open={postOpen}
         onClose={() => setPostOpen(false)}
+        categories={categories}
         onCreated={handleCreated}
       />
     </>
   );
 }
+6. serverから一覧を取るAPI
+
+client側はこの3つを叩く想定にしてる。
+
+GET /api/affiliateds
+GET /api/positions
+GET /api/categories
+
+ただ、今のserverで名前が違う可能性はある。
+
+たとえば既存がこうなら、
+
+GET /api/affiliated
+GET /api/ranks
+GET /api/category
+
+client側のここを変えればいい。
+
+const [affiliatedRes, positionRes, categoryRes] = await Promise.all([
+  api.fetch("/api/affiliateds"),
+  api.fetch("/api/positions"),
+  api.fetch("/api/categories"),
+]);
+
+もしまだserverに一覧APIがないなら、追加するならこういうイメージ。
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api")
+public class MasterController {
+
+    private final AffiliatedRepository affiliatedRepository;
+    private final RankRepository rankRepository;
+    private final CategoryRepository categoryRepository;
+
+    @GetMapping("/affiliateds")
+    public List<AffiliatedOptionDto> getAffiliateds() {
+        return affiliatedRepository.findAll()
+                .stream()
+                .map(a -> new AffiliatedOptionDto(
+                        a.getAffiliatedId(),
+                        a.getAffiliatedName()
+                ))
+                .toList();
+    }
+
+    @GetMapping("/positions")
+    public List<PositionOptionDto> getPositions() {
+        return rankRepository.findAll()
+                .stream()
+                .map(r -> new PositionOptionDto(
+                        r.getRankId(),
+                        r.getRankName()
+                ))
+                .toList();
+    }
+
+    @GetMapping("/categories")
+    public List<CategoryOptionDto> getCategories() {
+        return categoryRepository.findAll()
+                .stream()
+                .map(c -> new CategoryOptionDto(
+                        c.getCategoryId(),
+                        c.getCategoryName()
+                ))
+                .toList();
+    }
+}
+
+DTOはこれ。
+
+public record AffiliatedOptionDto(
+        Long affiliatedId,
+        String affiliatedName
+) {
+}
+public record PositionOptionDto(
+        Long positionId,
+        String positionName
+) {
+}
+public record CategoryOptionDto(
+        Long categoryId,
+        String categoryName
+) {
+}
+
+PositionOptionDto は中身では rankId / rankName を positionId / positionName に変換して返す。
+こうしておくと、client側は「職位 = position」として扱えて分かりやすい。
+
+結論としては、昔のコードをベースにするなら、NeedsListに右サイドバーを追加して、マスタ取得useEffectを追加するのが本命。
+投稿モーダルは SubmitForm の中に Dialog を持たせる形に統一すれば、Fabを押す前からボタンが見える問題も消える。
