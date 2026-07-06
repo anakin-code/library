@@ -1,4 +1,53 @@
-1. src/models/Need.ts
+全体の流れ
+1. NeedsList.tsx を開く
+2. useEffect で所属・職位・カテゴリ一覧を server から取得
+   GET /api/affiliateds
+   GET /api/ranks
+   GET /api/categories
+
+3. useEffect でお悩み一覧を取得
+   GET /api/needs/search?page=0&size=6&orderBy=new
+
+4. 右側の絞り込み欄で条件を選ぶ
+   所属 affiliatedId
+   職位 positionId
+   悩みカテゴリ categoryId
+   キーワード keyword
+
+5. 実行ボタンを押す
+   GET /api/needs/search?... に条件付きで再取得
+
+6. 右下ではなく、右サイドバー下の「お悩み投稿」ボタンを押す
+   postOpen = true
+
+7. Dialog が開く
+   中身は SubmitNeeds.tsx
+
+8. SubmitNeeds.tsx でカテゴリ・タイトル・詳細を入力
+
+9. 投稿する
+   POST /api/needs
+
+10. 投稿成功
+   onCreated()
+   onClose()
+   一覧再取得
+1. src/models/Affiliated.ts
+export type Affiliated = {
+  affiliatedId: number;
+  affiliatedName: string;
+};
+2. src/models/Rank.ts
+export type Rank = {
+  rankId: number;
+  rankName: string;
+};
+3. src/models/Category.ts
+export type Category = {
+  categoryId: number;
+  categoryName: string;
+};
+4. src/models/Need.ts
 export type Need = {
   needId: number;
   needTitle: string;
@@ -35,32 +84,16 @@ export type NeedInput = {
   needTitle: string;
   needDetail: string;
 };
-2. src/models/Affiliated.ts
-export type Affiliated = {
-  affiliatedId: number;
-  affiliatedName: string;
-};
-3. src/models/Rank.ts
-export type Rank = {
-  rankId: number;
-  rankName: string;
-};
-4. src/models/Category.ts
-export type Category = {
-  categoryId: number;
-  categoryName: string;
-};
 5. src/components/NeedCard.tsx
 
-カード押下で詳細画面に行く版。
-ルーティングが違うなら、navigate(/needs/${need.needId}) のところだけ変えればいい。
+カードを押すと詳細画面に飛ぶ。
+詳細URLが違うなら、ここだけ変更。
 
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-} from "@mui/material";
+navigate(`/needs/${need.needId}`);
+
+完全版。
+
+import { Box, Card, CardContent, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import type { Need } from "../models/Need";
 
@@ -72,8 +105,8 @@ export default function NeedCard({ need }: Props): JSX.Element {
   const navigate = useNavigate();
 
   const shortDetail =
-    need.needDetail && need.needDetail.length > 45
-      ? `${need.needDetail.slice(0, 45)}...`
+    need.needDetail && need.needDetail.length > 32
+      ? `${need.needDetail.slice(0, 32)}...`
       : need.needDetail;
 
   const handleClick = (): void => {
@@ -86,57 +119,55 @@ export default function NeedCard({ need }: Props): JSX.Element {
       onClick={handleClick}
       sx={{
         width: "100%",
-        height: 210,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        borderRadius: 4,
-        border: "1px solid #d6e9ff",
-        backgroundColor: "#ffffff",
-        transition: "all 0.25s ease",
+        height: 175,
+        borderRadius: 2,
+        border: "1px solid #e1d1b8",
+        backgroundColor: "#fff8ea",
         cursor: "pointer",
+        transition: "all 0.2s ease",
         "&:hover": {
-          transform: "translateY(-3px)",
-          boxShadow: "0 8px 20px rgba(0, 0, 0, 0.10)",
+          transform: "translateY(-2px)",
+          boxShadow: "0 6px 14px rgba(0, 0, 0, 0.12)",
         },
       }}
     >
       <CardContent
         sx={{
           height: "100%",
+          p: 1.5,
           display: "flex",
           flexDirection: "column",
-          p: 2,
           "&:last-child": {
-            pb: 2,
+            pb: 1.5,
           },
         }}
       >
         <Typography
           sx={{
             alignSelf: "center",
-            px: 1.5,
-            py: 0.4,
-            mb: 1.5,
+            px: 1.4,
+            py: 0.35,
+            mb: 1.2,
             borderRadius: 1,
-            backgroundColor: "#114C88",
+            backgroundColor: "#004d7a",
             color: "white",
-            fontSize: 11,
-            fontWeight: 700,
+            fontSize: 10,
+            fontWeight: 800,
+            lineHeight: 1.2,
           }}
         >
           {need.categoryName}
         </Typography>
 
         <Typography
-          variant="h6"
           sx={{
             color: "black",
-            fontSize: 18,
-            fontWeight: 700,
-            lineHeight: 1.45,
-            mb: 1,
+            fontSize: 16,
+            fontWeight: 800,
+            lineHeight: 1.35,
             textAlign: "center",
+            mb: 1,
+            minHeight: 42,
             wordBreak: "break-word",
           }}
         >
@@ -144,11 +175,10 @@ export default function NeedCard({ need }: Props): JSX.Element {
         </Typography>
 
         <Typography
-          variant="body2"
           sx={{
-            color: "text.secondary",
-            fontSize: 13,
-            lineHeight: 1.6,
+            color: "#3a3025",
+            fontSize: 12,
+            lineHeight: 1.45,
             flexGrow: 1,
             wordBreak: "break-word",
           }}
@@ -158,79 +188,77 @@ export default function NeedCard({ need }: Props): JSX.Element {
 
         <Box
           sx={{
-            mt: 1.5,
+            mt: 1,
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: "flex-end",
             gap: 1,
           }}
         >
           <Typography
-            variant="body2"
             sx={{
-              fontSize: 12,
-              fontWeight: 700,
+              fontSize: 11,
+              fontWeight: 800,
               color: "black",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              maxWidth: "45%",
+              maxWidth: "48%",
             }}
           >
             {need.userName}
           </Typography>
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              flexShrink: 0,
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
-              <span>💬</span>
-              <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 700 }}>
-                {need.answerCount}
-              </Typography>
+          <Box>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 0.8,
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.2 }}>
+                <span style={{ fontSize: 13 }}>💬</span>
+                <Typography sx={{ fontSize: 11, fontWeight: 800 }}>
+                  {need.answerCount}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.2 }}>
+                <span style={{ fontSize: 13, color: "#f4c400" }}>✋</span>
+                <Typography sx={{ fontSize: 11, fontWeight: 800 }}>
+                  {need.empathyCount}
+                </Typography>
+              </Box>
             </Box>
 
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
-              <span style={{ color: "#FFD700" }}>✋</span>
-              <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 700 }}>
-                {need.empathyCount}
-              </Typography>
-            </Box>
+            <Typography
+              sx={{
+                mt: 0.2,
+                fontSize: 10,
+                color: "#5f5548",
+                textAlign: "right",
+              }}
+            >
+              {need.createdTime?.slice(0, 10)}
+            </Typography>
           </Box>
         </Box>
-
-        <Typography
-          variant="body2"
-          sx={{
-            mt: 0.5,
-            fontSize: 11,
-            color: "text.secondary",
-            textAlign: "right",
-          }}
-        >
-          {need.createdTime?.slice(0, 10)}
-        </Typography>
       </CardContent>
     </Card>
   );
 }
 6. src/components/SubmitNeeds.tsx
 
-ここでは Dialogを書かない。
-Dialogは親の NeedsList.tsx 側で持つ。
+これが投稿Form。
+Dialogはここに書かない。
+Dialogは親の NeedsList.tsx が持つ。
 
-import {
-  Box,
-  Button,
-  MenuItem,
-  TextField,
-  Typography,
-} from "@mui/material";
+setOpen は絶対に使わない。
+閉じたいときは onClose()。
+
+import { Box, Button, MenuItem, TextField, Typography } from "@mui/material";
 import { useState } from "react";
 import { useApi } from "../lib/useApi";
 import type { Category } from "../models/Category";
@@ -275,6 +303,7 @@ export default function SubmitNeeds({
 
   const handleCancel = (): void => {
     if (isSubmitting) return;
+
     resetForm();
     onClose();
   };
@@ -334,10 +363,10 @@ export default function SubmitNeeds({
       <Typography
         component="h2"
         sx={{
-          fontSize: 24,
+          fontSize: 25,
           fontWeight: 800,
           textAlign: "center",
-          mb: 3,
+          mb: 2.5,
           color: "black",
         }}
       >
@@ -346,13 +375,27 @@ export default function SubmitNeeds({
 
       <Box
         sx={{
+          width: 280,
+          maxWidth: "100%",
+          mx: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: 2.5,
+          gap: 1.5,
         }}
       >
         <Box>
-          <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
+          <Typography
+            sx={{
+              fontSize: 20,
+              fontWeight: 800,
+              lineHeight: 1,
+              mb: 0.2,
+              color: "black",
+            }}
+          >
+            *
+          </Typography>
+
           <TextField
             select
             fullWidth
@@ -369,10 +412,17 @@ export default function SubmitNeeds({
               displayEmpty: true,
             }}
             sx={{
-              backgroundColor: "white",
+              backgroundColor: "#fff8ea",
               borderRadius: 2,
               "& .MuiOutlinedInput-root": {
+                height: 42,
                 borderRadius: 2,
+                fontSize: 15,
+                fontWeight: 800,
+              },
+              "& .MuiSelect-select": {
+                textAlign: "center",
+                color: formData.categoryId === "" ? "#c8b995" : "black",
               },
             }}
           >
@@ -381,10 +431,7 @@ export default function SubmitNeeds({
             </MenuItem>
 
             {categories.map((category) => (
-              <MenuItem
-                key={category.categoryId}
-                value={category.categoryId}
-              >
+              <MenuItem key={category.categoryId} value={category.categoryId}>
                 {category.categoryName}
               </MenuItem>
             ))}
@@ -392,7 +439,18 @@ export default function SubmitNeeds({
         </Box>
 
         <Box>
-          <Typography sx={{ fontWeight: 700, mb: 0.5 }}>*</Typography>
+          <Typography
+            sx={{
+              fontSize: 20,
+              fontWeight: 800,
+              lineHeight: 1,
+              mb: 0.2,
+              color: "black",
+            }}
+          >
+            *
+          </Typography>
+
           <TextField
             fullWidth
             size="small"
@@ -408,20 +466,31 @@ export default function SubmitNeeds({
               maxLength: 30,
             }}
             sx={{
-              backgroundColor: "white",
+              backgroundColor: "#fff8ea",
               borderRadius: 2,
               "& .MuiOutlinedInput-root": {
+                height: 42,
                 borderRadius: 2,
+                fontSize: 15,
+                fontWeight: 800,
+              },
+              "& input": {
+                textAlign: "center",
+                color: "black",
+              },
+              "& input::placeholder": {
+                color: "#c8b995",
+                opacity: 1,
               },
             }}
           />
 
           <Typography
             sx={{
-              mt: 0.3,
+              mt: 0.2,
               textAlign: "right",
               fontSize: 12,
-              color: titleCount > 30 ? "error.main" : "text.secondary",
+              color: "black",
             }}
           >
             {titleCount}/30
@@ -445,20 +514,32 @@ export default function SubmitNeeds({
               maxLength: 1000,
             }}
             sx={{
-              backgroundColor: "white",
+              backgroundColor: "#fff8ea",
               borderRadius: 2,
               "& .MuiOutlinedInput-root": {
+                minHeight: 105,
                 borderRadius: 2,
+                fontSize: 15,
+                fontWeight: 800,
+                alignItems: "center",
+              },
+              "& textarea": {
+                textAlign: "center",
+                color: "black",
+              },
+              "& textarea::placeholder": {
+                color: "#c8b995",
+                opacity: 1,
               },
             }}
           />
 
           <Typography
             sx={{
-              mt: 0.3,
+              mt: 0.2,
               textAlign: "right",
               fontSize: 12,
-              color: detailCount > 1000 ? "error.main" : "text.secondary",
+              color: "black",
             }}
           >
             {detailCount}/1000
@@ -466,10 +547,11 @@ export default function SubmitNeeds({
 
           <Typography
             sx={{
-              mt: 0.5,
+              mt: 0.3,
               textAlign: "center",
               fontSize: 11,
-              color: "text.secondary",
+              color: "black",
+              fontWeight: 800,
             }}
           >
             ※投稿後の編集はできません。
@@ -481,7 +563,7 @@ export default function SubmitNeeds({
             display: "flex",
             justifyContent: "center",
             gap: 2,
-            mt: 1,
+            mt: 0.5,
           }}
         >
           <Button
@@ -490,13 +572,17 @@ export default function SubmitNeeds({
             onClick={handleCancel}
             disabled={isSubmitting}
             sx={{
+              minWidth: 110,
+              height: 38,
               backgroundColor: "#ead9b8",
               color: "black",
               borderRadius: 3,
-              px: 4,
-              fontWeight: 700,
+              fontSize: 16,
+              fontWeight: 800,
+              boxShadow: "none",
               "&:hover": {
                 backgroundColor: "#dfc99d",
+                boxShadow: "none",
               },
             }}
           >
@@ -508,13 +594,21 @@ export default function SubmitNeeds({
             variant="contained"
             disabled={!canSubmit}
             sx={{
+              minWidth: 110,
+              height: 38,
               backgroundColor: "#0068a8",
               color: "white",
               borderRadius: 3,
-              px: 4,
-              fontWeight: 700,
+              fontSize: 16,
+              fontWeight: 800,
+              boxShadow: "none",
               "&:hover": {
                 backgroundColor: "#005486",
+                boxShadow: "none",
+              },
+              "&:disabled": {
+                backgroundColor: "#9bbbd0",
+                color: "white",
               },
             }}
           >
@@ -525,18 +619,10 @@ export default function SubmitNeeds({
     </Box>
   );
 }
-
-ここで setOpen は完全に消している。
-キャンセル時はこれ。
-
-onClick={handleCancel}
-
-中でこれを呼ぶ。
-
-onClose();
 7. src/pages/NeedsList.tsx
 
-検索・絞り込み・並び順・Fab・Dialog全部入り。
+一覧画面の本体。
+検索、絞り込み、並び順、投稿ボタン、Dialog、投稿後再取得まで全部入り。
 
 import {
   Alert,
@@ -545,7 +631,6 @@ import {
   CircularProgress,
   Dialog,
   DialogContent,
-  Fab,
   FormControl,
   Grid,
   MenuItem,
@@ -590,7 +675,6 @@ export default function NeedsList(): JSX.Element {
   const [sortBy, setSortBy] = useState<SortBy>("new");
   const [page, setPage] = useState(0);
   const [totalPage, setTotalPage] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
 
   const [searchCondition, setSearchCondition] =
     useState<SearchCondition>(emptySearchCondition);
@@ -606,7 +690,7 @@ export default function NeedsList(): JSX.Element {
   const [isMasterLoading, setIsMasterLoading] = useState(true);
   const [isServerStopping, setIsServerStopping] = useState(false);
 
-  const size = 18;
+  const size = 6;
 
   const requestUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -649,12 +733,10 @@ export default function NeedsList(): JSX.Element {
 
       setNeedList(data.content ?? []);
       setTotalPage(data.totalPages ?? 0);
-      setTotalElements(data.totalElements ?? 0);
     } catch (error) {
       console.error(error);
       setNeedList([]);
       setTotalPage(0);
-      setTotalElements(0);
       setIsServerStopping(true);
     } finally {
       setIsLoading(false);
@@ -756,377 +838,413 @@ export default function NeedsList(): JSX.Element {
     <>
       <Box
         sx={{
-          width: "100%",
           minHeight: "100vh",
-          px: { xs: 2, md: 5 },
+          backgroundColor: "#fff2dd",
+          px: { xs: 2, md: 4 },
           py: 3,
-          backgroundColor: "#fff7e8",
         }}
       >
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 230px" },
-            gap: 3,
-            alignItems: "start",
+            maxWidth: 1050,
+            mx: "auto",
           }}
         >
-          <Box>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                position: "relative",
-                mb: 3,
-              }}
-            >
-              <Typography
-                component="h1"
-                sx={{
-                  fontSize: 30,
-                  fontWeight: 800,
-                  color: "black",
-                  textAlign: "center",
-                }}
-              >
-                お悩み一覧
-              </Typography>
-
-              <FormControl
-                size="small"
-                sx={{
-                  position: { xs: "static", md: "absolute" },
-                  right: 0,
-                  minWidth: 110,
-                  ml: { xs: 2, md: 0 },
-                }}
-              >
-                <Select
-                  value={sortBy}
-                  onChange={handleSortChange}
-                  sx={{
-                    backgroundColor: "white",
-                    borderRadius: 1,
-                    fontSize: 13,
-                    fontWeight: 700,
-                  }}
-                >
-                  <MenuItem value="new">新着順</MenuItem>
-                  <MenuItem value="empathy">共感数順</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            {isServerStopping && (
-              <Alert
-                severity="error"
-                sx={{
-                  mb: 3,
-                  justifyContent: "center",
-                  maxWidth: 600,
-                  mx: "auto",
-                }}
-              >
-                サーバーが起動していません。しばらくたってからお試しください。
-              </Alert>
-            )}
-
-            {isLoading ? (
-              <CircularProgress
-                aria-label="Loading"
-                sx={{
-                  display: "block",
-                  mx: "auto",
-                  my: 8,
-                }}
-              />
-            ) : (
-              <>
-                {needList.length === 0 ? (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: 8,
-                      color: "text.secondary",
-                    }}
-                  >
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      お悩みがありません
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Grid container spacing={2}>
-                    {needList.map((need, index) => (
-                      <Grid
-                        item
-                        xs={12}
-                        sm={6}
-                        md={4}
-                        key={need.needId ?? index}
-                      >
-                        <NeedCard need={need} />
-                      </Grid>
-                    ))}
-                  </Grid>
-                )}
-
-                {totalPage > 1 && (
-                  <Stack
-                    direction="row"
-                    sx={{
-                      mt: 4,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: 1,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Button
-                      disabled={page <= 0}
-                      onClick={() => setPage(0)}
-                    >
-                      First
-                    </Button>
-
-                    <Button
-                      disabled={page <= 0}
-                      onClick={() => setPage(page - 1)}
-                    >
-                      前へ
-                    </Button>
-
-                    <Pagination
-                      count={totalPage}
-                      page={page + 1}
-                      onChange={handlePageChange}
-                      hidePrevButton
-                      hideNextButton
-                      color="primary"
-                      shape="rounded"
-                    />
-
-                    <Button
-                      disabled={totalPage <= 1 || page >= totalPage - 1}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      次へ
-                    </Button>
-
-                    <Button
-                      disabled={totalPage <= 1 || page >= totalPage - 1}
-                      onClick={() => setPage(totalPage - 1)}
-                    >
-                      Last
-                    </Button>
-                  </Stack>
-                )}
-              </>
-            )}
-          </Box>
-
           <Box
             sx={{
-              backgroundColor: "#e7e1c9",
-              borderRadius: 3,
-              px: 2,
-              py: 2.5,
-              position: { md: "sticky" },
-              top: { md: 24 },
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 190px" },
+              gap: 2,
+              alignItems: "start",
             }}
           >
-            <Typography
-              sx={{
-                fontSize: 18,
-                fontWeight: 800,
-                textAlign: "center",
-                mb: 2,
-              }}
-            >
-              絞り込み
-            </Typography>
-
-            <Stack spacing={1.5}>
-              <Box>
-                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                  所属
-                </Typography>
-
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={searchCondition.affiliatedId}
-                    onChange={handleSelectSearchChange("affiliatedId")}
-                    displayEmpty
-                    disabled={isMasterLoading}
-                    sx={{ backgroundColor: "white" }}
-                  >
-                    <MenuItem value="">指定なし▼</MenuItem>
-
-                    {affiliateds.map((affiliated) => (
-                      <MenuItem
-                        key={affiliated.affiliatedId}
-                        value={String(affiliated.affiliatedId)}
-                      >
-                        {affiliated.affiliatedName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <Box>
-                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                  職位
-                </Typography>
-
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={searchCondition.positionId}
-                    onChange={handleSelectSearchChange("positionId")}
-                    displayEmpty
-                    disabled={isMasterLoading}
-                    sx={{ backgroundColor: "white" }}
-                  >
-                    <MenuItem value="">指定なし▼</MenuItem>
-
-                    {ranks.map((rank) => (
-                      <MenuItem
-                        key={rank.rankId}
-                        value={String(rank.rankId)}
-                      >
-                        {rank.rankName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <Box>
-                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                  悩みカテゴリ
-                </Typography>
-
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={searchCondition.categoryId}
-                    onChange={handleSelectSearchChange("categoryId")}
-                    displayEmpty
-                    disabled={isMasterLoading}
-                    sx={{ backgroundColor: "white" }}
-                  >
-                    <MenuItem value="">指定なし▼</MenuItem>
-
-                    {categories.map((category) => (
-                      <MenuItem
-                        key={category.categoryId}
-                        value={String(category.categoryId)}
-                      >
-                        {category.categoryName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <Typography
-                sx={{
-                  fontSize: 16,
-                  fontWeight: 800,
-                  textAlign: "center",
-                  pt: 1,
-                }}
-              >
-                検索
-              </Typography>
-
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="人名/キーワード/投稿タイトル"
-                value={searchCondition.keyword}
-                onChange={handleKeywordChange}
-                sx={{ backgroundColor: "white" }}
-              />
-
+            <Box>
               <Box
                 sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 1,
-                  pt: 1,
+                  position: "relative",
+                  mb: 2,
+                  minHeight: 44,
                 }}
               >
-                <Button
-                  variant="contained"
-                  onClick={handleReset}
+                <Typography
+                  component="h1"
                   sx={{
-                    backgroundColor: "#d8ccb0",
+                    fontSize: 30,
+                    fontWeight: 800,
                     color: "black",
-                    fontWeight: 700,
-                    "&:hover": {
-                      backgroundColor: "#c9b990",
-                    },
+                    textAlign: "center",
                   }}
                 >
-                  リセット
-                </Button>
+                  お悩み一覧
+                </Typography>
 
-                <Button
-                  variant="contained"
-                  onClick={handleSearchSubmit}
+                <FormControl
+                  size="small"
                   sx={{
-                    backgroundColor: "#005b96",
-                    color: "white",
-                    fontWeight: 700,
-                    "&:hover": {
-                      backgroundColor: "#004a7c",
-                    },
+                    position: "absolute",
+                    right: 0,
+                    top: 4,
+                    width: 105,
+                    display: { xs: "none", md: "block" },
                   }}
                 >
-                  実行
-                </Button>
+                  <Select
+                    value={sortBy}
+                    onChange={handleSortChange}
+                    sx={{
+                      height: 34,
+                      backgroundColor: "#fff7ec",
+                      borderRadius: 1,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      "& .MuiSelect-select": {
+                        py: 0.5,
+                      },
+                    }}
+                  >
+                    <MenuItem value="new">新着順▼</MenuItem>
+                    <MenuItem value="empathy">共感数順▼</MenuItem>
+                  </Select>
+                </FormControl>
               </Box>
 
-              <Typography
+              {isServerStopping && (
+                <Alert
+                  severity="error"
+                  sx={{
+                    mb: 2,
+                    justifyContent: "center",
+                  }}
+                >
+                  サーバーが起動していません。しばらくたってからお試しください。
+                </Alert>
+              )}
+
+              {isLoading ? (
+                <CircularProgress
+                  aria-label="Loading"
+                  sx={{
+                    display: "block",
+                    mx: "auto",
+                    my: 8,
+                  }}
+                />
+              ) : (
+                <>
+                  {needList.length === 0 ? (
+                    <Box
+                      sx={{
+                        textAlign: "center",
+                        py: 8,
+                        color: "text.secondary",
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                        お悩みがありません
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Grid container spacing={2}>
+                      {needList.map((need, index) => (
+                        <Grid
+                          item
+                          xs={12}
+                          sm={6}
+                          md={4}
+                          key={need.needId ?? index}
+                        >
+                          <NeedCard need={need} />
+                        </Grid>
+                      ))}
+                    </Grid>
+                  )}
+
+                  {totalPage > 1 && (
+                    <Stack
+                      direction="row"
+                      sx={{
+                        mt: 3,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: 1,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Pagination
+                        count={totalPage}
+                        page={page + 1}
+                        onChange={handlePageChange}
+                        color="primary"
+                        shape="rounded"
+                        size="small"
+                      />
+                    </Stack>
+                  )}
+                </>
+              )}
+            </Box>
+
+            <Box>
+              <Box
                 sx={{
-                  pt: 1,
-                  textAlign: "center",
-                  fontSize: 12,
-                  color: "text.secondary",
+                  backgroundColor: "#e4dcc4",
+                  borderRadius: 1,
+                  px: 1.5,
+                  py: 2,
+                  mb: 2,
                 }}
               >
-                {totalElements}件
-              </Typography>
-            </Stack>
+                <Typography
+                  sx={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    textAlign: "center",
+                    mb: 2,
+                    color: "black",
+                  }}
+                >
+                  絞り込み
+                </Typography>
+
+                <Stack spacing={1.2}>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "50px 1fr",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                      所属
+                    </Typography>
+
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={searchCondition.affiliatedId}
+                        onChange={handleSelectSearchChange("affiliatedId")}
+                        displayEmpty
+                        disabled={isMasterLoading}
+                        sx={{
+                          height: 28,
+                          backgroundColor: "#fff7ec",
+                          fontSize: 11,
+                          "& .MuiSelect-select": {
+                            py: 0.2,
+                          },
+                        }}
+                      >
+                        <MenuItem value="">指定なし▼</MenuItem>
+
+                        {affiliateds.map((affiliated) => (
+                          <MenuItem
+                            key={affiliated.affiliatedId}
+                            value={String(affiliated.affiliatedId)}
+                          >
+                            {affiliated.affiliatedName}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "50px 1fr",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                      職位
+                    </Typography>
+
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={searchCondition.positionId}
+                        onChange={handleSelectSearchChange("positionId")}
+                        displayEmpty
+                        disabled={isMasterLoading}
+                        sx={{
+                          height: 28,
+                          backgroundColor: "#fff7ec",
+                          fontSize: 11,
+                          "& .MuiSelect-select": {
+                            py: 0.2,
+                          },
+                        }}
+                      >
+                        <MenuItem value="">指定なし▼</MenuItem>
+
+                        {ranks.map((rank) => (
+                          <MenuItem
+                            key={rank.rankId}
+                            value={String(rank.rankId)}
+                          >
+                            {rank.rankName}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "50px 1fr",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      悩み
+                      <br />
+                      カテゴリ
+                    </Typography>
+
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={searchCondition.categoryId}
+                        onChange={handleSelectSearchChange("categoryId")}
+                        displayEmpty
+                        disabled={isMasterLoading}
+                        sx={{
+                          height: 28,
+                          backgroundColor: "#fff7ec",
+                          fontSize: 11,
+                          "& .MuiSelect-select": {
+                            py: 0.2,
+                          },
+                        }}
+                      >
+                        <MenuItem value="">指定なし▼</MenuItem>
+
+                        {categories.map((category) => (
+                          <MenuItem
+                            key={category.categoryId}
+                            value={String(category.categoryId)}
+                          >
+                            {category.categoryName}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+
+                  <Typography
+                    sx={{
+                      fontSize: 16,
+                      fontWeight: 800,
+                      textAlign: "center",
+                      pt: 1,
+                      color: "black",
+                    }}
+                  >
+                    検索
+                  </Typography>
+
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="人名/キーワード/投稿タイトル"
+                    value={searchCondition.keyword}
+                    onChange={handleKeywordChange}
+                    sx={{
+                      backgroundColor: "#fff7ec",
+                      "& .MuiInputBase-input": {
+                        height: 20,
+                        fontSize: 11,
+                        py: 0.5,
+                      },
+                    }}
+                  />
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: 1,
+                      pt: 1,
+                    }}
+                  >
+                    <Button
+                      variant="contained"
+                      onClick={handleReset}
+                      sx={{
+                        minWidth: 58,
+                        height: 28,
+                        backgroundColor: "#d8ccb0",
+                        color: "black",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        boxShadow: "none",
+                        "&:hover": {
+                          backgroundColor: "#c9b990",
+                          boxShadow: "none",
+                        },
+                      }}
+                    >
+                      リセット
+                    </Button>
+
+                    <Button
+                      variant="contained"
+                      onClick={handleSearchSubmit}
+                      sx={{
+                        minWidth: 58,
+                        height: 28,
+                        backgroundColor: "#005b96",
+                        color: "white",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        boxShadow: "none",
+                        "&:hover": {
+                          backgroundColor: "#004a7c",
+                          boxShadow: "none",
+                        },
+                      }}
+                    >
+                      実行
+                    </Button>
+                  </Box>
+                </Stack>
+              </Box>
+
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={() => setPostOpen(true)}
+                disabled={isServerStopping}
+                sx={{
+                  height: 62,
+                  borderRadius: 8,
+                  backgroundColor: "#005b96",
+                  color: "white",
+                  fontSize: 19,
+                  fontWeight: 800,
+                  lineHeight: 1.2,
+                  boxShadow: "none",
+                  "&:hover": {
+                    backgroundColor: "#004a7c",
+                    boxShadow: "none",
+                  },
+                }}
+              >
+                お悩み
+                <br />
+                投稿
+              </Button>
+            </Box>
           </Box>
         </Box>
       </Box>
-
-      <Fab
-        color="primary"
-        onClick={() => setPostOpen(true)}
-        sx={{
-          position: "fixed",
-          right: 32,
-          bottom: 32,
-          zIndex: 1000,
-          width: 88,
-          height: 64,
-          borderRadius: 4,
-          fontSize: 18,
-          fontWeight: 800,
-          lineHeight: 1.2,
-          backgroundColor: "#005b96",
-          "&:hover": {
-            backgroundColor: "#004a7c",
-          },
-        }}
-        disabled={isServerStopping}
-      >
-        お悩み
-        <br />
-        投稿
-      </Fab>
 
       <Dialog
         open={postOpen}
@@ -1137,18 +1255,18 @@ export default function NeedsList(): JSX.Element {
           paper: {
             sx: {
               borderRadius: 4,
-              width: 420,
+              width: 410,
               maxWidth: "calc(100% - 32px)",
-              backgroundColor: "#fff7e8",
+              backgroundColor: "#fff2dd",
             },
           },
         }}
       >
         <DialogContent
           sx={{
-            px: 6,
+            px: 5,
             py: 4,
-            backgroundColor: "#fff7e8",
+            backgroundColor: "#fff2dd",
           }}
         >
           <SubmitNeeds
@@ -1161,24 +1279,19 @@ export default function NeedsList(): JSX.Element {
     </>
   );
 }
-もし useApi の場所が違う場合
+最後に確認するところ
 
-PDFでは SubmitNeeds.tsx がこうなっていた。
+useApi の場所だけ、君のプロジェクトに合わせて。
 
-import { useApi } from "../lib/useApi.ts";
+今がこれならそのまま。
 
-だから上の完全版もこれに合わせた。
+import { useApi } from "../lib/useApi";
 
-でも、あなたの今のプロジェクトで実際に
-
-src/lib/api.ts
-
-なら、全部こっちに直す。
+もし今の実ファイルが src/lib/api.ts なら、こう。
 
 import { useApi } from "../lib/api";
-API名だけ確認して
 
-この完全版は、serverにこのAPIがある前提。
+server側APIはこの前提。
 
 GET  /api/needs/search
 POST /api/needs
@@ -1186,17 +1299,5 @@ GET  /api/affiliateds
 GET  /api/ranks
 GET  /api/categories
 
-もしserver側の一覧API名が違うなら、NeedsList.tsx のここだけ変える。
-
-api.fetch("/api/affiliateds"),
-api.fetch("/api/ranks"),
-api.fetch("/api/categories"),
-
-ここまで入れれば、少なくとも今回の目的である、
-
-setOpenエラー解消
-右側絞り込み
-serverから所属・職位・カテゴリ取得
-/api/needs/searchに統一
-Fab押下で投稿モーダル
-モーダル外クリックで閉じる
+これで画面の一連の流れはつながる。
+投稿ボタンは画像通り、右の絞り込み欄の下に固定配置。
