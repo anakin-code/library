@@ -1,1 +1,279 @@
 
+package simplex.pj148.skippy.server.controller.dto.search;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipSearchConditionDto {
+
+    private String keyword;
+
+    private Long affiliatedId;
+
+    private Long rankId;
+
+    private Long categoryId;
+
+    private String orderBy;
+}
+
+
+package simplex.pj148.skippy.server.controller.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipListResponseDto {
+
+    private Long tipId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private String tipUrl;
+
+    private Long categoryId;
+
+    private String categoryName;
+
+    private Long userId;
+
+    private String userName;
+
+    private String affiliatedName;
+
+    private String rankName;
+
+    private Long interestCount;
+
+    private Long commentCount;
+
+    private Boolean interestByCurrentUser;
+
+    private Boolean editFlg;
+
+    private LocalDateTime createdTime;
+}
+
+
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import simplex.pj148.skippy.server.controller.dto.response.TipListResponseDto;
+import simplex.pj148.skippy.server.controller.dto.search.TipSearchConditionDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.TipService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequestMapping("/api/tips")
+@RequiredArgsConstructor
+public class TipController {
+
+    private final TipService tipService;
+
+    private final UserInfoService userInfoService;
+
+    @GetMapping("/search")
+    public Page<TipListResponseDto> searchTips(
+            @AuthenticationPrincipal Jwt jwt,
+            @ModelAttribute TipSearchConditionDto condition,
+            Pageable pageable
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return tipService.searchTips(loginUser.getUserId(), condition, pageable);
+    }
+}
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import simplex.pj148.skippy.server.entity.Tip;
+
+public interface TipRepository extends JpaRepository<Tip, Long> {
+
+    @Query(
+            value = """
+                    SELECT t
+                    FROM Tip t
+                    LEFT JOIN Tipinterest ti ON ti.tip = t
+                    LEFT JOIN Comment c ON c.tip = t AND c.deleteFlg = false
+                    WHERE t.deleteFlg = false
+                      AND (
+                            :keyword IS NULL
+                            OR :keyword = ''
+                            OR LOWER(t.tipTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.tipDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          )
+                      AND (:affiliatedId IS NULL OR t.user.affiliated.affiliatedId = :affiliatedId)
+                      AND (:rankId IS NULL OR t.user.rank.rankId = :rankId)
+                      AND (:categoryId IS NULL OR t.category.categoryId = :categoryId)
+                    GROUP BY t
+                    ORDER BY
+                      CASE WHEN :orderBy = 'interestCount' THEN COUNT(DISTINCT ti) END DESC,
+                      CASE WHEN :orderBy = 'commentCount' THEN COUNT(DISTINCT c) END DESC,
+                      t.createdTime DESC
+                    """,
+            countQuery = """
+                    SELECT COUNT(t)
+                    FROM Tip t
+                    WHERE t.deleteFlg = false
+                      AND (
+                            :keyword IS NULL
+                            OR :keyword = ''
+                            OR LOWER(t.tipTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.tipDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(t.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          )
+                      AND (:affiliatedId IS NULL OR t.user.affiliated.affiliatedId = :affiliatedId)
+                      AND (:rankId IS NULL OR t.user.rank.rankId = :rankId)
+                      AND (:categoryId IS NULL OR t.category.categoryId = :categoryId)
+                    """
+    )
+    Page<Tip> searchTips(
+            @Param("keyword") String keyword,
+            @Param("affiliatedId") Long affiliatedId,
+            @Param("rankId") Long rankId,
+            @Param("categoryId") Long categoryId,
+            @Param("orderBy") String orderBy,
+            Pageable pageable
+    );
+}
+package simplex.pj148.skippy.server.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.response.TipListResponseDto;
+import simplex.pj148.skippy.server.controller.dto.search.TipSearchConditionDto;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.repository.CommentRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.TipinterestRepository;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class TipService {
+
+    private final TipRepository tipRepository;
+
+    private final TipinterestRepository tipinterestRepository;
+
+    private final CommentRepository commentRepository;
+
+    @Transactional(readOnly = true)
+    public Page<TipListResponseDto> searchTips(
+            Long loginUserId,
+            TipSearchConditionDto condition,
+            Pageable pageable
+    ) {
+        Page<Tip> tips = tipRepository.searchTips(
+                condition.getKeyword(),
+                condition.getAffiliatedId(),
+                condition.getRankId(),
+                condition.getCategoryId(),
+                condition.getOrderBy(),
+                pageable
+        );
+
+        return tips.map(tip -> toTipListResponseDto(tip, loginUserId));
+    }
+
+    private TipListResponseDto toTipListResponseDto(Tip tip, Long loginUserId) {
+        Long interestCount = tipinterestRepository.countByTipTipId(tip.getTipId());
+
+        Long commentCount = commentRepository.countByTipTipIdAndDeleteFlgFalse(tip.getTipId());
+
+        Boolean interestByCurrentUser =
+                tipinterestRepository.existsByTipTipIdAndUserUserId(
+                        tip.getTipId(),
+                        loginUserId
+                );
+
+        Boolean editFlg = tip.getUser().getUserId().equals(loginUserId);
+
+        return new TipListResponseDto(
+                tip.getTipId(),
+                tip.getTipTitle(),
+                tip.getTipDetail(),
+                tip.getTipUrl(),
+                tip.getCategory().getCategoryId(),
+                tip.getCategory().getCategoryName(),
+                tip.getUser().getUserId(),
+                tip.getUser().getUserName(),
+                tip.getUser().getAffiliated().getAffiliatedName(),
+                tip.getUser().getRank().getRankName(),
+                interestCount,
+                commentCount,
+                interestByCurrentUser,
+                editFlg,
+                tip.getCreatedTime()
+        );
+    }
+}
+
+
+
+
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Tipinterest;
+
+import java.util.Optional;
+
+public interface TipinterestRepository extends JpaRepository<Tipinterest, Long> {
+
+    Optional<Tipinterest> findByTipTipIdAndUserUserId(Long tipId, Long userId);
+
+    boolean existsByTipTipIdAndUserUserId(Long tipId, Long userId);
+
+    Long countByTipTipId(Long tipId);
+}
+
+
+
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import simplex.pj148.skippy.server.entity.Comment;
+
+import java.util.List;
+
+public interface CommentRepository extends JpaRepository<Comment, Long> {
+
+    List<Comment> findByTipTipIdAndDeleteFlgFalseOrderByCreatedTimeAsc(Long tipId);
+
+    Long countByTipTipIdAndDeleteFlgFalse(Long tipId);
+}
+
