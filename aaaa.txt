@@ -1,613 +1,595 @@
--- =========================================
--- 初期データ
--- ddl-auto=create-drop 前提
--- =========================================
+1. src/models/Need.ts
+export type Need = {
+  needId: number;
+  needTitle: string;
+  needDetail: string;
 
--- =========================================
--- Master
--- =========================================
+  categoryId: number;
+  categoryName: string;
 
-INSERT INTO affiliated (
-    affiliated_id,
-    affiliated_name
-) VALUES
-    (1, 'SHI Staff'),
-    (2, 'SHI Engineer'),
-    (3, 'SHI Manager');
+  userId: number;
+  userName: string;
+  affiliatedName: string;
+  positionName: string;
 
-INSERT INTO rank (
-    rank_id,
-    rank_name
-) VALUES
-    (1, 'Staff'),
-    (2, 'Leader'),
-    (3, 'Manager');
+  empathyCount: number;
+  answerCount: number;
+  empathyByCurrentUser: boolean;
 
-INSERT INTO category (
-    category_id,
-    category_name,
-    created_time,
-    updated_time
-) VALUES
-    (1, '睡眠・体調'),
-    (2, '仕事・タスク'),
-    (3, '人間関係'),
-    (4, 'キャリア'),
-    (5, '生活習慣');
+  editFlg: boolean;
+  createdTime: string;
+};
 
-INSERT INTO frequency (
-    frequency_id,
-    frequency_name
-) VALUES
-    (1, '毎日'),
-    (2, '毎週'),
-    (3, '毎月');
+export type NeedPageResponse = {
+  content: Need[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+};
+2. src/components/NeedCard.tsx
 
--- =========================================
--- Users
--- =========================================
+react-icons と @mui/icons-material は使わない安全版。
+つまり、インストール不足で落ちない。
 
-INSERT INTO users (
-    user_id,
-    user_name,
-    self_introduction,
-    admin_flg,
-    mail_address,
-    affiliated_id,
-    rank_id,
-    created_time,
-    updated_time
-) VALUES
-    (
-        1,
-        '石川翔太',
-        '最近入社しました。よろしくお願いします。',
-        false,
-        'ishikawa@example.com',
-        1,
-        1,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    ),
-    (
-        2,
-        '石山隆太',
-        '業務改善に興味があります。',
-        false,
-        'ishiyama@example.com',
-        1,
-        1,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    ),
-    (
-        3,
-        '伊藤陽菜',
-        'チーム開発とナレッジ共有が好きです。',
-        false,
-        'ito@example.com',
-        1,
-        1,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    ),
-    (
-        4,
-        '佐藤健',
-        'タスク管理や設計相談が得意です。',
-        false,
-        'sato@example.com',
-        2,
-        2,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    ),
-    (
-        5,
-        '田中美咲',
-        '体調管理と働き方に関心があります。',
-        false,
-        'tanaka@example.com',
-        2,
-        1,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    ),
-    (
-        6,
-        '高橋亮',
-        'マネジメントまわりの相談に乗れます。',
-        false,
-        'takahashi@example.com',
-        3,
-        3,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    );
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+} from "@mui/material";
+import type { Need } from "../models/Need";
 
--- =========================================
--- Needs
--- お悩み一覧表示用
--- =========================================
+type Props = {
+  need: Need;
+};
 
-INSERT INTO needs (
-    need_id,
-    user_id,
-    category_id,
-    need_title,
-    need_detail,
-    created_time,
-    updated_time,
-    delete_flg
-) VALUES
-    (
-        1,
-        1,
-        1,
-        '最近寝れなくて',
-        'この前に産業保健委員に行ったとき、睡眠が浅いと言われました。仕事中も集中しづらいです。',
-        TIMESTAMP '2026-06-15 09:10:00',
-        TIMESTAMP '2026-06-15 09:10:00',
-        false
-    ),
-    (
-        2,
-        2,
-        1,
-        '最近歩くと足に激痛を感じることが多い',
-        'いい靴を買うと少しは良くなるのか、それとも病院に行った方がいいのか迷っています。',
-        TIMESTAMP '2026-06-15 10:20:00',
-        TIMESTAMP '2026-06-15 10:20:00',
-        false
-    ),
-    (
-        3,
-        3,
-        2,
-        '最近は忙しすぎてボルダリングができない',
-        'タスクを定時に終わらせるにはどうしたらいいか悩んでいます。予定の立て方が苦手です。',
-        TIMESTAMP '2026-06-15 11:30:00',
-        TIMESTAMP '2026-06-15 11:30:00',
-        false
-    ),
-    (
-        4,
-        4,
-        2,
-        'タスクを抱え込みすぎてしまう',
-        '人に頼るタイミングが分からず、気づいたら自分だけで抱え込んでしまいます。',
-        TIMESTAMP '2026-06-16 09:00:00',
-        TIMESTAMP '2026-06-16 09:00:00',
-        false
-    ),
-    (
-        5,
-        5,
-        3,
-        'チーム内で相談するタイミングが分からない',
-        '忙しそうな人に声をかけるのが苦手で、質問を後回しにしてしまいます。',
-        TIMESTAMP '2026-06-16 13:15:00',
-        TIMESTAMP '2026-06-16 13:15:00',
-        false
-    ),
-    (
-        6,
-        6,
-        4,
-        '今後のキャリアの方向性に迷っている',
-        '技術を深めるべきか、マネジメント寄りに進むべきか悩んでいます。',
-        TIMESTAMP '2026-06-17 08:45:00',
-        TIMESTAMP '2026-06-17 08:45:00',
-        false
-    ),
-    (
-        7,
-        1,
-        2,
-        '朝会までに進捗を整理できない',
-        '何を話せばよいか毎朝迷ってしまい、報告が長くなります。',
-        TIMESTAMP '2026-06-18 08:30:00',
-        TIMESTAMP '2026-06-18 08:30:00',
-        false
-    ),
-    (
-        8,
-        2,
-        1,
-        '肩こりがひどくて集中できない',
-        '長時間PC作業をしていると肩と首が固まってしまいます。',
-        TIMESTAMP '2026-06-18 16:10:00',
-        TIMESTAMP '2026-06-18 16:10:00',
-        false
-    ),
-    (
-        9,
-        3,
-        5,
-        '削除済みのお悩み',
-        'このデータは delete_flg=true の確認用です。画面には表示されない想定です。',
-        TIMESTAMP '2026-06-10 12:00:00',
-        TIMESTAMP '2026-06-10 12:00:00',
-        true
-    );
+export default function NeedCard({ need }: Props): JSX.Element {
+  const shortDetail =
+    need.needDetail && need.needDetail.length > 40
+      ? `${need.needDetail.slice(0, 40)}...`
+      : need.needDetail;
 
--- =========================================
--- Tips
--- Needの回答数 answerCount 用
--- =========================================
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        borderRadius: 4,
+        border: "1px solid #d6e9ff",
+        backgroundColor: "#ffffff",
+        transition: "all 0.25s ease",
+        cursor: "pointer",
+        "&:hover": {
+          transform: "translateY(-3px)",
+          boxShadow: "0 8px 20px rgba(0, 0, 0, 0.08)",
+        },
+      }}
+    >
+      <CardContent
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          p: 2,
+          "&:last-child": {
+            pb: 2,
+          },
+        }}
+      >
+        <Typography
+          sx={{
+            alignSelf: "flex-start",
+            px: 1.5,
+            py: 0.5,
+            mb: 1.5,
+            borderRadius: 2,
+            backgroundColor: "#114C88",
+            color: "white",
+            fontSize: 12,
+            fontWeight: 700,
+            maxWidth: "100%",
+          }}
+        >
+          {need.categoryName}
+        </Typography>
 
-INSERT INTO tips (
-    tip_id,
-    user_id,
-    category_id,
-    need_id,
-    tip_title,
-    tip_detail,
-    tip_url,
-    created_time,
-    updated_time,
-    delete_flg
-) VALUES
-    (
-        1,
-        4,
-        1,
-        1,
-        '寝る前のスマホ時間を減らす',
-        '寝る30分前からスマホを見ないだけでも、眠りやすくなることがあります。',
-        '',
-        TIMESTAMP '2026-06-15 12:00:00',
-        TIMESTAMP '2026-06-15 12:00:00',
-        false
-    ),
-    (
-        2,
-        5,
-        1,
-        1,
-        '起床時間を固定する',
-        '寝る時間よりも、まず起きる時間を固定すると生活リズムが整いやすいです。',
-        '',
-        TIMESTAMP '2026-06-15 12:30:00',
-        TIMESTAMP '2026-06-15 12:30:00',
-        false
-    ),
-    (
-        3,
-        5,
-        1,
-        2,
-        '痛みが続くなら病院に行く',
-        '足の激痛が続くなら、靴だけで解決しようとせず整形外科に相談するのが安全です。',
-        '',
-        TIMESTAMP '2026-06-15 13:00:00',
-        TIMESTAMP '2026-06-15 13:00:00',
-        false
-    ),
-    (
-        4,
-        4,
-        2,
-        3,
-        'タスクを15分単位に分ける',
-        '大きいタスクのままだと終わりが見えないので、15分でできる単位に分けると進めやすいです。',
-        '',
-        TIMESTAMP '2026-06-15 14:00:00',
-        TIMESTAMP '2026-06-15 14:00:00',
-        false
-    ),
-    (
-        5,
-        6,
-        2,
-        3,
-        '定時前に明日の準備をする',
-        '終業30分前に、明日の最初のタスクを決めておくと翌朝の動き出しが楽になります。',
-        '',
-        TIMESTAMP '2026-06-15 15:00:00',
-        TIMESTAMP '2026-06-15 15:00:00',
-        false
-    ),
-    (
-        6,
-        6,
-        2,
-        4,
-        '抱え込む前に共有するルールを作る',
-        '30分詰まったら相談、など自分の中でルール化すると声をかけやすくなります。',
-        '',
-        TIMESTAMP '2026-06-16 10:00:00',
-        TIMESTAMP '2026-06-16 10:00:00',
-        false
-    ),
-    (
-        7,
-        4,
-        3,
-        5,
-        '質問を短くメモしてから聞く',
-        'いきなり話しかけるのが不安なら、聞きたいことを1行でまとめてから相談すると楽です。',
-        '',
-        TIMESTAMP '2026-06-16 14:00:00',
-        TIMESTAMP '2026-06-16 14:00:00',
-        false
-    ),
-    (
-        8,
-        6,
-        4,
-        6,
-        'まずは半年単位で考える',
-        '長期キャリアを一気に決めようとせず、半年で伸ばしたいスキルを決めると動きやすいです。',
-        '',
-        TIMESTAMP '2026-06-17 10:00:00',
-        TIMESTAMP '2026-06-17 10:00:00',
-        false
-    ),
-    (
-        9,
-        4,
-        2,
-        7,
-        '昨日・今日・困りごとで分ける',
-        '朝会の報告は、昨日やったこと・今日やること・困っていることの3つに分けると伝わりやすいです。',
-        '',
-        TIMESTAMP '2026-06-18 09:30:00',
-        TIMESTAMP '2026-06-18 09:30:00',
-        false
-    ),
-    (
-        10,
-        5,
-        1,
-        8,
-        '椅子とモニターの高さを見直す',
-        '肩こりは姿勢の影響が大きいので、目線と肘の高さを調整すると改善しやすいです。',
-        '',
-        TIMESTAMP '2026-06-18 17:00:00',
-        TIMESTAMP '2026-06-18 17:00:00',
-        false
-    ),
-    (
-        11,
-        4,
-        2,
-        3,
-        '削除済みの回答',
-        'この回答は delete_flg=true の確認用です。answerCountには含めない想定です。',
-        '',
-        TIMESTAMP '2026-06-15 16:00:00',
-        TIMESTAMP '2026-06-15 16:00:00',
-        true
-    );
+        <Typography
+          variant="h6"
+          sx={{
+            color: "black",
+            fontSize: 20,
+            fontWeight: 700,
+            lineHeight: 1.4,
+            mb: 1,
+            wordBreak: "break-word",
+          }}
+        >
+          {need.needTitle}
+        </Typography>
 
--- =========================================
--- Comments
--- =========================================
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+            fontSize: 14,
+            lineHeight: 1.7,
+            flexGrow: 1,
+            wordBreak: "break-word",
+          }}
+        >
+          {shortDetail}
+        </Typography>
 
-INSERT INTO comments (
-    comment_id,
-    tip_id,
-    user_id,
-    comment_body,
-    created_time,
-    is_looked,
-    delete_flg
-) VALUES
-    (
-        1,
-        1,
-        1,
-        '今日から試してみます。',
-        TIMESTAMP '2026-06-15 18:00:00',
-        false,
-        false
-    ),
-    (
-        2,
-        4,
-        3,
-        '15分単位ならできそうです。',
-        TIMESTAMP '2026-06-15 18:10:00',
-        false,
-        false
-    ),
-    (
-        3,
-        7,
-        5,
-        '質問を短くするのは良さそうです。',
-        TIMESTAMP '2026-06-16 15:00:00',
-        false,
-        false
-    );
+        <Box
+          sx={{
+            mt: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <Typography
+            variant="body2"
+            sx={{
+              color: "text.secondary",
+              fontSize: 13,
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "55%",
+            }}
+          >
+            {need.userName}
+          </Typography>
 
--- =========================================
--- Need Empathy
--- unique(need_id, user_id)
--- =========================================
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              flexShrink: 0,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+              <span>💬</span>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {need.answerCount}
+              </Typography>
+            </Box>
 
-INSERT INTO need_empathy (
-    need_empathy_id,
-    need_id,
-    user_id,
-    created_time,
-    is_looked_by_reactor,
-    is_looked_by_poster
-) VALUES
-    (1, 1, 2, TIMESTAMP '2026-06-15 12:00:00', true, false),
-    (2, 1, 3, TIMESTAMP '2026-06-15 12:05:00', true, false),
-    (3, 1, 4, TIMESTAMP '2026-06-15 12:10:00', true, false),
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+              <span style={{ color: "#FFD700" }}>✋</span>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {need.empathyCount}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+3. src/pages/NeedsList.tsx
 
-    (4, 2, 1, TIMESTAMP '2026-06-15 13:00:00', true, false),
-    (5, 2, 3, TIMESTAMP '2026-06-15 13:05:00', true, false),
-    (6, 2, 5, TIMESTAMP '2026-06-15 13:10:00', true, false),
+これは、昔の NeedsList.tsx を今の仕様に合わせた完全版。
 
-    (7, 3, 1, TIMESTAMP '2026-06-15 14:00:00', true, false),
-    (8, 3, 2, TIMESTAMP '2026-06-15 14:05:00', true, false),
-    (9, 3, 4, TIMESTAMP '2026-06-15 14:10:00', true, false),
+ポイントはここ。
 
-    (10, 4, 1, TIMESTAMP '2026-06-16 10:00:00', true, false),
-    (11, 4, 2, TIMESTAMP '2026-06-16 10:05:00', true, false),
+/api/needs/search
+orderBy=new | empathy
+page=0始まり
+size=18
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Fab,
+  FormControl,
+  Grid,
+  MenuItem,
+  Pagination,
+  Select,
+  Stack,
+  Typography,
+} from "@mui/material";
+import type { SelectChangeEvent } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
+import NeedCard from "../components/NeedCard";
+import SubmitForm from "./SubmitForm";
+import type { Need, NeedPageResponse } from "../models/Need";
+import { useApi } from "../lib/api";
 
-    (12, 5, 3, TIMESTAMP '2026-06-16 15:00:00', true, false),
-    (13, 5, 4, TIMESTAMP '2026-06-16 15:05:00', true, false),
+type SortBy = "new" | "empathy";
 
-    (14, 6, 1, TIMESTAMP '2026-06-17 11:00:00', true, false),
-    (15, 6, 2, TIMESTAMP '2026-06-17 11:05:00', true, false),
-    (16, 6, 3, TIMESTAMP '2026-06-17 11:10:00', true, false),
-    (17, 6, 4, TIMESTAMP '2026-06-17 11:15:00', true, false),
+export default function NeedsList(): JSX.Element {
+  const api = useApi();
 
-    (18, 7, 2, TIMESTAMP '2026-06-18 09:00:00', true, false),
+  const [needList, setNeedList] = useState<Need[]>([]);
+  const [postOpen, setPostOpen] = useState(false);
 
-    (19, 8, 1, TIMESTAMP '2026-06-18 17:30:00', true, false),
-    (20, 8, 3, TIMESTAMP '2026-06-18 17:35:00', true, false);
+  const [sortBy, setSortBy] = useState<SortBy>("new");
+  const [page, setPage] = useState(0);
+  const [totalPage, setTotalPage] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
--- =========================================
--- Tip Interest
--- unique(tip_id, user_id)
--- =========================================
+  const [isLoading, setIsLoading] = useState(true);
+  const [isServerStopping, setIsServerStopping] = useState(false);
 
-INSERT INTO tip_interest (
-    tip_interest_id,
-    tip_id,
-    user_id,
-    created_time,
-    is_looked_by_reactor,
-    is_looked_by_poster,
-    is_looked_my_best,
-    is_my_best
-) VALUES
-    (
-        1,
-        1,
-        1,
-        TIMESTAMP '2026-06-15 18:00:00',
-        true,
-        false,
-        false,
-        true
-    ),
-    (
-        2,
-        2,
-        1,
-        TIMESTAMP '2026-06-15 18:05:00',
-        true,
-        false,
-        false,
-        false
-    ),
-    (
-        3,
-        3,
-        2,
-        TIMESTAMP '2026-06-15 18:10:00',
-        true,
-        false,
-        false,
-        true
-    ),
-    (
-        4,
-        4,
-        3,
-        TIMESTAMP '2026-06-15 18:20:00',
-        true,
-        false,
-        false,
-        true
-    ),
-    (
-        5,
-        5,
-        3,
-        TIMESTAMP '2026-06-15 18:25:00',
-        true,
-        false,
-        false,
-        false
-    ),
-    (
-        6,
-        6,
-        4,
-        TIMESTAMP '2026-06-16 11:00:00',
-        true,
-        false,
-        false,
-        true
-    ),
-    (
-        7,
-        7,
-        5,
-        TIMESTAMP '2026-06-16 15:30:00',
-        true,
-        false,
-        false,
-        true
-    ),
-    (
-        8,
-        8,
-        1,
-        TIMESTAMP '2026-06-17 12:00:00',
-        true,
-        false,
-        false,
-        true
-    ),
-    (
-        9,
-        9,
-        2,
-        TIMESTAMP '2026-06-18 10:00:00',
-        true,
-        false,
-        false,
-        true
-    ),
-    (
-        10,
-        10,
-        3,
-        TIMESTAMP '2026-06-18 18:00:00',
-        true,
-        false,
-        false,
-        true
-    );
+  const size = 18;
 
--- =========================================
--- Notifications
--- 通知機能をまだ使わないなら、このINSERTは消してもOK
--- =========================================
+  const requestUrl = useMemo(() => {
+    const params = new URLSearchParams();
 
-INSERT INTO notifications (
-    notification_id,
-    tip_interest_id,
-    frequency_id,
-    notification_week,
-    notification_day,
-    notification_time,
-    is_active
-) VALUES
-    (
-        1,
-        1,
-        2,
-        1,
-        null,
-        TIME '09:00:00',
-        true
-    ),
-    (
-        2,
-        4,
-        1,
-        null,
-        null,
-        TIME '08:30:00',
-        true
-    );
+    params.set("page", String(page));
+    params.set("size", String(size));
+    params.set("orderBy", sortBy);
+
+    return `/api/needs/search?${params.toString()}`;
+  }, [page, sortBy]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchNeeds = async (): Promise<void> => {
+      try {
+        setIsLoading(true);
+        setIsServerStopping(false);
+
+        const res: Response = await api.fetch(requestUrl);
+
+        if (!res.ok) {
+          throw new Error("Error fetching needs");
+        }
+
+        const data: NeedPageResponse = await res.json();
+
+        if (ignore) return;
+
+        setNeedList(data.content ?? []);
+        setTotalPage(data.totalPages ?? 0);
+        setTotalElements(data.totalElements ?? 0);
+      } catch (err) {
+        console.error(err);
+
+        if (!ignore) {
+          setNeedList([]);
+          setTotalPage(0);
+          setTotalElements(0);
+          setIsServerStopping(true);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchNeeds();
+
+    return () => {
+      ignore = true;
+    };
+  }, [api, requestUrl]);
+
+  const handleSortChange = (event: SelectChangeEvent): void => {
+    setSortBy(event.target.value as SortBy);
+    setPage(0);
+  };
+
+  const handlePageChange = (
+    _event: React.ChangeEvent<unknown>,
+    value: number
+  ): void => {
+    setPage(value - 1);
+  };
+
+  const handleCreated = (): void => {
+    setPostOpen(false);
+    setPage(0);
+
+    // 投稿後に再取得したいので、sortByが同じでもuseEffectを動かすための簡易対応
+    // 一番きれいにするなら fetchNeeds を useCallback で外に出す。
+    window.location.reload();
+  };
+
+  return (
+    <>
+      <Box
+        sx={{
+          width: "100%",
+          minHeight: "100vh",
+          px: { xs: 2, sm: 4, md: 6 },
+          py: 4,
+          backgroundColor: "#f8fbff",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            mb: 4,
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "primary.main",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.15rem",
+              }}
+            >
+              worries
+            </Typography>
+
+            <Typography
+              component="h1"
+              variant="h3"
+              sx={{
+                color: "#1a1a1a",
+                fontWeight: 800,
+                textAlign: "left",
+                letterSpacing: "-0.03em",
+                fontSize: { xs: "2rem", sm: "2.5rem" },
+                mt: 0.5,
+              }}
+            >
+              お悩み一覧
+            </Typography>
+
+            <Typography
+              variant="body2"
+              sx={{
+                mt: 1,
+                color: "text.secondary",
+              }}
+            >
+              {totalElements}件のお悩み
+            </Typography>
+          </Box>
+
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <Select
+              value={sortBy}
+              onChange={handleSortChange}
+              displayEmpty
+              sx={{
+                borderRadius: "10px",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                backgroundColor: "#fff",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(0, 0, 0, 0.08)",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(0, 0, 0, 0.15)",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "primary.main",
+                },
+              }}
+            >
+              <MenuItem value="new">新着順</MenuItem>
+              <MenuItem value="empathy">共感数順</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        {isServerStopping && (
+          <Alert
+            severity="error"
+            sx={{
+              mb: 4,
+              justifyContent: "center",
+              maxWidth: 600,
+              mx: "auto",
+            }}
+          >
+            サーバーが起動していません。しばらくたってからお試しください。
+          </Alert>
+        )}
+
+        {isLoading ? (
+          <CircularProgress
+            aria-label="Loading"
+            sx={{
+              display: "block",
+              mx: "auto",
+              my: 8,
+            }}
+          />
+        ) : (
+          <>
+            {needList.length === 0 ? (
+              <Box
+                sx={{
+                  textAlign: "center",
+                  py: 8,
+                  color: "text.secondary",
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  お悩みがありません
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  条件を変えるか、最初のお悩みを投稿してみてください。
+                </Typography>
+              </Box>
+            ) : (
+              <Grid
+                container
+                spacing={2}
+                sx={{
+                  mb: 5,
+                  mx: "auto",
+                  justifyContent: "flex-start",
+                }}
+              >
+                {needList.map((need, index) => (
+                  <Grid
+                    item
+                    xs={12}
+                    sm={6}
+                    md={4}
+                    key={need.needId ?? index}
+                  >
+                    <NeedCard need={need} />
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+
+            {totalPage > 1 && (
+              <Stack
+                direction="row"
+                sx={{
+                  pt: 2,
+                  borderTop: "1px solid",
+                  borderColor: "rgba(0, 0, 0, 0.08)",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 2,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Button
+                  variant="text"
+                  disabled={page <= 0}
+                  onClick={() => setPage(0)}
+                  sx={{
+                    borderRadius: 3,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    px: 2,
+                    color: "text.primary",
+                    "&:disabled": {
+                      color: "text.disabled",
+                    },
+                  }}
+                >
+                  First
+                </Button>
+
+                <Button
+                  variant="text"
+                  disabled={page <= 0}
+                  onClick={() => setPage(page - 1)}
+                  sx={{
+                    borderRadius: 3,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    px: 2,
+                    color: "text.primary",
+                    "&:disabled": {
+                      color: "text.disabled",
+                    },
+                  }}
+                >
+                  前へ
+                </Button>
+
+                <Pagination
+                  count={totalPage}
+                  page={page + 1}
+                  onChange={handlePageChange}
+                  hidePrevButton
+                  hideNextButton
+                  color="primary"
+                  variant="text"
+                  shape="rounded"
+                  sx={{
+                    "& .MuiPaginationItem-root": {
+                      fontWeight: 600,
+                      borderRadius: 2,
+                    },
+                    "& .Mui-selected": {
+                      backgroundColor: "primary.main",
+                      color: "white",
+                      "&:hover": {
+                        backgroundColor: "primary.dark",
+                      },
+                    },
+                  }}
+                />
+
+                <Button
+                  variant="text"
+                  disabled={totalPage <= 1 || page >= totalPage - 1}
+                  onClick={() => setPage(page + 1)}
+                  sx={{
+                    borderRadius: 3,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    px: 2,
+                    color: "text.primary",
+                    "&:disabled": {
+                      color: "text.disabled",
+                    },
+                  }}
+                >
+                  次へ
+                </Button>
+
+                <Button
+                  variant="text"
+                  disabled={totalPage <= 1 || page >= totalPage - 1}
+                  onClick={() => setPage(totalPage - 1)}
+                  sx={{
+                    borderRadius: 3,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    px: 2,
+                    color: "text.primary",
+                    "&:disabled": {
+                      color: "text.disabled",
+                    },
+                  }}
+                >
+                  Last
+                </Button>
+              </Stack>
+            )}
+          </>
+        )}
+      </Box>
+
+      <Fab
+        color="primary"
+        onClick={() => setPostOpen(true)}
+        sx={{
+          position: "fixed",
+          right: 32,
+          bottom: 32,
+          zIndex: 1000,
+          fontSize: 28,
+          fontWeight: 700,
+        }}
+        disabled={isServerStopping}
+      >
+        +
+      </Fab>
+
+      <SubmitForm
+        open={postOpen}
+        onClose={() => setPostOpen(false)}
+        onCreated={handleCreated}
+      />
+    </>
+  );
+}
