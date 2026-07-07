@@ -1,1018 +1,11 @@
-1. NeedEmpathyResponseDto.java
+1. NeedCard.tsx 修正版
 
-新規作成。
+CardActionArea を消した版。
+これで nested button エラーは消える。
 
-package simplex.pj148.skippy.server.controller.dto.response;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
-public class NeedEmpathyResponseDto {
-
-    private Long needId;
-
-    private Long empathyCount;
-
-    private Boolean empathyByCurrentUser;
-}
-2. NeedEmpathyRepository.java
-
-既存の NeedEmpathyRepository があるなら、これに置き換え。
-すでにあるメソッドは残して、この3つを追加でもOK。
-
-package simplex.pj148.skippy.server.repository;
-
-import java.util.Optional;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import simplex.pj148.skippy.server.entity.NeedEmpathy;
-
-@Repository
-public interface NeedEmpathyRepository extends JpaRepository<NeedEmpathy, Long> {
-
-    Optional<NeedEmpathy> findByUser_UserIdAndNeed_NeedId(Long userId, Long needId);
-
-    boolean existsByUser_UserIdAndNeed_NeedId(Long userId, Long needId);
-
-    Long countByNeed_NeedId(Long needId);
-}
-3. NeedRepository.java に必要なメソッド
-
-すでにあるなら追加不要。
-なければ追加。
-
-Optional<Need> findByNeedIdAndDeleteFlgFalse(Long needId);
-
-完全版の例。
-
-package simplex.pj148.skippy.server.repository;
-
-import java.util.Optional;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import simplex.pj148.skippy.server.entity.Need;
-
-@Repository
-public interface NeedRepository extends JpaRepository<Need, Long> {
-
-    Optional<Need> findByNeedIdAndDeleteFlgFalse(Long needId);
-}
-
-ただし、今の NeedRepository に検索用の @Query があるなら、それは消さない。
-その下にこれだけ足す。
-
-Optional<Need> findByNeedIdAndDeleteFlgFalse(Long needId);
-4. UserRepository.java に必要なメソッド
-
-すでにあるなら追加不要。
-なければ追加。
-
-Optional<User> findByUserId(Long userId);
-
-完全版の例。
-
-package simplex.pj148.skippy.server.repository;
-
-import java.util.Optional;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import simplex.pj148.skippy.server.entity.User;
-
-@Repository
-public interface UserRepository extends JpaRepository<User, Long> {
-
-    Optional<User> findByUserId(Long userId);
-}
-5. NeedEmpathyService.java
-
-新規作成。
-ここで 共感する / 共感解除する / 現在の共感数を返す をやる。
-
-package simplex.pj148.skippy.server.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import simplex.pj148.skippy.server.controller.dto.response.NeedEmpathyResponseDto;
-import simplex.pj148.skippy.server.entity.Need;
-import simplex.pj148.skippy.server.entity.NeedEmpathy;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
-import simplex.pj148.skippy.server.repository.NeedRepository;
-import simplex.pj148.skippy.server.repository.UserRepository;
-
-@Service
-@RequiredArgsConstructor
-public class NeedEmpathyService {
-
-    private final NeedEmpathyRepository needEmpathyRepository;
-
-    private final NeedRepository needRepository;
-
-    private final UserRepository userRepository;
-
-    @Transactional
-    public NeedEmpathyResponseDto createNeedEmpathy(Long needId, Long loginUserId) {
-        Need need = needRepository.findByNeedIdAndDeleteFlgFalse(needId)
-                .orElseThrow(() -> new RuntimeException("お悩みが存在しません"));
-
-        User user = userRepository.findByUserId(loginUserId)
-                .orElseThrow(() -> new RuntimeException("ユーザーが存在しません"));
-
-        boolean alreadyEmpathy = needEmpathyRepository
-                .existsByUser_UserIdAndNeed_NeedId(loginUserId, needId);
-
-        if (!alreadyEmpathy) {
-            NeedEmpathy needEmpathy = NeedEmpathy.builder()
-                    .need(need)
-                    .user(user)
-                    .isLookedByReactor(true)
-                    .isLookedByPoster(false)
-                    .build();
-
-            needEmpathyRepository.save(needEmpathy);
-        }
-
-        return buildNeedEmpathyResponse(needId, loginUserId);
-    }
-
-    @Transactional
-    public NeedEmpathyResponseDto deleteNeedEmpathy(Long needId, Long loginUserId) {
-        NeedEmpathy needEmpathy = needEmpathyRepository
-                .findByUser_UserIdAndNeed_NeedId(loginUserId, needId)
-                .orElse(null);
-
-        if (needEmpathy != null) {
-            needEmpathyRepository.delete(needEmpathy);
-        }
-
-        return buildNeedEmpathyResponse(needId, loginUserId);
-    }
-
-    @Transactional(readOnly = true)
-    public NeedEmpathyResponseDto buildNeedEmpathyResponse(Long needId, Long loginUserId) {
-        Long empathyCount = needEmpathyRepository.countByNeed_NeedId(needId);
-
-        Boolean empathyByCurrentUser = needEmpathyRepository
-                .existsByUser_UserIdAndNeed_NeedId(loginUserId, needId);
-
-        return NeedEmpathyResponseDto.builder()
-                .needId(needId)
-                .empathyCount(empathyCount)
-                .empathyByCurrentUser(empathyByCurrentUser)
-                .build();
-    }
-}
-6. NeedEmpathyController.java
-
-新規作成。
-Client側のこのURLと合わせる。
-
-POST   /api/needs/{needId}/empathy
-DELETE /api/needs/{needId}/empathy
-package simplex.pj148.skippy.server.controller;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import simplex.pj148.skippy.server.controller.dto.response.NeedEmpathyResponseDto;
-import simplex.pj148.skippy.server.entity.User;
-import simplex.pj148.skippy.server.service.NeedEmpathyService;
-import simplex.pj148.skippy.server.service.UserInfoService;
-
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/needs")
-public class NeedEmpathyController {
-
-    private final NeedEmpathyService needEmpathyService;
-
-    private final UserInfoService userInfoService;
-
-    @PostMapping("/{needId}/empathy")
-    public NeedEmpathyResponseDto createNeedEmpathy(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long needId
-    ) {
-        User loginUser = userInfoService.getUserFromJwt(jwt);
-
-        return needEmpathyService.createNeedEmpathy(
-                needId,
-                loginUser.getUserId()
-        );
-    }
-
-    @DeleteMapping("/{needId}/empathy")
-    public NeedEmpathyResponseDto deleteNeedEmpathy(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long needId
-    ) {
-        User loginUser = userInfoService.getUserFromJwt(jwt);
-
-        return needEmpathyService.deleteNeedEmpathy(
-                needId,
-                loginUser.getUserId()
-        );
-    }
-}
-7. 一覧取得側のDTO確認
-
-NeedListResponseDto にこの2つが必要。
-
-private Long empathyCount;
-
-private Boolean empathyByCurrentUser;
-
-完全版の例。
-
-package simplex.pj148.skippy.server.controller.dto.response;
-
-import java.time.LocalDateTime;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
-public class NeedListResponseDto {
-
-    private Long needId;
-
-    private String needTitle;
-
-    private String needDetail;
-
-    private Long categoryId;
-
-    private String categoryName;
-
-    private Long userId;
-
-    private String userName;
-
-    private String affiliatedName;
-
-    private String positionName;
-
-    private Long empathyCount;
-
-    private Long answerCount;
-
-    private Boolean empathyByCurrentUser;
-
-    private Boolean editFlg;
-
-    private LocalDateTime createdTime;
-}
-8. NeedService.java の一覧DTO変換部分
-
-一覧表示で、最初から黄色い手/白い手を出すにはここも必要。
-
-Long empathyCount = needEmpathyRepository.countByNeed_NeedId(need.getNeedId());
-
-Boolean empathyByCurrentUser = needEmpathyRepository
-        .existsByUser_UserIdAndNeed_NeedId(loginUserId, need.getNeedId());
-
-DTO変換メソッドの例。
-
-private NeedListResponseDto toNeedListResponseDto(Need need, Long loginUserId) {
-    Long empathyCount = needEmpathyRepository.countByNeed_NeedId(need.getNeedId());
-
-    Boolean empathyByCurrentUser = needEmpathyRepository
-            .existsByUser_UserIdAndNeed_NeedId(loginUserId, need.getNeedId());
-
-    Long answerCount = tipRepository.countByNeed_NeedIdAndDeleteFlgFalse(need.getNeedId());
-
-    Boolean editFlg = need.getUser().getUserId().equals(loginUserId);
-
-    return NeedListResponseDto.builder()
-            .needId(need.getNeedId())
-            .needTitle(need.getNeedTitle())
-            .needDetail(need.getNeedDetail())
-            .categoryId(need.getCategory().getCategoryId())
-            .categoryName(need.getCategory().getCategoryName())
-            .userId(need.getUser().getUserId())
-            .userName(need.getUser().getUserName())
-            .affiliatedName(need.getUser().getAffiliated().getAffiliatedName())
-            .positionName(need.getUser().getRank().getRankName())
-            .empathyCount(empathyCount)
-            .answerCount(answerCount)
-            .empathyByCurrentUser(empathyByCurrentUser)
-            .editFlg(editFlg)
-            .createdTime(need.getCreatedTime())
-            .build();
-}
-
-もし tipRepository のメソッド名が今これなら、
-
-countByNeedNeedIdAndDeleteFlgFalse
-
-上のここを、
-
-Long answerCount = tipRepository.countByNeed_NeedIdAndDeleteFlgFalse(need.getNeedId());
-
-ではなく、こうして。
-
-Long answerCount = tipRepository.countByNeedNeedIdAndDeleteFlgFalse(need.getNeedId());
-
-
-
-
-
-
-
-client
-
-src/pages/NeedsList.tsx 完全版
-import { useEffect, useMemo, useState } from "react";
-import type { ChangeEvent } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  FormControl,
-  Grid,
-  MenuItem,
-  Pagination,
-  Select,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-
-import NeedCard from "../components/NeedCard";
-import type { Need, NeedPageResponse } from "../models/Need";
-import { useApi } from "../lib/api";
-
-type Affiliated = {
-  affiliatedId: number;
-  affiliatedName: string;
-};
-
-type Rank = {
-  rankId: number;
-  rankName: string;
-};
-
-type Category = {
-  categoryId: number;
-  categoryName: string;
-};
-
-type NeedEmpathyResponse = {
-  needId: number;
-  empathyCount: number;
-  empathyByCurrentUser: boolean;
-};
-
-export default function NeedsList(): JSX.Element {
-  const api = useApi();
-
-  const [needList, setNeedList] = useState<Need[]>([]);
-
-  const [orderBy, setOrderBy] = useState<string>("new");
-
-  const [keyword, setKeyword] = useState<string>("");
-  const [appliedKeyword, setAppliedKeyword] = useState<string>("");
-
-  const [affiliatedId, setAffiliatedId] = useState<string>("");
-  const [positionId, setPositionId] = useState<string>("");
-  const [categoryId, setCategoryId] = useState<string>("");
-
-  const [affiliatedList, setAffiliatedList] = useState<Affiliated[]>([]);
-  const [rankList, setRankList] = useState<Rank[]>([]);
-  const [categoryList, setCategoryList] = useState<Category[]>([]);
-
-  const [page, setPage] = useState<number>(0);
-  const [totalPage, setTotalPage] = useState<number>(0);
-
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isServerStopping, setIsServerStopping] = useState<boolean>(false);
-
-  const requestUrl = useMemo((): string => {
-    const params = new URLSearchParams();
-
-    params.append("page", String(page));
-    params.append("size", "18");
-    params.append("orderBy", orderBy);
-
-    if (appliedKeyword.trim() !== "") {
-      params.append("keyword", appliedKeyword.trim());
-    }
-
-    if (affiliatedId !== "" && affiliatedId !== "0") {
-      params.append("affiliatedId", affiliatedId);
-    }
-
-    if (positionId !== "" && positionId !== "0") {
-      params.append("positionId", positionId);
-    }
-
-    if (categoryId !== "" && categoryId !== "0") {
-      params.append("categoryId", categoryId);
-    }
-
-    return `/api/needs/search?${params.toString()}`;
-  }, [page, orderBy, appliedKeyword, affiliatedId, positionId, categoryId]);
-
-  useEffect((): void => {
-    let ignore = false;
-
-    const fetchNeeds = async (): Promise<void> => {
-      try {
-        setIsLoading(true);
-        setIsServerStopping(false);
-
-        const response = await api.fetch(requestUrl);
-
-        if (!response.ok) {
-          throw new Error("お悩み一覧の取得に失敗しました");
-        }
-
-        const data: NeedPageResponse = await response.json();
-
-        if (ignore) {
-          return;
-        }
-
-        setNeedList(data.content ?? []);
-        setTotalPage(data.totalPages ?? 0);
-      } catch (error) {
-        if (ignore) {
-          return;
-        }
-
-        console.error(error);
-        setNeedList([]);
-        setTotalPage(0);
-        setIsServerStopping(true);
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchNeeds();
-
-    return () => {
-      ignore = true;
-    };
-
-    // api を依存配列に入れると useApi() の実装によっては無限fetchになるため入れない
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestUrl]);
-
-  useEffect((): void => {
-    let ignore = false;
-
-    const fetchMasterData = async (): Promise<void> => {
-      try {
-        const [affiliatedResponse, rankResponse, categoryResponse] =
-          await Promise.all([
-            api.fetch("/api/affiliated"),
-            api.fetch("/api/rank"),
-            api.fetch("/api/category"),
-          ]);
-
-        if (ignore) {
-          return;
-        }
-
-        if (affiliatedResponse.ok) {
-          const data: Affiliated[] = await affiliatedResponse.json();
-          setAffiliatedList(data ?? []);
-        }
-
-        if (rankResponse.ok) {
-          const data: Rank[] = await rankResponse.json();
-          setRankList(data ?? []);
-        }
-
-        if (categoryResponse.ok) {
-          const data: Category[] = await categoryResponse.json();
-          setCategoryList(data ?? []);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    fetchMasterData();
-
-    return () => {
-      ignore = true;
-    };
-
-    // 初回だけマスタを取得
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleSearch = (): void => {
-    setPage(0);
-    setAppliedKeyword(keyword);
-  };
-
-  const handleReset = (): void => {
-    setKeyword("");
-    setAppliedKeyword("");
-    setAffiliatedId("");
-    setPositionId("");
-    setCategoryId("");
-    setOrderBy("new");
-    setPage(0);
-  };
-
-  const handlePageChange = (
-    _event: ChangeEvent<unknown>,
-    value: number
-  ): void => {
-    setPage(value - 1);
-  };
-
-  const handleCardClick = (need: Need): void => {
-    // 遷移は別担当者が実装する想定
-    // 例: navigate(`/needs/${need.needId}`);
-    console.log("お悩み詳細へ遷移予定", need.needId);
-  };
-
-  const handleUserClick = (need: Need): void => {
-    // 遷移は別担当者が実装する想定
-    // 例: navigate(`/profiles/${need.userId}`);
-    console.log("プロフィールへ遷移予定", need.userId);
-  };
-
-  const handleEmpathyClick = async (need: Need): Promise<void> => {
-    try {
-      const method = need.empathyByCurrentUser ? "DELETE" : "POST";
-
-      const response = await api.fetch(`/api/needs/${need.needId}/empathy`, {
-        method,
-      });
-
-      if (!response.ok) {
-        throw new Error("共感の更新に失敗しました");
-      }
-
-      const data: NeedEmpathyResponse = await response.json();
-
-      setNeedList((prevList) =>
-        prevList.map((item) =>
-          item.needId === data.needId
-            ? {
-                ...item,
-                empathyCount: data.empathyCount,
-                empathyByCurrentUser: data.empathyByCurrentUser,
-              }
-            : item
-        )
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handlePostButtonClick = (): void => {
-    // 今は投稿フォームに遷移・表示しない
-    console.log("お悩み投稿ボタン押下。投稿フォームはまだ開かない。");
-  };
-
-  return (
-    <Box
-      sx={{
-        maxWidth: 1060,
-        mx: "auto",
-        px: 2,
-        py: 2.5,
-        color: "#071a33",
-      }}
-    >
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            md: "1fr 190px",
-          },
-          columnGap: 2,
-          alignItems: "start",
-        }}
-      >
-        <Box>
-          <Box
-            sx={{
-              position: "relative",
-              mb: 2,
-            }}
-          >
-            <Typography
-              component="h1"
-              sx={{
-                textAlign: "center",
-                fontSize: 28,
-                fontWeight: 900,
-                color: "#071a33",
-              }}
-            >
-              お悩み一覧
-            </Typography>
-
-            <FormControl
-              size="small"
-              sx={{
-                position: {
-                  xs: "static",
-                  md: "absolute",
-                },
-                right: 0,
-                top: 2,
-                minWidth: 105,
-                mt: {
-                  xs: 1.5,
-                  md: 0,
-                },
-                display: "flex",
-                alignItems: {
-                  xs: "flex-end",
-                  md: "stretch",
-                },
-              }}
-            >
-              <Select
-                value={orderBy}
-                onChange={(event) => {
-                  setOrderBy(event.target.value);
-                  setPage(0);
-                }}
-                sx={{
-                  height: 34,
-                  borderRadius: 1.3,
-                  backgroundColor: "#fff",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  color: "#071a33",
-                }}
-              >
-                <MenuItem value="new">新着順</MenuItem>
-                <MenuItem value="empathy">共感数順</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-
-          {isServerStopping ? (
-            <Alert
-              severity="error"
-              sx={{
-                mb: 2,
-                justifyContent: "center",
-                maxWidth: 600,
-                mx: "auto",
-              }}
-            >
-              サーバーが起動していません。しばらくたってからお試しください。
-            </Alert>
-          ) : isLoading ? (
-            <CircularProgress
-              aria-label="Loading"
-              sx={{
-                display: "block",
-                mx: "auto",
-                my: 6,
-              }}
-            />
-          ) : (
-            <>
-              <Grid container spacing={2}>
-                {needList.map((need: Need, index: number) => (
-                  <Grid
-                    size={{
-                      xs: 12,
-                      sm: 6,
-                      md: 4,
-                    }}
-                    key={need.needId ?? index}
-                  >
-                    <NeedCard
-                      need={need}
-                      onCardClick={handleCardClick}
-                      onUserClick={handleUserClick}
-                      onEmpathyClick={handleEmpathyClick}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-
-              {totalPage > 1 && (
-                <Stack
-                  direction="row"
-                  sx={{
-                    pt: 3,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Pagination
-                    count={totalPage}
-                    page={page + 1}
-                    onChange={handlePageChange}
-                    color="primary"
-                    shape="rounded"
-                  />
-                </Stack>
-              )}
-            </>
-          )}
-        </Box>
-
-        <Box
-          sx={{
-            mt: {
-              xs: 2,
-              md: 5,
-            },
-            width: {
-              xs: "100%",
-              md: 190,
-            },
-          }}
-        >
-          <Box
-            sx={{
-              borderRadius: 2,
-              p: 1.7,
-              backgroundColor: "#f3ecdc",
-            }}
-          >
-            <Typography
-              sx={{
-                fontWeight: 900,
-                textAlign: "center",
-                mb: 1.7,
-                fontSize: 17,
-                color: "#071a33",
-              }}
-            >
-              絞り込み
-            </Typography>
-
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "52px 1fr",
-                rowGap: 1.1,
-                columnGap: 1,
-                alignItems: "center",
-                mb: 1.7,
-              }}
-            >
-              <Typography sx={{ fontSize: 12, fontWeight: 900 }}>
-                所属
-              </Typography>
-
-              <FormControl fullWidth size="small">
-                <Select
-                  value={affiliatedId}
-                  displayEmpty
-                  onChange={(event) => {
-                    setAffiliatedId(event.target.value);
-                    setPage(0);
-                  }}
-                  sx={{
-                    height: 30,
-                    borderRadius: 1,
-                    backgroundColor: "#fff",
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  <MenuItem value="">指定なし</MenuItem>
-                  {affiliatedList.map((affiliated) => (
-                    <MenuItem
-                      key={affiliated.affiliatedId}
-                      value={String(affiliated.affiliatedId)}
-                    >
-                      {affiliated.affiliatedName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Typography sx={{ fontSize: 12, fontWeight: 900 }}>
-                職位
-              </Typography>
-
-              <FormControl fullWidth size="small">
-                <Select
-                  value={positionId}
-                  displayEmpty
-                  onChange={(event) => {
-                    setPositionId(event.target.value);
-                    setPage(0);
-                  }}
-                  sx={{
-                    height: 30,
-                    borderRadius: 1,
-                    backgroundColor: "#fff",
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  <MenuItem value="">指定なし</MenuItem>
-                  {rankList.map((rank) => (
-                    <MenuItem key={rank.rankId} value={String(rank.rankId)}>
-                      {rank.rankName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Typography
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 900,
-                  lineHeight: 1.2,
-                }}
-              >
-                悩み
-                <br />
-                カテゴリ
-              </Typography>
-
-              <FormControl fullWidth size="small">
-                <Select
-                  value={categoryId}
-                  displayEmpty
-                  onChange={(event) => {
-                    setCategoryId(event.target.value);
-                    setPage(0);
-                  }}
-                  sx={{
-                    height: 30,
-                    borderRadius: 1,
-                    backgroundColor: "#fff",
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  <MenuItem value="">指定なし</MenuItem>
-                  {categoryList.map((category) => (
-                    <MenuItem
-                      key={category.categoryId}
-                      value={String(category.categoryId)}
-                    >
-                      {category.categoryName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
-
-            <Box
-              sx={{
-                borderTop: "1px solid rgba(0,0,0,0.15)",
-                pt: 1.4,
-              }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  textAlign: "center",
-                  mb: 1.1,
-                  fontSize: 16,
-                  color: "#071a33",
-                }}
-              >
-                検索
-              </Typography>
-
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="人名/キーワード"
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    handleSearch();
-                  }
-                }}
-                sx={{
-                  mb: 1.2,
-                  backgroundColor: "#fff",
-                  borderRadius: 1,
-                  "& .MuiOutlinedInput-root": {
-                    height: 30,
-                    borderRadius: 1,
-                  },
-                  "& input": {
-                    fontSize: 10.5,
-                  },
-                }}
-              />
-
-              <Stack direction="row" spacing={1}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  onClick={handleReset}
-                  sx={{
-                    height: 28,
-                    borderRadius: 1,
-                    fontSize: 10.5,
-                    fontWeight: 900,
-                    color: "#071a33",
-                    borderColor: "#d8d2c8",
-                    backgroundColor: "#fff",
-                  }}
-                >
-                  リセット
-                </Button>
-
-                <Button
-                  fullWidth
-                  variant="contained"
-                  size="small"
-                  onClick={handleSearch}
-                  sx={{
-                    height: 28,
-                    borderRadius: 1,
-                    fontSize: 10.5,
-                    fontWeight: 900,
-                    backgroundColor: "#0054a6",
-                    "&:hover": {
-                      backgroundColor: "#004080",
-                    },
-                  }}
-                >
-                  実行
-                </Button>
-              </Stack>
-            </Box>
-          </Box>
-
-          <Button
-            variant="contained"
-            onClick={handlePostButtonClick}
-            disabled={isServerStopping}
-            sx={{
-              mt: 1.7,
-              width: "100%",
-              height: 58,
-              borderRadius: "999px",
-              backgroundColor: "#0054a6",
-              color: "#fff",
-              fontSize: 18,
-              fontWeight: 900,
-              lineHeight: 1.15,
-              boxShadow: "0 8px 18px rgba(0,84,166,0.25)",
-              "&:hover": {
-                backgroundColor: "#004080",
-              },
-              "&.Mui-disabled": {
-                backgroundColor: "#b0b0b0",
-                color: "#fff",
-              },
-            }}
-          >
-            お悩み
-            <br />
-            投稿
-          </Button>
-        </Box>
-      </Box>
-    </Box>
-  );
-}
-src/components/NeedCard.tsx 完全版
 import type { MouseEvent } from "react";
 import {
   Card,
-  CardActionArea,
   CardContent,
   Box,
   ButtonBase,
@@ -1034,6 +27,10 @@ export default function NeedCard({
   onUserClick,
   onEmpathyClick,
 }: Props): JSX.Element {
+  const handleCardClick = (): void => {
+    onCardClick(need);
+  };
+
   const handleUserClick = (event: MouseEvent<HTMLButtonElement>): void => {
     event.stopPropagation();
     onUserClick(need);
@@ -1047,11 +44,13 @@ export default function NeedCard({
   return (
     <Card
       elevation={0}
+      onClick={handleCardClick}
       sx={{
         height: 190,
         borderRadius: 2,
         border: "1px solid #d9d9d9",
         backgroundColor: "#fff",
+        cursor: "pointer",
         transition: "0.2s",
         "&:hover": {
           transform: "translateY(-2px)",
@@ -1059,203 +58,626 @@ export default function NeedCard({
         },
       }}
     >
-      <CardActionArea
-        onClick={() => onCardClick(need)}
+      <CardContent
         sx={{
           height: "100%",
-          alignItems: "stretch",
+          px: 1.5,
+          py: 1.3,
+          display: "flex",
+          flexDirection: "column",
+          "&:last-child": {
+            pb: 1.3,
+          },
         }}
       >
-        <CardContent
+        <Box sx={{ textAlign: "center", mb: 1.6 }}>
+          <Typography
+            sx={{
+              display: "inline-block",
+              px: 1,
+              py: 0.25,
+              borderRadius: 0.7,
+              backgroundColor: "#003b5c",
+              color: "#fff",
+              fontSize: 10,
+              fontWeight: 900,
+              lineHeight: 1.2,
+            }}
+          >
+            {need.categoryName}
+          </Typography>
+        </Box>
+
+        <Typography
           sx={{
-            height: "100%",
-            px: 1.5,
-            py: 1.3,
-            display: "flex",
-            flexDirection: "column",
-            "&:last-child": {
-              pb: 1.3,
-            },
+            fontSize: 16,
+            fontWeight: 900,
+            color: "#071a33",
+            textAlign: "center",
+            lineHeight: 1.35,
+            mb: 1.5,
+            minHeight: 43,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
-          <Box sx={{ textAlign: "center", mb: 1.6 }}>
-            <Typography
-              sx={{
-                display: "inline-block",
-                px: 1,
-                py: 0.25,
-                borderRadius: 0.7,
-                backgroundColor: "#003b5c",
-                color: "#fff",
-                fontSize: 10,
-                fontWeight: 900,
-                lineHeight: 1.2,
-              }}
-            >
-              {need.categoryName}
-            </Typography>
-          </Box>
+          {need.needTitle}
+        </Typography>
 
-          <Typography
-            sx={{
-              fontSize: 16,
-              fontWeight: 900,
-              color: "#071a33",
-              textAlign: "center",
-              lineHeight: 1.35,
-              mb: 1.5,
-              minHeight: 43,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {need.needTitle}
-          </Typography>
+        <Typography
+          sx={{
+            fontSize: 11.5,
+            color: "#4b4b4b",
+            lineHeight: 1.45,
+            textAlign: "left",
+            mb: 1,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {need.needDetail}
+        </Typography>
 
-          <Typography
-            sx={{
-              fontSize: 11.5,
-              color: "#4b4b4b",
-              lineHeight: 1.45,
-              textAlign: "left",
-              mb: 1,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {need.needDetail}
-          </Typography>
-
+        <Box
+          sx={{
+            mt: "auto",
+            pt: 0.8,
+            borderTop: "1px solid #e4e4e4",
+          }}
+        >
           <Box
             sx={{
-              mt: "auto",
-              pt: 0.8,
-              borderTop: "1px solid #e4e4e4",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 0.7,
             }}
           >
-            <Box
+            <ButtonBase
+              onClick={handleUserClick}
               sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 0.7,
+                justifyContent: "flex-start",
+                maxWidth: 120,
+                borderRadius: 0.5,
+                "&:hover": {
+                  textDecoration: "underline",
+                },
               }}
             >
-              <ButtonBase
-                onClick={handleUserClick}
+              <Typography
                 sx={{
-                  justifyContent: "flex-start",
-                  maxWidth: 120,
-                  borderRadius: 0.5,
-                  "&:hover": {
-                    textDecoration: "underline",
-                  },
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: 11,
-                    fontWeight: 900,
-                    color: "#071a33",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    maxWidth: 120,
-                  }}
-                >
-                  {need.affiliatedName} {need.userName}
-                </Typography>
-              </ButtonBase>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.4,
                   fontSize: 11,
                   fontWeight: 900,
                   color: "#071a33",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  maxWidth: 120,
                 }}
               >
-                <Box component="span" sx={{ fontSize: 12 }}>
-                  💬
-                </Box>
+                {need.affiliatedName} {need.userName}
+              </Typography>
+            </ButtonBase>
 
-                <Box component="span">{need.answerCount}</Box>
-
-                <ButtonBase
-                  onClick={handleEmpathyClick}
-                  sx={{
-                    borderRadius: "50%",
-                    width: 22,
-                    height: 22,
-                    ml: 0.2,
-                    transition: "0.15s",
-                    "&:hover": {
-                      backgroundColor: "rgba(244, 163, 0, 0.14)",
-                      boxShadow: "0 0 8px rgba(244, 163, 0, 0.55)",
-                    },
-                    "&:hover .empathy-icon": {
-                      color: "#f4a300",
-                      textShadow:
-                        "0 0 3px rgba(244, 163, 0, 0.9), 0 0 8px rgba(244, 163, 0, 0.55)",
-                    },
-                  }}
-                >
-                  <Box
-                    component="span"
-                    className="empathy-icon"
-                    sx={{
-                      fontSize: 14,
-                      lineHeight: 1,
-                      transition: "0.15s",
-                      color: need.empathyByCurrentUser ? "#f4a300" : "#fff",
-                      textShadow: need.empathyByCurrentUser
-                        ? "0 0 3px rgba(244, 163, 0, 0.75)"
-                        : "0 0 1px #071a33, 0 0 1px #071a33, 0 0 1px #071a33",
-                    }}
-                  >
-                    ✋
-                  </Box>
-                </ButtonBase>
-
-                <Box component="span">{need.empathyCount}</Box>
-              </Box>
-            </Box>
-
-            <Typography
+            <Box
               sx={{
-                mt: 0.25,
-                fontSize: 10,
-                color: "#666",
-                textAlign: "right",
+                display: "flex",
+                alignItems: "center",
+                gap: 0.4,
+                fontSize: 11,
+                fontWeight: 900,
+                color: "#071a33",
+                whiteSpace: "nowrap",
               }}
             >
-              {need.createdTime?.slice(0, 10).replaceAll("-", "/")}
-            </Typography>
+              <Box component="span" sx={{ fontSize: 12 }}>
+                💬
+              </Box>
+
+              <Box component="span">{need.answerCount}</Box>
+
+              <ButtonBase
+                onClick={handleEmpathyClick}
+                sx={{
+                  borderRadius: "50%",
+                  width: 22,
+                  height: 22,
+                  ml: 0.2,
+                  transition: "0.15s",
+                  "&:hover": {
+                    backgroundColor: "rgba(244, 163, 0, 0.14)",
+                    boxShadow: "0 0 8px rgba(244, 163, 0, 0.55)",
+                  },
+                  "&:hover .empathy-icon": {
+                    color: "#f4a300",
+                    textShadow:
+                      "0 0 3px rgba(244, 163, 0, 0.9), 0 0 8px rgba(244, 163, 0, 0.55)",
+                  },
+                }}
+              >
+                <Box
+                  component="span"
+                  className="empathy-icon"
+                  sx={{
+                    fontSize: 14,
+                    lineHeight: 1,
+                    transition: "0.15s",
+                    color: need.empathyByCurrentUser ? "#f4a300" : "#fff",
+                    textShadow: need.empathyByCurrentUser
+                      ? "0 0 3px rgba(244, 163, 0, 0.75)"
+                      : "0 0 1px #071a33, 0 0 1px #071a33, 0 0 1px #071a33",
+                  }}
+                >
+                  ✋
+                </Box>
+              </ButtonBase>
+
+              <Box component="span">{need.empathyCount}</Box>
+            </Box>
           </Box>
-        </CardContent>
-      </CardActionArea>
+
+          <Typography
+            sx={{
+              mt: 0.25,
+              fontSize: 10,
+              color: "#666",
+              textAlign: "right",
+            }}
+          >
+            {need.createdTime?.slice(0, 10).replaceAll("-", "/")}
+          </Typography>
+        </Box>
+      </CardContent>
     </Card>
   );
 }
-大事な変更点
+2. NeedsList.tsx の共感処理だけ修正
 
-投稿フォームが下に出ていた原因は、だいたいこれ。
+今たぶんここが、
 
-<SubmitForm open={postOpen} onClose={() => setPostOpen(false)} />
+api.fetch(`/api/needEmpathy/${need.needId}`, {
+  method,
+});
 
-今回の完全版では、SubmitForm をimportしていないし、renderもしていない。
-だから下に投稿フォームが出ない。
+みたいになっているはず。
+これを下に変えて。
 
-投稿ボタンも今はこれだけ。
+const handleEmpathyClick = async (need: Need): Promise<void> => {
+  try {
+    const method = need.empathyByCurrentUser ? "DELETE" : "POST";
 
-const handlePostButtonClick = (): void => {
-  console.log("お悩み投稿ボタン押下。投稿フォームはまだ開かない。");
+    const response = await api.fetch(`/api/needs/${need.needId}/empathy`, {
+      method,
+    });
+
+    if (!response.ok) {
+      throw new Error("共感の更新に失敗しました");
+    }
+
+    const data: NeedEmpathyResponse = await response.json();
+
+    setNeedList((prevList) =>
+      prevList.map((item) =>
+        item.needId === data.needId
+          ? {
+              ...item,
+              empathyCount: data.empathyCount,
+              empathyByCurrentUser: data.empathyByCurrentUser,
+            }
+          : item
+      )
+    );
+  } catch (error) {
+    console.error(error);
+  }
 };
+3. Server側のController URLと合わせる
 
-あとで投稿フォーム担当ができたら、ここを直せばいい。
+clientを上みたいにするなら、server側はこれ。
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/needs")
+public class NeedEmpathyController {
+
+    private final NeedEmpathyService needEmpathyService;
+    private final UserInfoService userInfoService;
+
+    @PostMapping("/{needId}/empathy")
+    public NeedEmpathyResponseDto createNeedEmpathy(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long needId
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        return needEmpathyService.createNeedEmpathy(needId, loginUser.getUserId());
+    }
+
+    @DeleteMapping("/{needId}/empathy")
+    public NeedEmpathyResponseDto deleteNeedEmpathy(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long needId
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+        return needEmpathyService.deleteNeedEmpathy(needId, loginUser.getUserId());
+    }
+}
+
+
+
+
+
+
+
+
+
+
+-- =========================================================
+-- 開発用初期データ
+-- 主キーIDは指定しない
+-- =========================================================
+
+TRUNCATE TABLE
+    comments,
+    notifications,
+    tip_interest,
+    need_empathy,
+    tips,
+    needs,
+    users,
+    frequency,
+    category,
+    rank,
+    affiliated
+RESTART IDENTITY CASCADE;
+
+
+-- =========================================================
+-- 所属
+-- =========================================================
+
+INSERT INTO affiliated (affiliated_name)
+VALUES
+    ('SHI Staff'),
+    ('SHI Engineer'),
+    ('SHI Manager');
+
+
+-- =========================================================
+-- 職位
+-- =========================================================
+
+INSERT INTO rank (rank_name)
+VALUES
+    ('Staff'),
+    ('Leader'),
+    ('Manager');
+
+
+-- =========================================================
+-- カテゴリ
+-- =========================================================
+
+INSERT INTO category (category_name, created_time)
+VALUES
+    ('睡眠・体調', CURRENT_TIMESTAMP),
+    ('仕事・タスク', CURRENT_TIMESTAMP),
+    ('人間関係', CURRENT_TIMESTAMP),
+    ('キャリア', CURRENT_TIMESTAMP),
+    ('生活習慣', CURRENT_TIMESTAMP);
+
+
+-- =========================================================
+-- 通知頻度
+-- =========================================================
+
+INSERT INTO frequency (frequency_name)
+VALUES
+    ('毎日'),
+    ('毎週'),
+    ('毎月');
+
+
+-- =========================================================
+-- ユーザー
+-- mail_address は自分のログインメールに合わせる
+-- =========================================================
+
+INSERT INTO users (
+    user_name,
+    self_introduction,
+    admin_flg,
+    mail_address,
+    affiliated_id,
+    rank_id,
+    created_time,
+    updated_time
+)
+VALUES
+(
+    '石川翔太',
+    '最近生活リズムを整えたいです。',
+    false,
+    'ishikawa@example.com',
+    (SELECT affiliated_id FROM affiliated WHERE affiliated_name = 'SHI Staff'),
+    (SELECT rank_id FROM rank WHERE rank_name = 'Staff'),
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+),
+(
+    '伊藤良典',
+    'タスク管理や仕事の進め方に関心があります。',
+    false,
+    'ito@example.com',
+    (SELECT affiliated_id FROM affiliated WHERE affiliated_name = 'SHI Staff'),
+    (SELECT rank_id FROM rank WHERE rank_name = 'Leader'),
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+),
+(
+    '山田太郎',
+    '人間関係やキャリアについて相談したいです。',
+    false,
+    'yamada@example.com',
+    (SELECT affiliated_id FROM affiliated WHERE affiliated_name = 'SHI Engineer'),
+    (SELECT rank_id FROM rank WHERE rank_name = 'Staff'),
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+),
+(
+    'ログインユーザー',
+    'ログイン確認用ユーザーです。',
+    false,
+    '19st-54tk@ezweb.ne.jp',
+    (SELECT affiliated_id FROM affiliated WHERE affiliated_name = 'SHI Staff'),
+    (SELECT rank_id FROM rank WHERE rank_name = 'Staff'),
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+
+-- =========================================================
+-- お悩み
+-- =========================================================
+
+INSERT INTO needs (
+    user_id,
+    category_id,
+    need_title,
+    need_detail,
+    created_time,
+    updated_time,
+    delete_flg
+)
+VALUES
+(
+    (SELECT user_id FROM users WHERE mail_address = 'ishikawa@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '睡眠・体調'),
+    '最近寝れなくて',
+    'この前に家族家具店に行ったときから、なかなか寝つけなくなりました。',
+    TIMESTAMP '2026-06-15 10:00:00',
+    TIMESTAMP '2026-06-15 10:00:00',
+    false
+),
+(
+    (SELECT user_id FROM users WHERE mail_address = 'ishikawa@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '生活習慣'),
+    '最近歩くと足に激痛を感じることが多い',
+    'いい靴を買うとやっぱり変わるのでしょうか。',
+    TIMESTAMP '2026-06-15 10:10:00',
+    TIMESTAMP '2026-06-15 10:10:00',
+    false
+),
+(
+    (SELECT user_id FROM users WHERE mail_address = 'ito@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '仕事・タスク'),
+    '最近忙しすぎてボルダリングができない…タスクを定時に終わらせるには',
+    'チョークを手に付けて登る時間を作りたいのに、仕事がなかなか終わりません。',
+    TIMESTAMP '2026-06-15 10:20:00',
+    TIMESTAMP '2026-06-15 10:20:00',
+    false
+),
+(
+    (SELECT user_id FROM users WHERE mail_address = 'yamada@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '仕事・タスク'),
+    '期限までに進捗を整理できない',
+    '気づいたら毎朝迷ってしまい、報告が長くなってしまいます。',
+    TIMESTAMP '2026-06-15 10:30:00',
+    TIMESTAMP '2026-06-15 10:30:00',
+    false
+),
+(
+    (SELECT user_id FROM users WHERE mail_address = 'yamada@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '人間関係'),
+    '社内で相談するタイミングが分からない',
+    '周りの人に声をかけるのが苦手で、質問を後回しにしてしまいます。',
+    TIMESTAMP '2026-06-15 10:40:00',
+    TIMESTAMP '2026-06-15 10:40:00',
+    false
+),
+(
+    (SELECT user_id FROM users WHERE mail_address = 'ito@example.com'),
+    (SELECT category_id FROM category WHERE category_name = 'キャリア'),
+    '今後のキャリアの方向性に迷っている',
+    '目の前の仕事を進めながら、自分の強みをどう伸ばすか悩んでいます。',
+    TIMESTAMP '2026-06-15 10:50:00',
+    TIMESTAMP '2026-06-15 10:50:00',
+    false
+);
+
+
+-- =========================================================
+-- ノウハウ
+-- =========================================================
+
+INSERT INTO tips (
+    user_id,
+    category_id,
+    need_id,
+    tip_title,
+    tip_detail,
+    tip_url,
+    created_time,
+    updated_time,
+    delete_flg
+)
+VALUES
+(
+    (SELECT user_id FROM users WHERE mail_address = 'ito@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '睡眠・体調'),
+    (SELECT need_id FROM needs WHERE need_title = '最近寝れなくて'),
+    '寝る前のスマホ時間を減らす',
+    '寝る30分前からスマホを見ないようにすると、寝つきが少し良くなります。',
+    '',
+    TIMESTAMP '2026-06-15 11:00:00',
+    TIMESTAMP '2026-06-15 11:00:00',
+    false
+),
+(
+    (SELECT user_id FROM users WHERE mail_address = 'yamada@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '仕事・タスク'),
+    (SELECT need_id FROM needs WHERE need_title = '期限までに進捗を整理できない'),
+    '朝一で今日の完了条件を書く',
+    '作業に入る前に、今日どこまで終わればよいかを1行で書くと迷いにくいです。',
+    '',
+    TIMESTAMP '2026-06-15 11:10:00',
+    TIMESTAMP '2026-06-15 11:10:00',
+    false
+),
+(
+    (SELECT user_id FROM users WHERE mail_address = 'ishikawa@example.com'),
+    (SELECT category_id FROM category WHERE category_name = '人間関係'),
+    (SELECT need_id FROM needs WHERE need_title = '社内で相談するタイミングが分からない'),
+    '質問前に現状と困りごとを分ける',
+    'いきなり質問するより、現状・試したこと・困っていることを分けると相談しやすいです。',
+    '',
+    TIMESTAMP '2026-06-15 11:20:00',
+    TIMESTAMP '2026-06-15 11:20:00',
+    false
+);
+
+
+-- =========================================================
+-- 共感
+-- need_empathy_id は指定しない
+-- =========================================================
+
+INSERT INTO need_empathy (
+    need_id,
+    user_id,
+    created_time,
+    is_looked_by_reactor,
+    is_looked_by_poster
+)
+VALUES
+(
+    (SELECT need_id FROM needs WHERE need_title = '最近寝れなくて'),
+    (SELECT user_id FROM users WHERE mail_address = 'ito@example.com'),
+    CURRENT_TIMESTAMP,
+    true,
+    false
+),
+(
+    (SELECT need_id FROM needs WHERE need_title = '最近寝れなくて'),
+    (SELECT user_id FROM users WHERE mail_address = 'yamada@example.com'),
+    CURRENT_TIMESTAMP,
+    true,
+    false
+),
+(
+    (SELECT need_id FROM needs WHERE need_title = '最近歩くと足に激痛を感じることが多い'),
+    (SELECT user_id FROM users WHERE mail_address = '19st-54tk@ezweb.ne.jp'),
+    CURRENT_TIMESTAMP,
+    true,
+    false
+),
+(
+    (SELECT need_id FROM needs WHERE need_title = '最近忙しすぎてボルダリングができない…タスクを定時に終わらせるには'),
+    (SELECT user_id FROM users WHERE mail_address = 'ishikawa@example.com'),
+    CURRENT_TIMESTAMP,
+    true,
+    false
+),
+(
+    (SELECT need_id FROM needs WHERE need_title = '期限までに進捗を整理できない'),
+    (SELECT user_id FROM users WHERE mail_address = 'ito@example.com'),
+    CURRENT_TIMESTAMP,
+    true,
+    false
+),
+(
+    (SELECT need_id FROM needs WHERE need_title = '社内で相談するタイミングが分からない'),
+    (SELECT user_id FROM users WHERE mail_address = '19st-54tk@ezweb.ne.jp'),
+    CURRENT_TIMESTAMP,
+    true,
+    false
+);
+
+
+-- =========================================================
+-- コメント
+-- comment_id は指定しない
+-- =========================================================
+
+INSERT INTO comments (
+    tip_id,
+    user_id,
+    comment_body,
+    created_time,
+    is_looked,
+    delete_flg
+)
+VALUES
+(
+    (SELECT tip_id FROM tips WHERE tip_title = '寝る前のスマホ時間を減らす'),
+    (SELECT user_id FROM users WHERE mail_address = 'ishikawa@example.com'),
+    '試してみます。',
+    CURRENT_TIMESTAMP,
+    false,
+    false
+),
+(
+    (SELECT tip_id FROM tips WHERE tip_title = '朝一で今日の完了条件を書く'),
+    (SELECT user_id FROM users WHERE mail_address = 'ito@example.com'),
+    'これは使えそうです。',
+    CURRENT_TIMESTAMP,
+    false,
+    false
+);
+
+
+-- =========================================================
+-- Tip Interest
+-- tip_interest_id は指定しない
+-- =========================================================
+
+INSERT INTO tip_interest (
+    tip_id,
+    user_id,
+    created_time,
+    is_looked_by_reactor,
+    is_looked_by_poster,
+    is_looked_my_best,
+    is_my_best
+)
+VALUES
+(
+    (SELECT tip_id FROM tips WHERE tip_title = '寝る前のスマホ時間を減らす'),
+    (SELECT user_id FROM users WHERE mail_address = '19st-54tk@ezweb.ne.jp'),
+    CURRENT_TIMESTAMP,
+    false,
+    true,
+    false,
+    false
+),
+(
+    (SELECT tip_id FROM tips WHERE tip_title = '朝一で今日の完了条件を書く'),
+    (SELECT user_id FROM users WHERE mail_address = 'ishikawa@example.com'),
+    CURRENT_TIMESTAMP,
+    false,
+    true,
+    false,
+    false
+);
