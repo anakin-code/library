@@ -1,209 +1,687 @@
--- =========================================================
--- 初期化
--- =========================================================
+投稿フォームボタンは表示するが、まだ投稿フォームへ遷移しない
+ページングUIを下に表示する
+検索・絞り込みしたら 1ページ目に戻す
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
-TRUNCATE TABLE
-    comments,
-    notifications,
-    tip_interest,
-    need_empathy,
-    tips,
-    needs,
-    users,
-    frequency,
-    category,
-    rank,
-    affiliated
-RESTART IDENTITY CASCADE;
+type Need = {
+  needId: number;
+  needTitle: string;
+  needDetail: string;
+  categoryId?: number;
+  categoryName?: string;
+  userId?: number;
+  userName?: string;
+  affiliatedName?: string;
+  positionName?: string;
+  empathyCount?: number;
+  answerCount?: number;
+  empathyByCurrentUser?: boolean;
+  editFlg?: boolean;
+  createdTime?: string;
+};
 
+type NeedPageResponse = {
+  content: Need[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+};
 
--- =========================================================
--- 所属
--- =========================================================
+type MasterItem = {
+  id: number;
+  name: string;
+};
 
-INSERT INTO affiliated
-(affiliated_id, affiliated_name)
-VALUES
-(1, 'SHI Staff'),
-(2, 'SHI Engineer'),
-(3, 'SHI Manager');
+type CategoryResponse = {
+  categoryId: number;
+  categoryName: string;
+};
 
+type AffiliatedResponse = {
+  affiliatedId: number;
+  affiliatedName: string;
+};
 
--- =========================================================
--- 職位
--- =========================================================
+type PositionResponse = {
+  positionId: number;
+  positionName: string;
+};
 
-INSERT INTO rank
-(rank_id, rank_name)
-VALUES
-(1, 'Staff'),
-(2, 'Leader'),
-(3, 'Manager');
+type NeedListProps = {
+  api: {
+    fetch: (url: string, options?: RequestInit) => Promise<Response>;
+  };
+};
 
+const NeedList: React.FC<NeedListProps> = ({ api }) => {
+  const navigate = useNavigate();
 
--- =========================================================
--- カテゴリ
--- =========================================================
+  const [needList, setNeedList] = useState<Need[]>([]);
 
-INSERT INTO category
-(category_id, category_name, created_time)
-VALUES
-(1, '睡眠・体調', CURRENT_TIMESTAMP),
-(2, '仕事・タスク', CURRENT_TIMESTAMP),
-(3, '人間関係', CURRENT_TIMESTAMP),
-(4, 'キャリア', CURRENT_TIMESTAMP),
-(5, '生活習慣', CURRENT_TIMESTAMP);
+  const [keywordInput, setKeywordInput] = useState<string>("");
+  const [keyword, setKeyword] = useState<string>("");
 
+  const [selectedAffiliatedId, setSelectedAffiliatedId] = useState<string>("");
+  const [selectedPositionId, setSelectedPositionId] = useState<string>("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [orderBy, setOrderBy] = useState<string>("createdTime");
 
--- =========================================================
--- 通知頻度
--- =========================================================
+  const [affiliatedList, setAffiliatedList] = useState<MasterItem[]>([]);
+  const [positionList, setPositionList] = useState<MasterItem[]>([]);
+  const [categoryList, setCategoryList] = useState<MasterItem[]>([]);
 
-INSERT INTO frequency
-(frequency_id, frequency_name)
-VALUES
-(1, '毎日'),
-(2, '毎週'),
-(3, '毎月');
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [totalPage, setTotalPage] = useState<number>(0);
+  const [pageSize] = useState<number>(6);
 
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isServerStopping, setIsServerStopping] = useState<boolean>(false);
 
--- =========================================================
--- ユーザー
--- =========================================================
+  const requestUrl = useMemo(() => {
+    const params = new URLSearchParams();
 
-INSERT INTO users
-(user_id, user_name, self_introduction, admin_flg, mail_address, affiliated_id, rank_id, created_time, updated_time)
-VALUES
-(1, '石川翔太', '最近生活リズムを整えたいです。', false, 'ishikawa@example.com', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(2, '伊藤良典', 'タスク管理や仕事の進め方に関心があります。', false, 'ito@example.com', 1, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(3, '山田太郎', '人間関係やキャリアについて相談したいです。', false, 'yamada@example.com', 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(4, 'ログインユーザー', 'ログイン確認用ユーザーです。', false, '19st-54tk@ezweb.ne.jp', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    params.append("page", String(currentPage));
+    params.append("size", String(pageSize));
 
+    if (keyword.trim() !== "") {
+      params.append("keyword", keyword.trim());
+    }
 
--- =========================================================
--- お悩み
--- =========================================================
+    if (selectedAffiliatedId !== "") {
+      params.append("affiliatedId", selectedAffiliatedId);
+    }
 
-INSERT INTO needs
-(need_id, user_id, category_id, need_title, need_detail, created_time, updated_time, delete_flg)
-VALUES
-(1, 1, 1, '最近寝れなくて', 'この前に家族家具店に行ったときから、なかなか寝つけなくなりました。', TIMESTAMP '2026-06-15 10:00:00', TIMESTAMP '2026-06-15 10:00:00', false),
-(2, 1, 5, '最近歩くと足に激痛を感じることが多い', 'いい靴を買うとやっぱり変わるのでしょうか。', TIMESTAMP '2026-06-15 10:10:00', TIMESTAMP '2026-06-15 10:10:00', false),
-(3, 2, 2, '最近忙しすぎてボルダリングができない…タスクを定時に終わらせるには', 'チョークを手に付けて登る時間を作りたいのに、仕事がなかなか終わりません。', TIMESTAMP '2026-06-15 10:20:00', TIMESTAMP '2026-06-15 10:20:00', false),
-(4, 3, 2, '期限までに進捗を整理できない', '気づいたら毎朝迷ってしまい、報告が長くなってしまいます。', TIMESTAMP '2026-06-15 10:30:00', TIMESTAMP '2026-06-15 10:30:00', false),
-(5, 3, 3, '社内で相談するタイミングが分からない', '周りの人に声をかけるのが苦手で、質問を後回しにしてしまいます。', TIMESTAMP '2026-06-15 10:40:00', TIMESTAMP '2026-06-15 10:40:00', false),
-(6, 2, 4, '今後のキャリアの方向性に迷っている', '目の前の仕事を進めながら、自分の強みをどう伸ばすか悩んでいます。', TIMESTAMP '2026-06-15 10:50:00', TIMESTAMP '2026-06-15 10:50:00', false);
+    if (selectedPositionId !== "") {
+      params.append("positionId", selectedPositionId);
+    }
 
+    if (selectedCategoryId !== "") {
+      params.append("categoryId", selectedCategoryId);
+    }
 
--- =========================================================
--- ノウハウ
--- =========================================================
+    if (orderBy !== "") {
+      params.append("orderBy", orderBy);
+    }
 
-INSERT INTO tips
-(tip_id, user_id, category_id, need_id, tip_title, tip_detail, tip_url, created_time, updated_time, delete_flg)
-VALUES
-(1, 2, 1, 1, '寝る前のスマホ時間を減らす', '寝る30分前からスマホを見ないようにすると、寝つきが少し良くなります。', '', TIMESTAMP '2026-06-15 11:00:00', TIMESTAMP '2026-06-15 11:00:00', false),
-(2, 3, 2, 4, '朝一で今日の完了条件を書く', '作業に入る前に、今日どこまで終わればよいかを1行で書くと迷いにくいです。', '', TIMESTAMP '2026-06-15 11:10:00', TIMESTAMP '2026-06-15 11:10:00', false),
-(3, 1, 3, 5, '質問前に現状と困りごとを分ける', 'いきなり質問するより、現状・試したこと・困っていることを分けると相談しやすいです。', '', TIMESTAMP '2026-06-15 11:20:00', TIMESTAMP '2026-06-15 11:20:00', false);
+    return `/api/needs?${params.toString()}`;
+  }, [
+    currentPage,
+    pageSize,
+    keyword,
+    selectedAffiliatedId,
+    selectedPositionId,
+    selectedCategoryId,
+    orderBy,
+  ]);
 
+  const fetchNeeds = useCallback(async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      setIsServerStopping(false);
 
--- =========================================================
--- 共感
--- =========================================================
+      const response = await api.fetch(requestUrl);
 
-INSERT INTO need_empathy
-(need_empathy_id, need_id, user_id, created_time, is_looked_by_reactor, is_looked_by_poster)
-VALUES
-(1, 1, 2, CURRENT_TIMESTAMP, true, false),
-(2, 1, 3, CURRENT_TIMESTAMP, true, false),
-(3, 2, 4, CURRENT_TIMESTAMP, true, false),
-(4, 3, 1, CURRENT_TIMESTAMP, true, false),
-(5, 4, 2, CURRENT_TIMESTAMP, true, false),
-(6, 5, 4, CURRENT_TIMESTAMP, true, false);
+      if (!response.ok) {
+        throw new Error("お悩み一覧の取得に失敗しました");
+      }
 
+      const data: NeedPageResponse = await response.json();
 
--- =========================================================
--- コメント
--- =========================================================
+      setNeedList(data.content ?? []);
+      setTotalPage(data.totalPages ?? 0);
 
-INSERT INTO comments
-(comment_id, tip_id, user_id, comment_body, created_time, is_looked, delete_flg)
-VALUES
-(1, 1, 1, '試してみます。', CURRENT_TIMESTAMP, false, false),
-(2, 2, 2, 'これは使えそうです。', CURRENT_TIMESTAMP, false, false);
+      if (data.totalPages > 0 && currentPage >= data.totalPages) {
+        setCurrentPage(data.totalPages - 1);
+      }
+    } catch (error) {
+      console.error(error);
+      setNeedList([]);
+      setTotalPage(0);
+      setIsServerStopping(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [api, requestUrl, currentPage]);
 
+  const fetchMasters = useCallback(async (): Promise<void> => {
+    try {
+      const [categoryResponse, affiliatedResponse, positionResponse] =
+        await Promise.all([
+          api.fetch("/api/categories"),
+          api.fetch("/api/affiliateds"),
+          api.fetch("/api/positions"),
+        ]);
 
--- =========================================================
--- Tip Interest
--- =========================================================
+      if (categoryResponse.ok) {
+        const categories: CategoryResponse[] = await categoryResponse.json();
+        setCategoryList(
+          categories.map((category) => ({
+            id: category.categoryId,
+            name: category.categoryName,
+          }))
+        );
+      }
 
-INSERT INTO tip_interest
-(tip_interest_id, tip_id, user_id, created_time, is_looked_by_reactor, is_looked_by_poster, is_looked_my_best, is_my_best)
-VALUES
-(1, 1, 4, CURRENT_TIMESTAMP, false, true, false, false),
-(2, 2, 1, CURRENT_TIMESTAMP, false, true, false, false);
+      if (affiliatedResponse.ok) {
+        const affiliateds: AffiliatedResponse[] =
+          await affiliatedResponse.json();
+        setAffiliatedList(
+          affiliateds.map((affiliated) => ({
+            id: affiliated.affiliatedId,
+            name: affiliated.affiliatedName,
+          }))
+        );
+      }
 
+      if (positionResponse.ok) {
+        const positions: PositionResponse[] = await positionResponse.json();
+        setPositionList(
+          positions.map((position) => ({
+            id: position.positionId,
+            name: position.positionName,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("マスタ取得に失敗しました", error);
+    }
+  }, [api]);
 
--- =========================================================
--- 自動採番の位置を修正
--- =========================================================
+  useEffect(() => {
+    fetchMasters();
+  }, [fetchMasters]);
 
-SELECT setval(
-    pg_get_serial_sequence('affiliated', 'affiliated_id'),
-    COALESCE((SELECT MAX(affiliated_id) FROM affiliated), 1),
-    true
-);
+  useEffect(() => {
+    fetchNeeds();
+  }, [fetchNeeds]);
 
-SELECT setval(
-    pg_get_serial_sequence('category', 'category_id'),
-    COALESCE((SELECT MAX(category_id) FROM category), 1),
-    true
-);
+  const handleSearch = (): void => {
+    setKeyword(keywordInput);
+    setCurrentPage(0);
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('rank', 'rank_id'),
-    COALESCE((SELECT MAX(rank_id) FROM rank), 1),
-    true
-);
+  const handleReset = (): void => {
+    setKeywordInput("");
+    setKeyword("");
+    setSelectedAffiliatedId("");
+    setSelectedPositionId("");
+    setSelectedCategoryId("");
+    setOrderBy("createdTime");
+    setCurrentPage(0);
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('users', 'user_id'),
-    COALESCE((SELECT MAX(user_id) FROM users), 1),
-    true
-);
+  const handleChangeAffiliated = (event: SelectChangeEvent): void => {
+    setSelectedAffiliatedId(event.target.value);
+    setCurrentPage(0);
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('frequency', 'frequency_id'),
-    COALESCE((SELECT MAX(frequency_id) FROM frequency), 1),
-    true
-);
+  const handleChangePosition = (event: SelectChangeEvent): void => {
+    setSelectedPositionId(event.target.value);
+    setCurrentPage(0);
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('needs', 'need_id'),
-    COALESCE((SELECT MAX(need_id) FROM needs), 1),
-    true
-);
+  const handleChangeCategory = (event: SelectChangeEvent): void => {
+    setSelectedCategoryId(event.target.value);
+    setCurrentPage(0);
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('tips', 'tip_id'),
-    COALESCE((SELECT MAX(tip_id) FROM tips), 1),
-    true
-);
+  const handleChangeOrderBy = (event: SelectChangeEvent): void => {
+    setOrderBy(event.target.value);
+    setCurrentPage(0);
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('need_empathy', 'need_empathy_id'),
-    COALESCE((SELECT MAX(need_empathy_id) FROM need_empathy), 1),
-    true
-);
+  const handleClickNeedCard = (needId: number): void => {
+    navigate(`/needs/${needId}`);
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('comments', 'comment_id'),
-    COALESCE((SELECT MAX(comment_id) FROM comments), 1),
-    true
-);
+  const handleClickCreateNeed = (): void => {
+    // まだ投稿フォームへ遷移しない
+    console.log("お悩み投稿ボタンが押されました");
+  };
 
-SELECT setval(
-    pg_get_serial_sequence('tip_interest', 'tip_interest_id'),
-    COALESCE((SELECT MAX(tip_interest_id) FROM tip_interest), 1),
-    true
-);
+  const handleClickEmpathy = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    need: Need
+  ): Promise<void> => {
+    event.stopPropagation();
+
+    try {
+      const response = await api.fetch(`/api/needEmpathy/${need.needId}`, {
+        method: need.empathyByCurrentUser ? "DELETE" : "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("共感更新に失敗しました");
+      }
+
+      setNeedList((prevNeedList) =>
+        prevNeedList.map((currentNeed) => {
+          if (currentNeed.needId !== need.needId) {
+            return currentNeed;
+          }
+
+          const currentCount = currentNeed.empathyCount ?? 0;
+          const alreadyEmpathy = currentNeed.empathyByCurrentUser ?? false;
+
+          return {
+            ...currentNeed,
+            empathyByCurrentUser: !alreadyEmpathy,
+            empathyCount: alreadyEmpathy
+              ? Math.max(currentCount - 1, 0)
+              : currentCount + 1,
+          };
+        })
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const isFirstPage = currentPage === 0;
+  const isLastPage = totalPage === 0 || currentPage >= totalPage - 1;
+
+  return (
+    <Box sx={{ p: 4 }}>
+      <Typography
+        variant="h4"
+        sx={{
+          textAlign: "center",
+          fontWeight: "bold",
+          mb: 4,
+        }}
+      >
+        お悩み一覧
+      </Typography>
+
+      <Box
+        sx={{
+          display: "flex",
+          gap: 3,
+          alignItems: "flex-start",
+        }}
+      >
+        <Box sx={{ flex: 1 }}>
+          {isLoading && (
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
+              <CircularProgress />
+            </Box>
+          )}
+
+          {!isLoading && isServerStopping && (
+            <Typography sx={{ textAlign: "center", mt: 6 }}>
+              サーバーに接続できません。
+            </Typography>
+          )}
+
+          {!isLoading && !isServerStopping && needList.length === 0 && (
+            <Typography sx={{ textAlign: "center", mt: 6 }}>
+              表示できるお悩みがありません。
+            </Typography>
+          )}
+
+          {!isLoading && !isServerStopping && needList.length > 0 && (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 3,
+              }}
+            >
+              {needList.map((need) => (
+                <Card
+                  key={need.needId}
+                  onClick={() => handleClickNeedCard(need.needId)}
+                  sx={{
+                    minHeight: 210,
+                    borderRadius: 3,
+                    cursor: "pointer",
+                    boxShadow: 2,
+                    transition: "0.2s",
+                    "&:hover": {
+                      boxShadow: 6,
+                      transform: "translateY(-2px)",
+                    },
+                  }}
+                >
+                  <CardContent>
+                    <Box sx={{ textAlign: "center", mb: 1 }}>
+                      <Typography
+                        sx={{
+                          display: "inline-block",
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
+                          backgroundColor: "#005bac",
+                          color: "white",
+                          fontSize: 12,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {need.categoryName ?? "悩みカテゴリ"}
+                      </Typography>
+                    </Box>
+
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        mb: 2,
+                        minHeight: 56,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {need.needTitle}
+                    </Typography>
+
+                    <Typography
+                      sx={{
+                        fontSize: 14,
+                        color: "text.secondary",
+                        mb: 2,
+                        minHeight: 40,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {need.needDetail}
+                    </Typography>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: 13,
+                        color: "text.secondary",
+                        mb: 1,
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 13 }}>
+                        {need.affiliatedName ?? ""}
+                        {need.positionName ? ` ${need.positionName}` : ""}
+                        {need.userName ? ` ${need.userName}` : ""}
+                      </Typography>
+
+                      <Typography sx={{ fontSize: 13 }}>
+                        回答 {need.answerCount ?? 0}
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Button
+                        onClick={(event) => handleClickEmpathy(event, need)}
+                        sx={{
+                          minWidth: 72,
+                          borderRadius: 5,
+                          color: "black",
+                          backgroundColor: need.empathyByCurrentUser
+                            ? "#ffe082"
+                            : "#f5f5f5",
+                          boxShadow: need.empathyByCurrentUser ? 3 : 1,
+                          "&:hover": {
+                            backgroundColor: "#ffe082",
+                            boxShadow: 4,
+                          },
+                        }}
+                      >
+                        共感 👏 {need.empathyCount ?? 0}
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+          )}
+
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mt: 5,
+              px: 4,
+            }}
+          >
+            <Button
+              disabled={isFirstPage}
+              onClick={() => setCurrentPage(0)}
+              sx={{
+                color: isFirstPage ? "gray" : "black",
+              }}
+            >
+              ＜ First
+            </Button>
+
+            <Button
+              disabled={isFirstPage}
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+              sx={{
+                color: isFirstPage ? "gray" : "black",
+              }}
+            >
+              ＜ 前へ
+            </Button>
+
+            <Typography sx={{ color: "text.secondary" }}>
+              {totalPage === 0 ? 0 : currentPage + 1} / {totalPage}
+            </Typography>
+
+            <Button
+              disabled={isLastPage}
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPage - 1))
+              }
+              sx={{
+                color: isLastPage ? "gray" : "black",
+              }}
+            >
+              次へ ＞
+            </Button>
+
+            <Button
+              disabled={isLastPage}
+              onClick={() => setCurrentPage(Math.max(totalPage - 1, 0))}
+              sx={{
+                color: isLastPage ? "gray" : "black",
+              }}
+            >
+              Last ＞
+            </Button>
+          </Box>
+        </Box>
+
+        <Box
+          sx={{
+            width: 240,
+            p: 2,
+            borderRadius: 2,
+            backgroundColor: "#f1eadf",
+            position: "sticky",
+            top: 24,
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              textAlign: "center",
+              mb: 2,
+            }}
+          >
+            絞り込み
+          </Typography>
+
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>所属</InputLabel>
+            <Select
+              value={selectedAffiliatedId}
+              label="所属"
+              onChange={handleChangeAffiliated}
+            >
+              <MenuItem value="">指定なし</MenuItem>
+              {affiliatedList.map((affiliated) => (
+                <MenuItem key={affiliated.id} value={String(affiliated.id)}>
+                  {affiliated.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>職位</InputLabel>
+            <Select
+              value={selectedPositionId}
+              label="職位"
+              onChange={handleChangePosition}
+            >
+              <MenuItem value="">指定なし</MenuItem>
+              {positionList.map((position) => (
+                <MenuItem key={position.id} value={String(position.id)}>
+                  {position.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>悩みカテゴリ</InputLabel>
+            <Select
+              value={selectedCategoryId}
+              label="悩みカテゴリ"
+              onChange={handleChangeCategory}
+            >
+              <MenuItem value="">指定なし</MenuItem>
+              {categoryList.map((category) => (
+                <MenuItem key={category.id} value={String(category.id)}>
+                  {category.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>並び替え</InputLabel>
+            <Select value={orderBy} label="並び替え" onChange={handleChangeOrderBy}>
+              <MenuItem value="createdTime">新着順</MenuItem>
+              <MenuItem value="empathyCount">共感が多い順</MenuItem>
+              <MenuItem value="answerCount">回答が多い順</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Typography
+            variant="subtitle1"
+            sx={{
+              fontWeight: "bold",
+              textAlign: "center",
+              mt: 3,
+              mb: 1,
+            }}
+          >
+            検索
+          </Typography>
+
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="キーワード"
+            value={keywordInput}
+            onChange={(event) => setKeywordInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                handleSearch();
+              }
+            }}
+            sx={{ mb: 2, backgroundColor: "white" }}
+          />
+
+          <Box sx={{ display: "flex", gap: 1, mb: 3 }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={handleReset}
+              sx={{
+                backgroundColor: "white",
+              }}
+            >
+              リセット
+            </Button>
+
+            <Button fullWidth variant="contained" onClick={handleSearch}>
+              実行
+            </Button>
+          </Box>
+
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={handleClickCreateNeed}
+            sx={{
+              borderRadius: 5,
+              py: 1.5,
+              fontWeight: "bold",
+              backgroundColor: "#005bac",
+            }}
+          >
+            お悩み
+            <br />
+            投稿
+          </Button>
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
+export default NeedList;
+
+もし君の既存コードで api.fetch じゃなくて普通の fetch を使っているなら、この部分だけ変えて。
+
+const response = await api.fetch(requestUrl);
+
+を
+
+const response = await fetch(requestUrl);
+
+にする。
+
+共感のところも同じ。
+
+const response = await api.fetch(`/api/needEmpathy/${need.needId}`, {
+  method: need.empathyByCurrentUser ? "DELETE" : "POST",
+});
+
+を
+
+const response = await fetch(`/api/needEmpathy/${need.needId}`, {
+  method: need.empathyByCurrentUser ? "DELETE" : "POST",
+});
+
+にする。
