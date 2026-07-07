@@ -1,948 +1,221 @@
-src/pages/NeedsList.tsx 完全版
-import { useEffect, useMemo, useState } from "react";
-import type { ChangeEvent } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  FormControl,
-  Grid,
-  MenuItem,
-  Pagination,
-  Select,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+1. NeedEmpathyResponseDto.java
 
-import NeedCard from "../components/NeedCard";
-import SubmitForm from "./SubmitForm";
-import type { Need, NeedPageResponse } from "../models/Need";
-import { useApi } from "../lib/api";
+新規作成。
 
-type Affiliated = {
-  affiliatedId: number;
-  affiliatedName: string;
-};
+package simplex.pj148.skippy.server.controller.dto.response;
 
-type Rank = {
-  rankId: number;
-  rankName: string;
-};
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-type Category = {
-  categoryId: number;
-  categoryName: string;
-};
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class NeedEmpathyResponseDto {
 
-export default function NeedsList(): JSX.Element {
-  const api = useApi();
+    private Long needId;
 
-  const [needList, setNeedList] = useState<Need[]>([]);
+    private Long empathyCount;
 
-  const [orderBy, setOrderBy] = useState<string>("new");
-
-  const [keyword, setKeyword] = useState<string>("");
-  const [appliedKeyword, setAppliedKeyword] = useState<string>("");
-
-  const [affiliatedId, setAffiliatedId] = useState<string>("");
-  const [positionId, setPositionId] = useState<string>("");
-  const [categoryId, setCategoryId] = useState<string>("");
-
-  const [affiliatedList, setAffiliatedList] = useState<Affiliated[]>([]);
-  const [rankList, setRankList] = useState<Rank[]>([]);
-  const [categoryList, setCategoryList] = useState<Category[]>([]);
-
-  const [page, setPage] = useState<number>(0);
-  const [totalPage, setTotalPage] = useState<number>(0);
-
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isServerStopping, setIsServerStopping] = useState<boolean>(false);
-  const [postOpen, setPostOpen] = useState<boolean>(false);
-
-  const requestUrl = useMemo((): string => {
-    const params = new URLSearchParams();
-
-    params.append("page", String(page));
-    params.append("size", "18");
-    params.append("orderBy", orderBy);
-
-    if (appliedKeyword.trim() !== "") {
-      params.append("keyword", appliedKeyword.trim());
-    }
-
-    if (affiliatedId !== "" && affiliatedId !== "0") {
-      params.append("affiliatedId", affiliatedId);
-    }
-
-    if (positionId !== "" && positionId !== "0") {
-      params.append("positionId", positionId);
-    }
-
-    if (categoryId !== "" && categoryId !== "0") {
-      params.append("categoryId", categoryId);
-    }
-
-    return `/api/needs/search?${params.toString()}`;
-  }, [page, orderBy, appliedKeyword, affiliatedId, positionId, categoryId]);
-
-  useEffect((): void => {
-    let ignore = false;
-
-    const fetchNeeds = async (): Promise<void> => {
-      try {
-        setIsLoading(true);
-        setIsServerStopping(false);
-
-        const response = await api.fetch(requestUrl);
-
-        if (!response.ok) {
-          throw new Error("お悩み一覧の取得に失敗しました");
-        }
-
-        const data: NeedPageResponse = await response.json();
-
-        if (ignore) {
-          return;
-        }
-
-        setNeedList(data.content ?? []);
-        setTotalPage(data.totalPages ?? 0);
-      } catch (error) {
-        if (ignore) {
-          return;
-        }
-
-        console.error(error);
-        setNeedList([]);
-        setTotalPage(0);
-        setIsServerStopping(true);
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchNeeds();
-
-    return () => {
-      ignore = true;
-    };
-
-    // useApi() の戻り値が毎回変わる場合、apiを依存配列に入れると無限fetchになる
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestUrl]);
-
-  useEffect((): void => {
-    let ignore = false;
-
-    const fetchMasterData = async (): Promise<void> => {
-      try {
-        const [affiliatedResponse, rankResponse, categoryResponse] =
-          await Promise.all([
-            api.fetch("/api/affiliated"),
-            api.fetch("/api/rank"),
-            api.fetch("/api/category"),
-          ]);
-
-        if (ignore) {
-          return;
-        }
-
-        if (affiliatedResponse.ok) {
-          const data: Affiliated[] = await affiliatedResponse.json();
-          setAffiliatedList(data ?? []);
-        }
-
-        if (rankResponse.ok) {
-          const data: Rank[] = await rankResponse.json();
-          setRankList(data ?? []);
-        }
-
-        if (categoryResponse.ok) {
-          const data: Category[] = await categoryResponse.json();
-          setCategoryList(data ?? []);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    fetchMasterData();
-
-    return () => {
-      ignore = true;
-    };
-
-    // 初回だけマスタを取る
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleSearch = (): void => {
-    setPage(0);
-    setAppliedKeyword(keyword);
-  };
-
-  const handleReset = (): void => {
-    setKeyword("");
-    setAppliedKeyword("");
-    setAffiliatedId("");
-    setPositionId("");
-    setCategoryId("");
-    setOrderBy("new");
-    setPage(0);
-  };
-
-  const handlePageChange = (
-    _event: ChangeEvent<unknown>,
-    value: number
-  ): void => {
-    setPage(value - 1);
-  };
-
-  const handleEmpathyClick = async (need: Need): Promise<void> => {
-    const nextEmpathyByCurrentUser = !need.empathyByCurrentUser;
-    const nextEmpathyCount = nextEmpathyByCurrentUser
-      ? need.empathyCount + 1
-      : Math.max(need.empathyCount - 1, 0);
-
-    // 先に画面だけ更新する。体感が軽い。
-    setNeedList((prevList) =>
-      prevList.map((item) =>
-        item.needId === need.needId
-          ? {
-              ...item,
-              empathyByCurrentUser: nextEmpathyByCurrentUser,
-              empathyCount: nextEmpathyCount,
-            }
-          : item
-      )
-    );
-
-    try {
-      const response = await api.fetch(`/api/needs/${need.needId}/empathy`, {
-        method: nextEmpathyByCurrentUser ? "POST" : "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("共感の更新に失敗しました");
-      }
-    } catch (error) {
-      console.error(error);
-
-      // API失敗時は元に戻す
-      setNeedList((prevList) =>
-        prevList.map((item) =>
-          item.needId === need.needId
-            ? {
-                ...item,
-                empathyByCurrentUser: need.empathyByCurrentUser,
-                empathyCount: need.empathyCount,
-              }
-            : item
-        )
-      );
-    }
-  };
-
-  const handleCardClick = (need: Need): void => {
-    // 遷移は別担当者が実装する想定
-    // 例:
-    // navigate(`/needs/${need.needId}`);
-    console.log("お悩み詳細へ遷移予定", need.needId);
-  };
-
-  const handleUserClick = (need: Need): void => {
-    // 遷移は別担当者が実装する想定
-    // 例:
-    // navigate(`/profiles/${need.userId}`);
-    console.log("プロフィールへ遷移予定", need.userId);
-  };
-
-  return (
-    <>
-      <Box
-        sx={{
-          maxWidth: 1060,
-          mx: "auto",
-          px: 2,
-          py: 2.5,
-          color: "#071a33",
-        }}
-      >
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              md: "1fr 190px",
-            },
-            columnGap: 2,
-            alignItems: "start",
-          }}
-        >
-          <Box>
-            <Box
-              sx={{
-                position: "relative",
-                mb: 2,
-              }}
-            >
-              <Typography
-                component="h1"
-                sx={{
-                  textAlign: "center",
-                  fontSize: 28,
-                  fontWeight: 900,
-                  color: "#071a33",
-                }}
-              >
-                お悩み一覧
-              </Typography>
-
-              <FormControl
-                size="small"
-                sx={{
-                  position: {
-                    xs: "static",
-                    md: "absolute",
-                  },
-                  right: 0,
-                  top: 2,
-                  minWidth: 105,
-                  mt: {
-                    xs: 1.5,
-                    md: 0,
-                  },
-                  display: "flex",
-                  alignItems: {
-                    xs: "flex-end",
-                    md: "stretch",
-                  },
-                }}
-              >
-                <Select
-                  value={orderBy}
-                  onChange={(event) => {
-                    setOrderBy(event.target.value);
-                    setPage(0);
-                  }}
-                  sx={{
-                    height: 34,
-                    borderRadius: 1.3,
-                    backgroundColor: "#fff",
-                    fontWeight: 800,
-                    fontSize: 13,
-                    color: "#071a33",
-                  }}
-                >
-                  <MenuItem value="new">新着順</MenuItem>
-                  <MenuItem value="empathy">共感数順</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            {isServerStopping ? (
-              <Alert
-                severity="error"
-                sx={{
-                  mb: 2,
-                  justifyContent: "center",
-                  maxWidth: 600,
-                  mx: "auto",
-                }}
-              >
-                サーバーが起動していません。しばらくたってからお試しください。
-              </Alert>
-            ) : isLoading ? (
-              <CircularProgress
-                aria-label="Loading"
-                sx={{
-                  display: "block",
-                  mx: "auto",
-                  my: 6,
-                }}
-              />
-            ) : (
-              <>
-                <Grid container spacing={2}>
-                  {needList.map((need: Need, index: number) => (
-                    <Grid
-                      size={{
-                        xs: 12,
-                        sm: 6,
-                        md: 4,
-                      }}
-                      key={need.needId ?? index}
-                    >
-                      <NeedCard
-                        need={need}
-                        onCardClick={handleCardClick}
-                        onUserClick={handleUserClick}
-                        onEmpathyClick={handleEmpathyClick}
-                      />
-                    </Grid>
-                  ))}
-                </Grid>
-
-                {totalPage > 1 && (
-                  <Stack
-                    direction="row"
-                    sx={{
-                      pt: 3,
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Pagination
-                      count={totalPage}
-                      page={page + 1}
-                      onChange={handlePageChange}
-                      color="primary"
-                      shape="rounded"
-                    />
-                  </Stack>
-                )}
-              </>
-            )}
-          </Box>
-
-          <Box
-            sx={{
-              mt: {
-                xs: 2,
-                md: 5,
-              },
-              width: {
-                xs: "100%",
-                md: 190,
-              },
-            }}
-          >
-            <Box
-              sx={{
-                borderRadius: 2,
-                p: 1.7,
-                backgroundColor: "#f3ecdc",
-              }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  textAlign: "center",
-                  mb: 1.7,
-                  fontSize: 17,
-                  color: "#071a33",
-                }}
-              >
-                絞り込み
-              </Typography>
-
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "52px 1fr",
-                  rowGap: 1.1,
-                  columnGap: 1,
-                  alignItems: "center",
-                  mb: 1.7,
-                }}
-              >
-                <Typography sx={{ fontSize: 12, fontWeight: 900 }}>
-                  所属
-                </Typography>
-
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={affiliatedId}
-                    displayEmpty
-                    onChange={(event) => {
-                      setAffiliatedId(event.target.value);
-                      setPage(0);
-                    }}
-                    sx={{
-                      height: 30,
-                      borderRadius: 1,
-                      backgroundColor: "#fff",
-                      fontSize: 11,
-                      fontWeight: 700,
-                    }}
-                  >
-                    <MenuItem value="">指定なし</MenuItem>
-                    {affiliatedList.map((affiliated) => (
-                      <MenuItem
-                        key={affiliated.affiliatedId}
-                        value={String(affiliated.affiliatedId)}
-                      >
-                        {affiliated.affiliatedName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <Typography sx={{ fontSize: 12, fontWeight: 900 }}>
-                  職位
-                </Typography>
-
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={positionId}
-                    displayEmpty
-                    onChange={(event) => {
-                      setPositionId(event.target.value);
-                      setPage(0);
-                    }}
-                    sx={{
-                      height: 30,
-                      borderRadius: 1,
-                      backgroundColor: "#fff",
-                      fontSize: 11,
-                      fontWeight: 700,
-                    }}
-                  >
-                    <MenuItem value="">指定なし</MenuItem>
-                    {rankList.map((rank) => (
-                      <MenuItem key={rank.rankId} value={String(rank.rankId)}>
-                        {rank.rankName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  悩み
-                  <br />
-                  カテゴリ
-                </Typography>
-
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={categoryId}
-                    displayEmpty
-                    onChange={(event) => {
-                      setCategoryId(event.target.value);
-                      setPage(0);
-                    }}
-                    sx={{
-                      height: 30,
-                      borderRadius: 1,
-                      backgroundColor: "#fff",
-                      fontSize: 11,
-                      fontWeight: 700,
-                    }}
-                  >
-                    <MenuItem value="">指定なし</MenuItem>
-                    {categoryList.map((category) => (
-                      <MenuItem
-                        key={category.categoryId}
-                        value={String(category.categoryId)}
-                      >
-                        {category.categoryName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <Box
-                sx={{
-                  borderTop: "1px solid rgba(0,0,0,0.15)",
-                  pt: 1.4,
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontWeight: 900,
-                    textAlign: "center",
-                    mb: 1.1,
-                    fontSize: 16,
-                    color: "#071a33",
-                  }}
-                >
-                  検索
-                </Typography>
-
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="人名/キーワード"
-                  value={keyword}
-                  onChange={(event) => setKeyword(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleSearch();
-                    }
-                  }}
-                  sx={{
-                    mb: 1.2,
-                    backgroundColor: "#fff",
-                    borderRadius: 1,
-                    "& .MuiOutlinedInput-root": {
-                      height: 30,
-                      borderRadius: 1,
-                    },
-                    "& input": {
-                      fontSize: 10.5,
-                    },
-                  }}
-                />
-
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    onClick={handleReset}
-                    sx={{
-                      height: 28,
-                      borderRadius: 1,
-                      fontSize: 10.5,
-                      fontWeight: 900,
-                      color: "#071a33",
-                      borderColor: "#d8d2c8",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    リセット
-                  </Button>
-
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    size="small"
-                    onClick={handleSearch}
-                    sx={{
-                      height: 28,
-                      borderRadius: 1,
-                      fontSize: 10.5,
-                      fontWeight: 900,
-                      backgroundColor: "#0054a6",
-                      "&:hover": {
-                        backgroundColor: "#004080",
-                      },
-                    }}
-                  >
-                    実行
-                  </Button>
-                </Stack>
-              </Box>
-            </Box>
-
-            <Button
-              variant="contained"
-              onClick={() => setPostOpen(true)}
-              disabled={isServerStopping}
-              sx={{
-                mt: 1.7,
-                width: "100%",
-                height: 58,
-                borderRadius: "999px",
-                backgroundColor: "#0054a6",
-                color: "#fff",
-                fontSize: 18,
-                fontWeight: 900,
-                lineHeight: 1.15,
-                boxShadow: "0 8px 18px rgba(0,84,166,0.25)",
-                "&:hover": {
-                  backgroundColor: "#004080",
-                },
-                "&.Mui-disabled": {
-                  backgroundColor: "#b0b0b0",
-                  color: "#fff",
-                },
-              }}
-            >
-              お悩み
-              <br />
-              投稿
-            </Button>
-          </Box>
-        </Box>
-      </Box>
-
-      <SubmitForm open={postOpen} onClose={() => setPostOpen(false)} />
-    </>
-  );
+    private Boolean empathyByCurrentUser;
 }
-src/components/NeedCard.tsx 完全版
+2. NeedEmpathyRepository.java
 
-@mui/icons-material を使わない版。
-なので追加インストール不要。
+これに置き換え、または足りないメソッドを追加。
 
-import type { MouseEvent } from "react";
-import {
-  Card,
-  CardActionArea,
-  CardContent,
-  Box,
-  ButtonBase,
-  Typography,
-} from "@mui/material";
+package simplex.pj148.skippy.server.repository;
 
-import type { Need } from "../models/Need";
+import java.util.Optional;
 
-type Props = {
-  need: Need;
-  onCardClick: (need: Need) => void;
-  onUserClick: (need: Need) => void;
-  onEmpathyClick: (need: Need) => void;
-};
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-export default function NeedCard({
-  need,
-  onCardClick,
-  onUserClick,
-  onEmpathyClick,
-}: Props): JSX.Element {
-  const handleUserClick = (event: MouseEvent<HTMLButtonElement>): void => {
-    event.stopPropagation();
-    onUserClick(need);
-  };
+import simplex.pj148.skippy.server.entity.NeedEmpathy;
 
-  const handleEmpathyClick = (event: MouseEvent<HTMLButtonElement>): void => {
-    event.stopPropagation();
-    onEmpathyClick(need);
-  };
+@Repository
+public interface NeedEmpathyRepository extends JpaRepository<NeedEmpathy, Long> {
 
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        height: 190,
-        borderRadius: 2,
-        border: "1px solid #d9d9d9",
-        backgroundColor: "#fff",
-        transition: "0.2s",
-        "&:hover": {
-          transform: "translateY(-2px)",
-          boxShadow: "0 6px 14px rgba(0,0,0,0.08)",
-        },
-      }}
-    >
-      <CardActionArea
-        onClick={() => onCardClick(need)}
-        sx={{
-          height: "100%",
-          alignItems: "stretch",
-        }}
-      >
-        <CardContent
-          sx={{
-            height: "100%",
-            px: 1.5,
-            py: 1.3,
-            display: "flex",
-            flexDirection: "column",
-            "&:last-child": {
-              pb: 1.3,
-            },
-          }}
-        >
-          <Box sx={{ textAlign: "center", mb: 1.6 }}>
-            <Typography
-              sx={{
-                display: "inline-block",
-                px: 1,
-                py: 0.25,
-                borderRadius: 0.7,
-                backgroundColor: "#003b5c",
-                color: "#fff",
-                fontSize: 10,
-                fontWeight: 900,
-                lineHeight: 1.2,
-              }}
-            >
-              {need.categoryName}
-            </Typography>
-          </Box>
+    Optional<NeedEmpathy> findByUser_UserIdAndNeed_NeedId(Long userId, Long needId);
 
-          <Typography
-            sx={{
-              fontSize: 16,
-              fontWeight: 900,
-              color: "#071a33",
-              textAlign: "center",
-              lineHeight: 1.35,
-              mb: 1.5,
-              minHeight: 43,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {need.needTitle}
-          </Typography>
+    boolean existsByUser_UserIdAndNeed_NeedId(Long userId, Long needId);
 
-          <Typography
-            sx={{
-              fontSize: 11.5,
-              color: "#4b4b4b",
-              lineHeight: 1.45,
-              textAlign: "left",
-              mb: 1,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {need.needDetail}
-          </Typography>
-
-          <Box
-            sx={{
-              mt: "auto",
-              pt: 0.8,
-              borderTop: "1px solid #e4e4e4",
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 0.7,
-              }}
-            >
-              <ButtonBase
-                onClick={handleUserClick}
-                sx={{
-                  justifyContent: "flex-start",
-                  maxWidth: 120,
-                  borderRadius: 0.5,
-                  "&:hover": {
-                    textDecoration: "underline",
-                  },
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: 11,
-                    fontWeight: 900,
-                    color: "#071a33",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    maxWidth: 120,
-                  }}
-                >
-                  {need.affiliatedName} {need.userName}
-                </Typography>
-              </ButtonBase>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.45,
-                  fontSize: 11,
-                  fontWeight: 900,
-                  color: "#071a33",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <span style={{ fontSize: 12 }}>💬</span>
-                <span>{need.answerCount}</span>
-
-                <ButtonBase
-                  onClick={handleEmpathyClick}
-                  sx={{
-                    borderRadius: "50%",
-                    width: 20,
-                    height: 20,
-                    ml: 0.2,
-                  }}
-                >
-                  <Box
-                    component="span"
-                    sx={{
-                      fontSize: 13,
-                      lineHeight: 1,
-                      filter: need.empathyByCurrentUser
-                        ? "none"
-                        : "grayscale(1)",
-                      color: need.empathyByCurrentUser ? "#f4a300" : "#fff",
-                      textShadow: need.empathyByCurrentUser
-                        ? "none"
-                        : "0 0 1px #071a33, 0 0 1px #071a33, 0 0 1px #071a33",
-                    }}
-                  >
-                    ✋
-                  </Box>
-                </ButtonBase>
-
-                <span>{need.empathyCount}</span>
-              </Box>
-            </Box>
-
-            <Typography
-              sx={{
-                mt: 0.25,
-                fontSize: 10,
-                color: "#666",
-                textAlign: "right",
-              }}
-            >
-              {need.createdTime?.slice(0, 10).replaceAll("-", "/")}
-            </Typography>
-          </Box>
-        </CardContent>
-      </CardActionArea>
-    </Card>
-  );
+    Long countByNeed_NeedId(Long needId);
 }
-共感APIの想定
+3. NeedEmpathyService.java
 
-このコードでは、共感のAPIをこう想定している。
+ここがメイン。
+すでに共感している状態でPOSTされても二重登録しない。
+共感していない状態でDELETEされてもエラーにしない。
+画面側で連打しても壊れにくいようにしてる。
 
-POST   /api/needs/{needId}/empathy
-DELETE /api/needs/{needId}/empathy
+package simplex.pj148.skippy.server.service;
 
-押していない状態で押す。
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-POST /api/needs/1/empathy
+import simplex.pj148.skippy.server.controller.dto.response.NeedEmpathyResponseDto;
+import simplex.pj148.skippy.server.entity.Need;
+import simplex.pj148.skippy.server.entity.NeedEmpathy;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.NeedEmpathyRepository;
+import simplex.pj148.skippy.server.repository.NeedRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+import simplex.pj148.skippy.server.service.exception.EntityNotFoundException;
 
-すでに押している状態で押す。
+@Service
+@RequiredArgsConstructor
+public class NeedEmpathyService {
 
-DELETE /api/needs/1/empathy
+    private final NeedEmpathyRepository needEmpathyRepository;
+    private final NeedRepository needRepository;
+    private final UserRepository userRepository;
 
-サーバー側のAPI名が違うなら、ここだけ変える。
+    @Transactional
+    public NeedEmpathyResponseDto createNeedEmpathy(Long needId, Long loginUserId) {
+        Need need = needRepository.findByNeedId(needId)
+                .orElseThrow(() -> new EntityNotFoundException("お悩みがDBに存在しない"));
 
-const response = await api.fetch(`/api/needs/${need.needId}/empathy`, {
-  method: nextEmpathyByCurrentUser ? "POST" : "DELETE",
-});
-遷移担当者に渡す場所
+        User user = userRepository.findByUserId(loginUserId)
+                .orElseThrow(() -> new EntityNotFoundException("ユーザーがDBに存在しない"));
 
-遷移を実装する人は、NeedsList.tsx のここだけ直せばいい。
+        boolean alreadyEmpathy = needEmpathyRepository
+                .existsByUser_UserIdAndNeed_NeedId(loginUserId, needId);
 
-const handleCardClick = (need: Need): void => {
-  // navigate(`/needs/${need.needId}`);
-  console.log("お悩み詳細へ遷移予定", need.needId);
-};
+        if (!alreadyEmpathy) {
+            NeedEmpathy needEmpathy = NeedEmpathy.builder()
+                    .need(need)
+                    .user(user)
+                    .isLookedByReactor(true)
+                    .isLookedByPoster(false)
+                    .build();
 
-const handleUserClick = (need: Need): void => {
-  // navigate(`/profiles/${need.userId}`);
-  console.log("プロフィールへ遷移予定", need.userId);
-};
+            needEmpathyRepository.save(needEmpathy);
+        }
 
-ここに useNavigate() を入れれば完成。
+        return buildResponse(needId, loginUserId);
+    }
 
-const navigate = useNavigate();
+    @Transactional
+    public NeedEmpathyResponseDto deleteNeedEmpathy(Long needId, Long loginUserId) {
+        NeedEmpathy needEmpathy = needEmpathyRepository
+                .findByUser_UserIdAndNeed_NeedId(loginUserId, needId)
+                .orElse(null);
 
-const handleCardClick = (need: Need): void => {
-  navigate(`/needs/${need.needId}`);
-};
+        if (needEmpathy != null) {
+            needEmpathyRepository.delete(needEmpathy);
+        }
 
-const handleUserClick = (need: Need): void => {
-  navigate(`/profiles/${need.userId}`);
-};
+        return buildResponse(needId, loginUserId);
+    }
 
-今は別担当なら、console.log のままでOK。
+    @Transactional(readOnly = true)
+    public NeedEmpathyResponseDto buildResponse(Long needId, Long loginUserId) {
+        Long empathyCount = needEmpathyRepository.countByNeed_NeedId(needId);
+
+        Boolean empathyByCurrentUser = needEmpathyRepository
+                .existsByUser_UserIdAndNeed_NeedId(loginUserId, needId);
+
+        return NeedEmpathyResponseDto.builder()
+                .needId(needId)
+                .empathyCount(empathyCount)
+                .empathyByCurrentUser(empathyByCurrentUser)
+                .build();
+    }
+}
+4. NeedEmpathyController.java
+
+今ある NeedEmpathyController に追加でもいいけど、分かりやすく完全版で出す。
+既存の古いエンドポイントがあるなら、消さずにこの2つを足してもOK。
+
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import simplex.pj148.skippy.server.controller.dto.response.NeedEmpathyResponseDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.NeedEmpathyService;
+import simplex.pj148.skippy.server.service.UserInfoService;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/needs")
+public class NeedEmpathyController {
+
+    private final NeedEmpathyService needEmpathyService;
+    private final UserInfoService userInfoService;
+
+    @PostMapping("/{needId}/empathy")
+    public NeedEmpathyResponseDto createNeedEmpathy(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long needId
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return needEmpathyService.createNeedEmpathy(
+                needId,
+                loginUser.getUserId()
+        );
+    }
+
+    @DeleteMapping("/{needId}/empathy")
+    public NeedEmpathyResponseDto deleteNeedEmpathy(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long needId
+    ) {
+        User loginUser = userInfoService.getUserFromJwt(jwt);
+
+        return needEmpathyService.deleteNeedEmpathy(
+                needId,
+                loginUser.getUserId()
+        );
+    }
+}
+5. NeedService.java 側も確認
+
+一覧表示で黄色/白色の手を切り替えるには、一覧DTOにこの2つが入っている必要がある。
+
+private Long empathyCount;
+private Boolean empathyByCurrentUser;
+
+NeedService のDTO変換部分ではこうする。
+
+Long empathyCount = needEmpathyRepository.countByNeed_NeedId(need.getNeedId());
+
+Boolean empathyByCurrentUser = needEmpathyRepository
+        .existsByUser_UserIdAndNeed_NeedId(loginUserId, need.getNeedId());
+
+たとえば toNeedResponseDto みたいなメソッドがあるなら、そこはこう。
+
+private NeedListResponseDto toNeedListResponseDto(Need need, Long loginUserId) {
+    Long empathyCount = needEmpathyRepository.countByNeed_NeedId(need.getNeedId());
+
+    Boolean empathyByCurrentUser = needEmpathyRepository
+            .existsByUser_UserIdAndNeed_NeedId(loginUserId, need.getNeedId());
+
+    return NeedListResponseDto.builder()
+            .needId(need.getNeedId())
+            .needTitle(need.getNeedTitle())
+            .needDetail(need.getNeedDetail())
+            .categoryId(need.getCategory().getCategoryId())
+            .categoryName(need.getCategory().getCategoryName())
+            .userId(need.getUser().getUserId())
+            .userName(need.getUser().getUserName())
+            .affiliatedName(need.getUser().getAffiliated().getAffiliatedName())
+            .positionName(need.getUser().getRank().getRankName())
+            .empathyCount(empathyCount)
+            .empathyByCurrentUser(empathyByCurrentUser)
+            .createdTime(need.getCreatedTime())
+            .build();
+}
+
+NeedListResponseDto が @Builder じゃなくてコンストラクタ型なら、そこは今のDTOに合わせて値を渡せばいい。
