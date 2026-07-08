@@ -1,1 +1,929 @@
 
+1. TipsCreateDto.java
+package simplex.pj148.skippy.server.controller.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TipsCreateDto {
+
+    private Long categoryId;
+
+    private String tipTitle;
+
+    private String tipDetail;
+
+    private String tipURL;
+}
+2. TipController.java
+
+パッケージ名や LoginUser の取得方法は、今のプロジェクトに合わせている想定。
+もし今すでにControllerがあるなら、createTip() の部分だけ合わせればOK。
+
+package simplex.pj148.skippy.server.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import simplex.pj148.skippy.server.controller.dto.request.TipsCreateDto;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.service.TipService;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/tips")
+public class TipController {
+
+    private final TipService tipService;
+
+    @PostMapping
+    public ResponseEntity<Void> createTip(@RequestBody TipsCreateDto input) {
+
+        /*
+         * 本来はログイン中ユーザーを認証情報から取得する。
+         * ただ、今の開発中で認証を簡単にしているなら、
+         * Service側で仮ユーザーを取る形でもOK。
+         *
+         * ここでは loginUser を Service 側で仮取得する形にするため、
+         * Controller では DTO だけ渡す。
+         */
+        tipService.createTip(input);
+
+        return ResponseEntity.ok().build();
+    }
+}
+3. TipService.java
+
+ここが一番大事。
+固定値代入を全部消す。
+
+package simplex.pj148.skippy.server.service;
+
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import simplex.pj148.skippy.server.controller.dto.request.TipsCreateDto;
+import simplex.pj148.skippy.server.entity.Category;
+import simplex.pj148.skippy.server.entity.Tip;
+import simplex.pj148.skippy.server.entity.User;
+import simplex.pj148.skippy.server.repository.CategoryRepository;
+import simplex.pj148.skippy.server.repository.TipRepository;
+import simplex.pj148.skippy.server.repository.UserRepository;
+
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class TipService {
+
+    private final TipRepository tipRepository;
+    private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public void createTip(TipsCreateDto input) {
+
+        /*
+         * 修正前：
+         *
+         * input.setCategoryId(1);
+         * input.setTipTitle("title");
+         * input.setTipDetail("detail");
+         * input.setTipURL("url");
+         *
+         * これは絶対に消す。
+         * フロントから来た値をサーバー側で上書きしてしまうため。
+         */
+
+        Category category = categoryRepository.findByCategoryId(input.getCategoryId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "カテゴリDBに存在しないカテゴリ：" + input.getCategoryId() + " が選択されています。"
+                ));
+
+        /*
+         * 仮ログインユーザー。
+         * 認証をまだ作っていない/外しているなら、いったん userId=1 のユーザーで投稿させる。
+         * data.sql に user_id = 1 のユーザーが必要。
+         */
+        User loginUser = userRepository.findByUserId(1L)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "ユーザーDBに存在しないユーザー：1 が選択されています。"
+                ));
+
+        LocalDateTime createdTime = LocalDateTime.now();
+
+        Tip tip = Tip.builder()
+                .user(loginUser)
+                .category(category)
+                .tipTitle(input.getTipTitle())
+                .tipDetail(input.getTipDetail())
+                .tipURL(input.getTipURL())
+                .createdTime(createdTime)
+                .deleteFlg(false)
+                .build();
+
+        tipRepository.save(tip);
+    }
+}
+4. CategoryRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Category;
+
+import java.util.Optional;
+
+@Repository
+public interface CategoryRepository extends JpaRepository<Category, Long> {
+
+    Optional<Category> findByCategoryId(Long categoryId);
+}
+5. UserRepository.java
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.User;
+
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    Optional<User> findByUserId(Long userId);
+}
+6. TipRepository.java
+
+今の写真だと countByNeedNeedIdAndDeleteFlgFalse(Long needId) が入っていたけど、投稿作成だけなら不要。
+検索も残すなら、この形。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Tip;
+
+@Repository
+public interface TipRepository extends JpaRepository<Tip, Long>, JpaSpecificationExecutor<Tip> {
+
+    Long countByNeedNeedIdAndDeleteFlgFalse(Long needId);
+}
+
+もし Tip Entity に Need need; がないなら、上のメソッドはエラーになる。
+その場合はこう。
+
+package simplex.pj148.skippy.server.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.stereotype.Repository;
+import simplex.pj148.skippy.server.entity.Tip;
+
+@Repository
+public interface TipRepository extends JpaRepository<Tip, Long>, JpaSpecificationExecutor<Tip> {
+}
+7. Home.tsx
+
+写真の Home.tsx では、投稿処理で requestBody = { values } のような形に見えた。これだとDTOとズレる。
+なので、values をそのままPOSTする。
+
+import { useState, useEffect, Fragment } from "react";
+import {
+  Container,
+  Box,
+  Typography,
+  Grid,
+  Stack,
+  Button,
+  Pagination,
+  Chip,
+  MenuItem,
+  FormControl,
+  Select,
+  CircularProgress,
+  Alert,
+  Fab,
+} from "@mui/material";
+import type { SelectChangeEvent } from "@mui/material";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import SortIcon from "@mui/icons-material/Sort";
+import AddIcon from "@mui/icons-material/Add";
+
+import ContentCard from "../components/ContentCard.tsx";
+import TipForm from "../components/TipForm.tsx";
+import type { Tips } from "../models/tip.ts";
+import type { Category } from "../models/category.ts";
+import { useApi } from "../hooks/useApi.ts";
+
+function Home(): JSX.Element {
+  const [contents, setContents] = useState<Tips[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [page, setPage] = useState<number>(0);
+  const [totalPage, setTotalPage] = useState<number>(0);
+  const [selectedCategory, setSelectedCategory] = useState<Category>({
+    categoryId: 0,
+    categoryName: "すべて",
+  });
+  const [sortBy, setSortBy] = useState<string>("createdTime,desc");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isServerStopping, setIsServerStopping] = useState<boolean>(false);
+  const [isPostFormOpen, setIsPostFormOpen] = useState<boolean>(false);
+
+  const api = useApi();
+
+  useEffect(() => {
+    api
+      .fetch("/api/categories")
+      .then((res: Response) => res.json())
+      .then((categories: Category[]) => {
+        setCategories([
+          {
+            categoryId: 0,
+            categoryName: "すべて",
+          },
+          ...categories,
+        ]);
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+      });
+  }, [api]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setIsServerStopping(false);
+
+    const categoryKeyword =
+      selectedCategory.categoryId === 0
+        ? ""
+        : `&categoryId=${selectedCategory.categoryId}`;
+
+    api
+      .fetch(`/api/tips?page=${page}&sort=${sortBy}${categoryKeyword}`)
+      .then((res: Response) => {
+        if (!res.ok) {
+          throw new Error("投稿一覧の取得に失敗しました");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setContents(data.content ?? []);
+        setTotalPage(data.totalPages ?? 0);
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+        setContents([]);
+        setTotalPage(0);
+        setIsServerStopping(true);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [api, page, selectedCategory, sortBy]);
+
+  const handleSubmit = async (values: {
+    categoryId: number;
+    tipTitle: string;
+    tipDetail: string;
+    tipURL: string;
+  }): Promise<void> => {
+    console.log("submit values:", values);
+
+    /*
+     * 修正前：
+     * const requestBody = { values };
+     *
+     * これだとサーバーに
+     * {
+     *   values: {
+     *     categoryId: 1,
+     *     tipTitle: "...",
+     *     tipDetail: "...",
+     *     tipURL: "..."
+     *   }
+     * }
+     * が送られてしまう。
+     *
+     * DTOが受け取りたいのは
+     * {
+     *   categoryId: 1,
+     *   tipTitle: "...",
+     *   tipDetail: "...",
+     *   tipURL: "..."
+     * }
+     * なので values をそのまま送る。
+     */
+    const requestBody = values;
+
+    try {
+      const response = await api.sendJson("/api/tips", requestBody, {
+        method: "POST",
+        headers: {
+          "Content-type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("投稿に失敗しました");
+      }
+
+      setIsPostFormOpen(false);
+      setPage(0);
+
+      const categoryKeyword =
+        selectedCategory.categoryId === 0
+          ? ""
+          : `&categoryId=${selectedCategory.categoryId}`;
+
+      const reloadResponse = await api.fetch(
+        `/api/tips?page=0&sort=${sortBy}${categoryKeyword}`
+      );
+
+      if (!reloadResponse.ok) {
+        throw new Error("投稿一覧の再取得に失敗しました");
+      }
+
+      const data = await reloadResponse.json();
+
+      setContents(data.content ?? []);
+      setTotalPage(data.totalPages ?? 0);
+    } catch (error: unknown) {
+      console.error(error);
+      alert("投稿に失敗しました。入力内容かサーバーを確認してください。");
+    }
+  };
+
+  const handleCategoryChange = (
+    categoryId: number,
+    categoryName: string
+  ): void => {
+    setSelectedCategory({
+      categoryId,
+      categoryName,
+    });
+    setPage(0);
+  };
+
+  const handleSortChange = (event: SelectChangeEvent<string>): void => {
+    setSortBy(event.target.value);
+    setPage(0);
+  };
+
+  const handlePageChange = (
+    _event: React.ChangeEvent<unknown>,
+    value: number
+  ): void => {
+    setPage(value - 1);
+  };
+
+  return (
+    <Container maxWidth={false}>
+      <Box>
+        <Typography
+          sx={{
+            color: "primary.main",
+            fontWeight: 700,
+            textAlign: "center",
+            textTransform: "uppercase",
+            letterSpacing: "0.15rem",
+            display: "block",
+            mb: 1,
+          }}
+        >
+          Overview
+        </Typography>
+
+        <Typography
+          component="h1"
+          variant="h3"
+          sx={{
+            color: "black",
+            fontWeight: 800,
+            textAlign: "center",
+            letterSpacing: "-0.03rem",
+            fontSize: {
+              xs: "2rem",
+              sm: "2.5rem",
+            },
+            mb: 5,
+          }}
+        >
+          投稿一覧
+        </Typography>
+
+        <Box>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 1,
+              mb: 5,
+              pb: 2,
+              overflowX: "auto",
+              whiteSpace: "nowrap",
+              width: "100%",
+              "&::-webkit-scrollbar": {
+                display: "none",
+              },
+              msOverflowStyle: "none",
+              scrollbarWidth: "none",
+            }}
+          >
+            {categories.map((category) => {
+              const isSelected =
+                selectedCategory.categoryName === category.categoryName;
+
+              return (
+                <Chip
+                  key={category.categoryId}
+                  label={category.categoryName}
+                  clickable
+                  onClick={() =>
+                    handleCategoryChange(
+                      category.categoryId,
+                      category.categoryName
+                    )
+                  }
+                  variant={isSelected ? "filled" : "outlined"}
+                  color={isSelected ? "primary" : "default"}
+                  sx={{
+                    fontWeight: isSelected ? 600 : 400,
+                    fontSize: "0.85rem",
+                    borderRadius: "10px",
+                    px: 0.5,
+                  }}
+                />
+              );
+            })}
+          </Box>
+
+          <Box
+            sx={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <Select
+                value={sortBy}
+                onChange={handleSortChange}
+                displayEmpty
+                startAdornment={
+                  <SortIcon
+                    fontSize="small"
+                    sx={{
+                      mr: 0.5,
+                      color: "text.secondary",
+                    }}
+                  />
+                }
+                sx={{
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  backgroundColor: "white",
+                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "rgba(0, 0, 0, 0.08)",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "rgba(0, 0, 0, 0.15)",
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "primary.main",
+                  },
+                }}
+              >
+                <MenuItem
+                  value="createdTime,desc"
+                  sx={{
+                    fontSize: "0.9rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  新着順
+                </MenuItem>
+                <MenuItem
+                  value="interestCount,desc"
+                  sx={{
+                    fontSize: "0.9rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  わいわい度順
+                </MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+
+        {isServerStopping ? (
+          <Alert
+            severity="error"
+            sx={{
+              marginBottom: 4,
+              justifyContent: "center",
+              maxWidth: 600,
+              mx: "auto",
+            }}
+          >
+            サーバーが起動していません。しばらくたってからお試しください。
+          </Alert>
+        ) : isLoading ? (
+          <CircularProgress
+            aria-label="Loading..."
+            sx={{
+              margin: "0 auto",
+              display: "block",
+            }}
+          />
+        ) : (
+          <Grid
+            container
+            spacing={4}
+            sx={{
+              mx: "auto",
+              justifyContent: "space-between",
+            }}
+          >
+            {contents.map((content) => (
+              <Fragment key={content.tipId}>
+                <Grid
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: "100%",
+                      maxWidth: {
+                        xs: "400px",
+                        sm: "100%",
+                      },
+                      height: "100%",
+                      transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease",
+                      "&:hover": {
+                        transform: "translateY(-6px)",
+                      },
+                    }}
+                  >
+                    <ContentCard content={content} />
+                  </Box>
+                </Grid>
+              </Fragment>
+            ))}
+          </Grid>
+        )}
+
+        <Stack
+          direction="row"
+          sx={{
+            pt: 4,
+            borderTop: "1px solid",
+            borderColor: "rgba(0, 0, 0, 0.06)",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Button
+            variant="text"
+            startIcon={<ChevronLeftIcon />}
+            disabled={totalPage <= 1 || page === 0}
+            onClick={() => setPage(0)}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              px: 2,
+              color: "text.primary",
+              "&:disabled": {
+                color: "text.disabled",
+              },
+            }}
+          >
+            First
+          </Button>
+
+          <Button
+            variant="text"
+            startIcon={<ChevronLeftIcon />}
+            disabled={totalPage <= 1 || page === 0}
+            onClick={() => setPage(page - 1)}
+            sx={{
+              borderRadius: 3,
+              textTransform: "none",
+              fontWeight: 600,
+              px: 2,
+              color: "text.primary",
+              "&:disabled": {
+                color: "text.disabled",
+              },
+            }}
+          >
+            前へ
+          </Button>
+
+          <Pagination
+            count={totalPage}
+            page={page + 1}
+            onChange={handlePageChange}
+            hidePrevButton
+            hideNextButton
+            color="primary"
+            variant="text"
+            shape="rounded"
+          />
+
+          <Button
+            variant="text"
+            endIcon={<ChevronRightIcon />}
+            disabled={totalPage <= 1 || page + 1 >= totalPage}
+            onClick={() => setPage(page + 1)}
+            sx={{
+              borderRadius: 3,
+              textTransform: "none",
+              fontWeight: 600,
+              px: 2,
+              color: "text.primary",
+              "&:disabled": {
+                color: "text.disabled",
+              },
+            }}
+          >
+            次へ
+          </Button>
+
+          <Button
+            variant="text"
+            endIcon={<ChevronRightIcon />}
+            disabled={totalPage <= 1 || page + 1 >= totalPage}
+            onClick={() => setPage(totalPage - 1)}
+            sx={{
+              borderRadius: 3,
+              textTransform: "none",
+              fontWeight: 600,
+              px: 2,
+              color: "text.primary",
+              "&:disabled": {
+                color: "text.disabled",
+              },
+            }}
+          >
+            Last
+          </Button>
+        </Stack>
+
+        <Fab
+          color="primary"
+          aria-label="add"
+          onClick={() => setIsPostFormOpen(true)}
+          sx={{
+            position: "fixed",
+            right: 32,
+            bottom: 32,
+          }}
+        >
+          <AddIcon />
+        </Fab>
+
+        {isPostFormOpen && (
+          <TipForm
+            initialValues={{
+              categoryId: "",
+              tipTitle: "",
+              tipDetail: "",
+              tipURL: "",
+            }}
+            onSubmit={handleSubmit}
+            submitLabel="投稿する"
+            onClose={() => setIsPostFormOpen(false)}
+          />
+        )}
+      </Box>
+    </Container>
+  );
+}
+
+export default Home;
+8. TipForm.tsx
+
+既存の見た目があると思うけど、投稿できる最小構成の完全版はこれ。
+
+import { useState } from "react";
+import {
+  Box,
+  Button,
+  MenuItem,
+  Modal,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+
+type TipFormInputValues = {
+  categoryId: string | number;
+  tipTitle: string;
+  tipDetail: string;
+  tipURL: string;
+};
+
+type TipFormSubmitValues = {
+  categoryId: number;
+  tipTitle: string;
+  tipDetail: string;
+  tipURL: string;
+};
+
+type TipFormProps = {
+  initialValues: TipFormInputValues;
+  onSubmit: (values: TipFormSubmitValues) => void;
+  submitLabel: string;
+  onClose: () => void;
+};
+
+const categories = [
+  {
+    categoryId: 1,
+    categoryName: "カテゴリ1",
+  },
+  {
+    categoryId: 2,
+    categoryName: "カテゴリ2",
+  },
+  {
+    categoryId: 3,
+    categoryName: "カテゴリ3",
+  },
+];
+
+function TipForm({
+  initialValues,
+  onSubmit,
+  submitLabel,
+  onClose,
+}: TipFormProps): JSX.Element {
+  const [formData, setFormData] = useState<TipFormInputValues>(initialValues);
+
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ): void => {
+    const { name, value } = event.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+
+    if (formData.categoryId === "") {
+      alert("カテゴリを選択してください。");
+      return;
+    }
+
+    if (formData.tipTitle.trim() === "") {
+      alert("タイトルを入力してください。");
+      return;
+    }
+
+    if (formData.tipDetail.trim() === "") {
+      alert("内容を入力してください。");
+      return;
+    }
+
+    onSubmit({
+      categoryId: Number(formData.categoryId),
+      tipTitle: formData.tipTitle,
+      tipDetail: formData.tipDetail,
+      tipURL: formData.tipURL,
+    });
+  };
+
+  return (
+    <Modal open onClose={onClose}>
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        sx={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: {
+            xs: "90%",
+            sm: 520,
+          },
+          bgcolor: "background.paper",
+          borderRadius: 3,
+          boxShadow: 24,
+          p: 4,
+        }}
+      >
+        <Typography
+          component="h2"
+          variant="h5"
+          sx={{
+            fontWeight: 700,
+            mb: 3,
+          }}
+        >
+          投稿フォーム
+        </Typography>
+
+        <Stack spacing={2}>
+          <TextField
+            required
+            select
+            fullWidth
+            label="カテゴリ"
+            name="categoryId"
+            value={formData.categoryId}
+            onChange={handleChange}
+          >
+            <MenuItem value="" disabled>
+              カテゴリを選択
+            </MenuItem>
+
+            {categories.map((category) => (
+              <MenuItem key={category.categoryId} value={category.categoryId}>
+                {category.categoryName}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            required
+            fullWidth
+            label="タイトル"
+            name="tipTitle"
+            value={formData.tipTitle}
+            onChange={handleChange}
+            inputProps={{
+              maxLength: 50,
+            }}
+          />
+
+          <TextField
+            required
+            fullWidth
+            multiline
+            minRows={4}
+            label="投稿内容"
+            name="tipDetail"
+            value={formData.tipDetail}
+            onChange={handleChange}
+            inputProps={{
+              maxLength: 500,
+            }}
+          />
+
+          <TextField
+            fullWidth
+            label="URL"
+            name="tipURL"
+            value={formData.tipURL}
+            onChange={handleChange}
+          />
+
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{
+              justifyContent: "flex-end",
+              pt: 2,
+            }}
+          >
+            <Button variant="outlined" onClick={onClose}>
+              キャンセル
+            </Button>
+
+            <Button type="submit" variant="contained">
+              {submitLabel}
+            </Button>
+          </Stack>
+        </Stack>
+      </Box>
+    </Modal>
+  );
+}
+
+export default TipForm;
+
+ただし、この TipForm.tsx はカテゴリを仮で固定配列にしている。
+
+const categories = [
+  { categoryId: 1, categoryName: "カテゴリ1" },
+  { categoryId: 2, categoryName: "カテゴリ2" },
+  { categoryId: 3, categoryName: "カテゴリ3" },
+];
