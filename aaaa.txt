@@ -1,800 +1,149 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ChangeEvent } from "react";
+const response: Response = await api.fetch(requestUrl);
 
-import {
-  Alert,
-  Autocomplete,
-  Box,
-  Button,
-  CircularProgress,
-  FormControl,
-  Grid,
-  MenuItem,
-  Pagination,
-  Select,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import type { SelectChangeEvent } from "@mui/material";
+ここで requestUrl の型がただの string になっている。
+でも、君の useApi の fetch はたぶん型がこうなってる。
 
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+fetch(path: `/${string}`, options?: RequestInit)
 
-import { useNavigate } from "react-router";
+つまり、api.fetch() は 必ず / から始まる文字列 を要求している。
 
-import NeedCard from "../components/NeedCard";
-import SubmitNeeds from "../components/SubmitNeeds";
-import type { Need, NeedPageResponse } from "../models/Need";
-import { useApi } from "../lib/useApi";
+でも requestUrl は中身としては
 
-type Affiliated = {
-  affiliatedId: number;
-  affiliatedName: string;
-};
+"/api/needs/search?..."
 
-type Rank = {
-  rankId: number;
-  rankName: string;
-};
+でも、TypeScript上はただの string だから怒られてる。
 
-type Category = {
-  categoryId: number;
-  categoryName: string;
-};
+エラーの意味はこれ。
 
-export default function NeedList(): JSX.Element {
-  const api = useApi();
-  const navigate = useNavigate();
+Argument of type 'string' is not assignable to parameter of type `/${string}`
 
-  const [needList, setNeedList] = useState<Need[]>([]);
+つまり、
 
-  const [orderBy, setOrderBy] = useState("new");
-  const [keyword, setKeyword] = useState("");
-  const [appliedKeyword, setAppliedKeyword] = useState("");
+中身は /api/... っぽいけど、型としてはただのstringだから信用できない
 
-  const [affiliatedId, setAffiliatedId] = useState("");
-  const [positionId, setPositionId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+ということ。
 
-  const [affiliatedList, setAffiliatedList] = useState<Affiliated[]>([]);
-  const [rankList, setRankList] = useState<Rank[]>([]);
-  const [categoryList, setCategoryList] = useState<Category[]>([]);
+修正方法
 
-  const [page, setPage] = useState(0);
-  const [totalPage, setTotalPage] = useState(0);
+requestUrl の型を /${string} にする。
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isServerStopping, setIsServerStopping] = useState(false);
+今こうなってるはず。
 
-  const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
+const requestUrl: string = useMemo((): string => {
+  const params = new URLSearchParams();
 
-  const selectedAffiliated =
-    affiliatedList.find(
-      (affiliated) => String(affiliated.affiliatedId) === affiliatedId
-    ) ?? null;
+  params.append("page", String(page));
+  params.append("size", "18");
+  params.append("orderBy", orderBy);
 
-  const selectedPosition =
-    rankList.find((rank) => String(rank.rankId) === positionId) ?? null;
+  if (appliedKeyword.trim() !== "") {
+    params.append("keyword", appliedKeyword.trim());
+  }
 
-  const selectedCategory =
-    categoryList.find(
-      (category) => String(category.categoryId) === categoryId
-    ) ?? null;
+  if (affiliatedId !== "") {
+    params.append("affiliatedId", affiliatedId);
+  }
 
-  const requestUrl = useMemo((): string => {
-    const params = new URLSearchParams();
+  if (positionId !== "") {
+    params.append("positionId", positionId);
+  }
 
-    params.append("page", String(page));
-    params.append("size", "18");
-    params.append("orderBy", orderBy);
+  if (categoryId !== "") {
+    params.append("categoryId", categoryId);
+  }
 
-    if (appliedKeyword.trim() !== "") {
-      params.append("keyword", appliedKeyword.trim());
-    }
+  return `/api/needs/search?${params.toString()}`;
+}, [page, orderBy, appliedKeyword, affiliatedId, positionId, categoryId]);
 
-    if (affiliatedId !== "") {
-      params.append("affiliatedId", affiliatedId);
-    }
+これをこう直す。
 
-    if (positionId !== "") {
-      params.append("positionId", positionId);
-    }
+const requestUrl = useMemo((): `/${string}` => {
+  const params = new URLSearchParams();
 
-    if (categoryId !== "") {
-      params.append("categoryId", categoryId);
-    }
+  params.append("page", String(page));
+  params.append("size", "18");
+  params.append("orderBy", orderBy);
 
-    return `/api/needs/search?${params.toString()}`;
-  }, [page, orderBy, appliedKeyword, affiliatedId, positionId, categoryId]);
+  if (appliedKeyword.trim() !== "") {
+    params.append("keyword", appliedKeyword.trim());
+  }
 
-  useEffect((): (() => void) => {
-    let ignore = false;
+  if (affiliatedId !== "") {
+    params.append("affiliatedId", affiliatedId);
+  }
 
-    const fetchNeeds = async (): Promise<void> => {
-      try {
-        setIsLoading(true);
-        setIsServerStopping(false);
+  if (positionId !== "") {
+    params.append("positionId", positionId);
+  }
 
-        const response = await api.fetch(requestUrl);
+  if (categoryId !== "") {
+    params.append("categoryId", categoryId);
+  }
 
-        if (!response.ok) {
-          throw new Error("お悩み一覧の取得に失敗しました");
-        }
+  return `/api/needs/search?${params.toString()}`;
+}, [page, orderBy, appliedKeyword, affiliatedId, positionId, categoryId]);
 
-        const data: NeedPageResponse = await response.json();
+これで
 
-        if (ignore) {
-          return;
-        }
+await api.fetch(requestUrl);
 
-        setNeedList(data.content ?? []);
-        setTotalPage(data.totalPages ?? 0);
-      } catch (error) {
-        if (ignore) {
-          return;
-        }
+が通る。
 
-        console.error(error);
-        setNeedList([]);
-        setTotalPage(0);
-        setIsServerStopping(true);
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    };
+さらに短く直すなら
 
-    fetchNeeds();
+この1行だけでもいける。
 
-    return (): void => {
-      ignore = true;
-    };
-  }, [api, requestUrl]);
+const response: Response = await api.fetch(requestUrl as `/${string}`);
 
-  useEffect((): (() => void) => {
-    let ignore = false;
+ただ、これは応急処置。
+ちゃんと直すなら、requestUrl の戻り値型を /${string} にする方がきれい。
 
-    const fetchMasterData = async (): Promise<void> => {
-      try {
-        const [affiliatedResponse, rankResponse, categoryResponse] =
-          await Promise.all([
-            api.fetch("/api/affiliated"),
-            api.fetch("/api/rank"),
-            api.fetch("/api/categories"),
-          ]);
+もう1つのエラー
 
-        if (ignore) {
-          return;
-        }
+写真にこれも出てる。
 
-        if (affiliatedResponse.ok) {
-          const data: Affiliated[] = await affiliatedResponse.json();
-          setAffiliatedList(data ?? []);
-        }
+selectedAffiliated is assigned a value but never used
 
-        if (rankResponse.ok) {
-          const data: Rank[] = await rankResponse.json();
-          setRankList(data ?? []);
-        }
+これは、上で
 
-        if (categoryResponse.ok) {
-          const data: Category[] = await categoryResponse.json();
-          setCategoryList(data ?? []);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
+const selectedAffiliated = ...
 
-    fetchMasterData();
+を作ったのに、JSX側でまだ使ってないという意味。
 
-    return (): void => {
-      ignore = true;
-    };
-  }, [api]);
+つまり、Autocomplete に置き換えていないか、置き換えたけど value={selectedAffiliated} を書いてない。
 
-  const handleSearch = (): void => {
+使うならこう。
+
+<Autocomplete
+  disablePortal
+  size="small"
+  options={affiliatedList}
+  value={selectedAffiliated}
+  getOptionLabel={(option: Affiliated): string => option.affiliatedName}
+  isOptionEqualToValue={(option, value): boolean =>
+    option.affiliatedId === value.affiliatedId
+  }
+  onChange={(_, value: Affiliated | null): void => {
+    setAffiliatedId(value ? String(value.affiliatedId) : "");
     setPage(0);
-    setAppliedKeyword(keyword);
-  };
+  }}
+  renderInput={(params) => (
+    <TextField {...params} placeholder="指定なし" />
+  )}
+/>
 
-  const handleReset = (): void => {
-    setKeyword("");
-    setAppliedKeyword("");
-    setAffiliatedId("");
-    setPositionId("");
-    setCategoryId("");
-    setOrderBy("new");
-    setPage(0);
-  };
+使わないなら、selectedAffiliated 自体を消す。
 
-  const handlePageChange = (
-    _event: ChangeEvent<unknown>,
-    value: number
-  ): void => {
-    setPage(value - 1);
-  };
+今回まず直す場所
 
-  const handleCardClick = (need: Need): void => {
-    navigate(`/need/detail/${need.needId}`);
-  };
+ここだけ。
 
-  const handleUserClick = (need: Need): void => {
-    navigate(`/userpage/${need.userId}`);
-  };
+const requestUrl: string = useMemo((): string => {
 
-  const handlePostButtonClick = (): void => {
-    setIsPostDialogOpen(true);
-    console.log("お悩み投稿ボタン押下。投稿フォームはまだ開かない。");
-  };
+を
 
-  return (
-    <Box
-      sx={{
-        maxWidth: 1060,
-        mx: "auto",
-        px: 2,
-        py: 2.5,
-        color: "#071a33",
-      }}
-    >
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            md: "1fr 190px",
-          },
-          columnGap: 2,
-          alignItems: "start",
-        }}
-      >
-        <Box>
-          <Box
-            sx={{
-              position: "relative",
-              mb: 2,
-            }}
-          >
-            <Typography
-              component="h1"
-              sx={{
-                textAlign: "center",
-                fontSize: 28,
-                fontWeight: 900,
-                color: "#071a33",
-              }}
-            >
-              お悩み一覧
-            </Typography>
-          </Box>
+const requestUrl = useMemo((): `/${string}` => {
 
-          {isServerStopping ? (
-            <Alert
-              severity="error"
-              sx={{
-                mb: 2,
-                justifyContent: "center",
-                maxWidth: 600,
-                mx: "auto",
-              }}
-            >
-              サーバーが起動していません。しばらくたってからお試しください。
-            </Alert>
-          ) : isLoading ? (
-            <CircularProgress
-              aria-label="Loading"
-              sx={{
-                display: "block",
-                mx: "auto",
-                my: 6,
-              }}
-            />
-          ) : needList.length === 0 ? (
-            <Typography
-              component="h2"
-              sx={{
-                textAlign: "center",
-                fontSize: 28,
-                fontWeight: 900,
-                color: "#071a33",
-              }}
-            >
-              条件に一致するお悩みがありませんでした
-            </Typography>
-          ) : (
-            <Grid container spacing={2}>
-              {needList.map((need, index) => (
-                <Grid
-                  key={need.needId ?? index}
-                  size={{
-                    xs: 12,
-                    sm: 6,
-                    md: 4,
-                  }}
-                >
-                  <NeedCard
-                    need={need}
-                    onCardClick={handleCardClick}
-                    onUserClick={handleUserClick}
-                  />
-                </Grid>
-              ))}
-            </Grid>
-          )}
+に変える。
 
-          {totalPage > 1 && (
-            <Stack
-              direction="row"
-              sx={{
-                pt: 4,
-                borderTop: "1px solid",
-                borderColor: "rgba(0, 0, 0, 0.06)",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Button
-                variant="text"
-                startIcon={<ChevronLeftIcon />}
-                disabled={page === 0}
-                onClick={() => setPage(0)}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 2,
-                  color: "text.primary",
-                  "&:disabled": {
-                    color: "text.disabled",
-                  },
-                }}
-              >
-                First
-              </Button>
-
-              <Button
-                variant="text"
-                startIcon={<ChevronLeftIcon />}
-                disabled={page === 0}
-                onClick={() => setPage(page - 1)}
-                sx={{
-                  borderRadius: 3,
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 2,
-                  color: "text.primary",
-                  "&:disabled": {
-                    color: "text.disabled",
-                  },
-                }}
-              >
-                前へ
-              </Button>
-
-              <Pagination
-                count={totalPage}
-                page={page + 1}
-                onChange={handlePageChange}
-                hidePrevButton
-                hideNextButton
-                color="primary"
-                variant="text"
-                shape="rounded"
-                sx={{
-                  "& .MuiPaginationItem-root": {
-                    fontWeight: 600,
-                    borderRadius: 2,
-                  },
-                  "& .Mui-selected": {
-                    backgroundColor: "primary.main",
-                    color: "#fff",
-                    "&:hover": {
-                      backgroundColor: "primary.dark",
-                    },
-                  },
-                }}
-              />
-
-              <Button
-                variant="text"
-                endIcon={<ChevronRightIcon />}
-                disabled={page + 1 >= totalPage}
-                onClick={() => setPage(page + 1)}
-                sx={{
-                  borderRadius: 3,
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 2,
-                  color: "text.primary",
-                  "&:disabled": {
-                    color: "text.disabled",
-                  },
-                }}
-              >
-                次へ
-              </Button>
-
-              <Button
-                variant="text"
-                endIcon={<ChevronRightIcon />}
-                disabled={page + 1 >= totalPage}
-                onClick={() => setPage(totalPage - 1)}
-                sx={{
-                  borderRadius: 3,
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 2,
-                  color: "text.primary",
-                  "&:disabled": {
-                    color: "text.disabled",
-                  },
-                }}
-              >
-                Last
-              </Button>
-            </Stack>
-          )}
-        </Box>
-
-        <Box
-          sx={{
-            position: {
-              xs: "static",
-              md: "sticky",
-            },
-            top: 105,
-            mt: {
-              xs: 3,
-              md: 0,
-            },
-          }}
-        >
-          <Box
-            sx={{
-              backgroundColor: "#f5f0dc",
-              borderRadius: 2,
-              p: 2,
-              mb: 2,
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: 18,
-                fontWeight: 900,
-                textAlign: "center",
-                mb: 2,
-                color: "#111",
-              }}
-            >
-              絞り込み
-            </Typography>
-
-            <Stack spacing={1.6}>
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="入力キーワード"
-                value={keyword}
-                onChange={(event): void => {
-                  setKeyword(event.target.value);
-                }}
-                sx={{
-                  backgroundColor: "#fff",
-                  borderRadius: 1,
-                  "& .MuiOutlinedInput-root": {
-                    height: 34,
-                    borderRadius: 1,
-                    fontSize: 12,
-                    fontWeight: 700,
-                  },
-                }}
-              />
-
-              <Box>
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    lineHeight: 1.2,
-                    mb: 0.5,
-                    color: "#111",
-                  }}
-                >
-                  所属
-                </Typography>
-
-                <Autocomplete
-                  disablePortal
-                  size="small"
-                  options={affiliatedList}
-                  value={selectedAffiliated}
-                  getOptionLabel={(option: Affiliated): string =>
-                    option.affiliatedName
-                  }
-                  isOptionEqualToValue={(option, value): boolean =>
-                    option.affiliatedId === value.affiliatedId
-                  }
-                  onChange={(_, value: Affiliated | null): void => {
-                    setAffiliatedId(value ? String(value.affiliatedId) : "");
-                    setPage(0);
-                  }}
-                  noOptionsText="候補がありません"
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="指定なし"
-                      sx={{
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": {
-                          minHeight: 34,
-                          borderRadius: 1,
-                          fontSize: 12,
-                          fontWeight: 700,
-                        },
-                      }}
-                    />
-                  )}
-                  slotProps={{
-                    paper: {
-                      sx: {
-                        mt: 0.5,
-                        borderRadius: 1,
-                        maxHeight: 260,
-                        overflow: "auto",
-                      },
-                    },
-                    listbox: {
-                      sx: {
-                        py: 0.5,
-                        "& .MuiAutocomplete-option": {
-                          fontSize: 13,
-                          fontWeight: 700,
-                          py: 1,
-                        },
-                      },
-                    },
-                  }}
-                />
-              </Box>
-
-              <Box>
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    lineHeight: 1.2,
-                    mb: 0.5,
-                    color: "#111",
-                  }}
-                >
-                  職位
-                </Typography>
-
-                <Autocomplete
-                  disablePortal
-                  size="small"
-                  options={rankList}
-                  value={selectedPosition}
-                  getOptionLabel={(option: Rank): string => option.rankName}
-                  isOptionEqualToValue={(option, value): boolean =>
-                    option.rankId === value.rankId
-                  }
-                  onChange={(_, value: Rank | null): void => {
-                    setPositionId(value ? String(value.rankId) : "");
-                    setPage(0);
-                  }}
-                  noOptionsText="候補がありません"
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="指定なし"
-                      sx={{
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": {
-                          minHeight: 34,
-                          borderRadius: 1,
-                          fontSize: 12,
-                          fontWeight: 700,
-                        },
-                      }}
-                    />
-                  )}
-                  slotProps={{
-                    paper: {
-                      sx: {
-                        mt: 0.5,
-                        borderRadius: 1,
-                        maxHeight: 260,
-                        overflow: "auto",
-                      },
-                    },
-                    listbox: {
-                      sx: {
-                        py: 0.5,
-                        "& .MuiAutocomplete-option": {
-                          fontSize: 13,
-                          fontWeight: 700,
-                          py: 1,
-                        },
-                      },
-                    },
-                  }}
-                />
-              </Box>
-
-              <Box>
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    lineHeight: 1.2,
-                    mb: 0.5,
-                    color: "#111",
-                  }}
-                >
-                  悩み
-                  <br />
-                  カテゴリ
-                </Typography>
-
-                <Autocomplete
-                  disablePortal
-                  size="small"
-                  options={categoryList}
-                  value={selectedCategory}
-                  getOptionLabel={(option: Category): string =>
-                    option.categoryName
-                  }
-                  isOptionEqualToValue={(option, value): boolean =>
-                    option.categoryId === value.categoryId
-                  }
-                  onChange={(_, value: Category | null): void => {
-                    setCategoryId(value ? String(value.categoryId) : "");
-                    setPage(0);
-                  }}
-                  noOptionsText="候補がありません"
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="指定なし"
-                      sx={{
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": {
-                          minHeight: 34,
-                          borderRadius: 1,
-                          fontSize: 12,
-                          fontWeight: 700,
-                        },
-                      }}
-                    />
-                  )}
-                  slotProps={{
-                    paper: {
-                      sx: {
-                        mt: 0.5,
-                        borderRadius: 1,
-                        maxHeight: 260,
-                        overflow: "auto",
-                      },
-                    },
-                    listbox: {
-                      sx: {
-                        py: 0.5,
-                        "& .MuiAutocomplete-option": {
-                          fontSize: 13,
-                          fontWeight: 700,
-                          py: 1,
-                        },
-                      },
-                    },
-                  }}
-                />
-              </Box>
-
-              <Stack direction="row" spacing={1}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={handleReset}
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    color: "#111",
-                    borderColor: "#d6c8a8",
-                    backgroundColor: "#fff8e8",
-                    "&:hover": {
-                      borderColor: "#d6c8a8",
-                      backgroundColor: "#fff8e8",
-                    },
-                  }}
-                >
-                  リセット
-                </Button>
-
-                <Button
-                  fullWidth
-                  variant="contained"
-                  onClick={handleSearch}
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    backgroundColor: "#071a33",
-                    color: "#fff",
-                    "&:hover": {
-                      backgroundColor: "#071a33",
-                    },
-                  }}
-                >
-                  実行
-                </Button>
-              </Stack>
-            </Stack>
-          </Box>
-
-          <Box
-            sx={{
-              mb: 2,
-            }}
-          >
-            <FormControl fullWidth size="small">
-              <Select
-                value={orderBy}
-                displayEmpty
-                onChange={(event: SelectChangeEvent<string>): void => {
-                  setOrderBy(event.target.value);
-                  setPage(0);
-                }}
-                sx={{
-                  height: 34,
-                  borderRadius: 1.3,
-                  backgroundColor: "#fff",
-                  fontWeight: 800,
-                  fontSize: 12,
-                  color: "#071a33",
-                }}
-              >
-                <MenuItem value="new">新着順</MenuItem>
-                <MenuItem value="empathy">共感数順</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={handlePostButtonClick}
-            sx={{
-              borderRadius: 999,
-              backgroundColor: "#071a33",
-              color: "#fff",
-              fontSize: 16,
-              fontWeight: 900,
-              py: 1.2,
-              lineHeight: 1.2,
-              "&:hover": {
-                backgroundColor: "#071a33",
-              },
-            }}
-          >
-            お悩み
-            <br />
-            投稿
-          </Button>
-        </Box>
-      </Box>
-
-      {isPostDialogOpen && (
-        <SubmitNeeds
-          onCancel={() => {
-            setIsPostDialogOpen(false);
-          }}
-        />
-      )}
-    </Box>
-  );
-}
+それで api.fetch(requestUrl) のエラーは消えるはず。
