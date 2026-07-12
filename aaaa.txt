@@ -1,1 +1,309 @@
 
+schema.sql
+
+-- ================================================================
+-- Drop tables
+-- ================================================================
+
+drop table if exists notifications cascade;
+drop table if exists comments cascade;
+drop table if exists tip_interest cascade;
+drop table if exists need_empathy cascade;
+drop table if exists tips cascade;
+drop table if exists needs cascade;
+drop table if exists users cascade;
+drop table if exists category cascade;
+drop table if exists frequency cascade;
+drop table if exists affiliated cascade;
+drop table if exists rank cascade;
+
+drop function if exists update_updated_time() cascade;
+
+-- ================================================================
+-- affiliated
+-- ================================================================
+
+create table if not exists affiliated
+(
+    affiliated_id   bigserial primary key,
+    affiliated_name varchar(10) not null unique
+);
+
+-- ================================================================
+-- rank
+-- ================================================================
+
+create table if not exists rank
+(
+    rank_id   bigserial primary key,
+    rank_name varchar(10) not null unique
+);
+
+-- ================================================================
+-- category
+-- ================================================================
+
+create table if not exists category
+(
+    category_id   bigserial primary key,
+    category_name varchar(30) not null unique,
+    created_time  timestamp not null default current_timestamp,
+    updated_time  timestamp not null default current_timestamp
+);
+
+-- ================================================================
+-- frequency
+-- ================================================================
+
+create table if not exists frequency
+(
+    frequency_id   bigserial primary key,
+    frequency_name varchar(10) not null unique
+);
+
+-- ================================================================
+-- users
+-- ================================================================
+
+create table if not exists users
+(
+    user_id           bigserial primary key,
+    user_name         varchar(50) not null,
+    self_introduction varchar(100),
+    admin_flg         boolean not null default false,
+    mail_address      varchar(50) not null unique,
+    affiliated_id     bigint not null,
+    rank_id           bigint not null,
+    created_time      timestamp not null default current_timestamp,
+    updated_time      timestamp not null default current_timestamp,
+
+    constraint fk_users_affiliated
+        foreign key (affiliated_id)
+        references affiliated(affiliated_id),
+
+    constraint fk_users_rank
+        foreign key (rank_id)
+        references rank(rank_id)
+);
+
+-- ================================================================
+-- needs
+-- ================================================================
+
+create table if not exists needs
+(
+    need_id      bigserial primary key,
+    user_id      bigint not null,
+    category_id  bigint not null,
+    need_title   varchar(50) not null,
+    need_detail  varchar(500) not null,
+    created_time timestamp not null default current_timestamp,
+    updated_time timestamp not null default current_timestamp,
+    delete_flg   boolean not null default false,
+
+    constraint fk_needs_user
+        foreign key (user_id)
+        references users(user_id),
+
+    constraint fk_needs_category
+        foreign key (category_id)
+        references category(category_id)
+);
+
+-- ================================================================
+-- tips
+-- ================================================================
+
+create table if not exists tips
+(
+    tip_id       bigserial primary key,
+    user_id      bigint not null,
+    category_id  bigint not null,
+    need_id      bigint,
+    tip_title    varchar(50) not null,
+    tip_detail   varchar(500) not null,
+    tip_url      varchar(500),
+    created_time timestamp not null default current_timestamp,
+    updated_time timestamp not null default current_timestamp,
+    delete_flg   boolean not null default false,
+
+    constraint fk_tips_user
+        foreign key (user_id)
+        references users(user_id),
+
+    constraint fk_tips_category
+        foreign key (category_id)
+        references category(category_id),
+
+    constraint fk_tips_need
+        foreign key (need_id)
+        references needs(need_id)
+);
+
+-- ================================================================
+-- comments
+-- ================================================================
+
+create table if not exists comments
+(
+    comment_id   bigserial primary key,
+    tip_id       bigint not null,
+    user_id      bigint not null,
+    comment_body varchar(250) not null,
+    created_time timestamp not null default current_timestamp,
+    is_looked    boolean not null default false,
+    delete_flg   boolean not null default false,
+
+    constraint fk_comments_tip
+        foreign key (tip_id)
+        references tips(tip_id),
+
+    constraint fk_comments_user
+        foreign key (user_id)
+        references users(user_id)
+);
+
+-- ================================================================
+-- need_empathy
+-- ================================================================
+
+create table if not exists need_empathy
+(
+    need_empathy_id      bigserial primary key,
+    need_id              bigint not null,
+    user_id              bigint not null,
+    created_time         timestamp not null default current_timestamp,
+    is_looked_by_reactor boolean not null default true,
+    is_looked_by_poster  boolean not null default false,
+
+    constraint fk_need_empathy_need
+        foreign key (need_id)
+        references needs(need_id),
+
+    constraint fk_need_empathy_user
+        foreign key (user_id)
+        references users(user_id),
+
+    constraint uq_need_empathy_need_user
+        unique (need_id, user_id)
+);
+
+-- ================================================================
+-- tip_interest
+-- ================================================================
+
+create table if not exists tip_interest
+(
+    tip_interest_id      bigserial primary key,
+    tip_id               bigint not null,
+    user_id              bigint not null,
+    created_time         timestamp not null default current_timestamp,
+    is_looked_by_reactor boolean not null default false,
+    is_looked_by_poster  boolean not null default true,
+    is_looked_by_best    boolean not null default false,
+    is_my_best           boolean not null default false,
+
+    constraint fk_tip_interest_tip
+        foreign key (tip_id)
+        references tips(tip_id),
+
+    constraint fk_tip_interest_user
+        foreign key (user_id)
+        references users(user_id),
+
+    constraint uq_tip_interest_tip_user
+        unique (tip_id, user_id)
+);
+
+-- ================================================================
+-- notifications
+-- ================================================================
+
+create table if not exists notifications
+(
+    notification_id   bigserial primary key,
+    tip_interest_id   bigint not null,
+    frequency_id      bigint not null,
+    notification_week integer,
+    notification_day  integer,
+    notification_time time not null,
+    is_active          boolean not null default true,
+
+    constraint fk_notifications_tip_interest
+        foreign key (tip_interest_id)
+        references tip_interest(tip_interest_id),
+
+    constraint fk_notifications_frequency
+        foreign key (frequency_id)
+        references frequency(frequency_id)
+);
+
+-- ================================================================
+-- Initial master data
+-- ================================================================
+
+insert into affiliated (affiliated_name)
+values
+    ('金融'),
+    ('保険'),
+    ('DX'),
+    ('AI'),
+    ('管理');
+
+insert into rank (rank_name)
+values
+    ('EP'),
+    ('PP'),
+    ('AP'),
+    ('LD'),
+    ('ST'),
+    ('AST'),
+    ('others');
+
+insert into category (category_name)
+values
+    ('仕事の進め方'),
+    ('人間関係'),
+    ('キャリア'),
+    ('スキル・学習'),
+    ('健康'),
+    ('その他');
+
+-- ================================================================
+-- updated_time trigger
+-- ================================================================
+
+create or replace function update_updated_time()
+returns trigger as $$
+begin
+    new.updated_time = current_timestamp;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_category_updated_time
+    before update on category
+    for each row
+    execute function update_updated_time();
+
+create trigger trg_users_updated_time
+    before update on users
+    for each row
+    execute function update_updated_time();
+
+create trigger trg_needs_updated_time
+    before update on needs
+    for each row
+    execute function update_updated_time();
+
+create trigger trg_tips_updated_time
+    before update on tips
+    for each row
+    execute function update_updated_time();
+
+
+
+
+
+
+
