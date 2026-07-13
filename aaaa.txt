@@ -1,12 +1,1 @@
 
-{tip?.comments.map((comment) => (
-  <Box key={comment.commentId}>
-    <Typography>
-      {comment.commentBody}
-    </Typography>
-
-    <Typography>
-      {comment.user.userName}
-    </Typography>
-  </Box>
-))}
