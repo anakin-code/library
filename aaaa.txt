@@ -1,1 +1,144 @@
+return (
+  <Paper
+    elevation={0}
+    sx={{
+      height: "100%",
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    }}
+  >
+    {/* コメント一覧 */}
+    <Box
+      sx={{
+        flex: 1,
+        overflowY: "auto",
+        mb: 2,
+        px: 1,
+      }}
+    >
+      {comments.length === 0 ? (
+        <Typography sx={{ color: "text.secondary" }}>
+          まだコメントはありません。最初のコメントを残しましょう！
+        </Typography>
+      ) : (
+        comments.map((comment: Comment): Element => (
+          <Box
+            key={comment.commentId}
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              py: 2,
+              gap: 2,
+              borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+              backgroundColor: "#F8FDFE",
+            }}
+          >
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                p: 1,
+                borderRadius: 3,
+                border: "1px solid rgba(0, 0, 0, 0.02)",
+              }}
+            >
+              <Typography>{comment.commentsBody}</Typography>
 
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block",
+                  mt: 1,
+                  color: "text.secondary",
+                }}
+              >
+                {comment.userName}
+              </Typography>
+            </Box>
+
+            {comment.editFlg && (
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  ml: "auto",
+                  alignItems: "flex-start",
+                }}
+              >
+                <CommentDeleteButton commentId={comment.commentId} />
+              </Box>
+            )}
+          </Box>
+        ))
+      )}
+    </Box>
+
+    {/* コメント入力欄 */}
+    <Box
+      component="form"
+      onSubmit={handleSubmit}
+      sx={{
+        flexShrink: 0,
+        position: "sticky",
+        bottom: 0,
+        width: "100%",
+        p: 2,
+        backgroundColor: "#F8FDFE",
+        borderTop: "1px solid rgba(0, 0, 0, 0.1)",
+        zIndex: 1,
+      }}
+    >
+      <Stack direction="row" spacing={2} alignItems="flex-start">
+        <TextField
+          label="コメントを入力"
+          name="commentBody"
+          value={newComment?.commentBody ?? ""}
+          onChange={handleChange}
+          fullWidth
+          multiline
+          slotProps={{
+            htmlInput: {
+              maxLength: 100,
+            },
+          }}
+          sx={{
+            backgroundColor: "white",
+          }}
+        />
+
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          disabled={isSubmitting}
+          sx={{
+            flexShrink: 0,
+            py: 1,
+            fontWeight: "bold",
+            borderRadius: 2,
+            boxShadow: "0 4px 12px rgba(25, 118, 210, 0.2)",
+            textTransform: "none",
+          }}
+        >
+          送信
+        </Button>
+      </Stack>
+
+      <Typography
+        variant="caption"
+        sx={{
+          display: "block",
+          mt: 0.5,
+          textAlign: "right",
+        }}
+      >
+        {newComment.commentBody.length >= 100
+          ? "コメントは100文字までです"
+          : `${newComment.commentBody.length}/100`}
+      </Typography>
+    </Box>
+  </Paper>
+);
