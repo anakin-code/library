@@ -1,60 +1,17 @@
-// 【修正①】handleSubmitを丸ごと置き換える
-const handleSubmit = async (): Promise<void> => {
-  // needData自体がない場合は送信しない
-  if (!needData) {
-    console.error("お悩み情報が取得できていません");
-    return;
-  }
+<Typography
+  sx={{
+    fontSize: 11.5,
+    color: "#4b4b4b",
+    lineHeight: 1.45,
+    textAlign: "left",
+    mb: 1,
 
-  // categoryIdがない場合は送信しない
-  if (needData.categoryId == null) {
-    console.error("カテゴリーIDが取得できていません");
-    return;
-  }
-
-  // needIdがない場合は送信しない
-  if (needData.needId == null) {
-    console.error("お悩みIDが取得できていません");
-    return;
-  }
-
-  // setFormDataは使わず、送信データに直接入れる
-  const requestBody: ContentInput = {
-    ...formData,
-    categoryId: needData.categoryId,
-    needId: needData.needId,
-  };
-
-  console.log("送信データ:", requestBody);
-
-  try {
-    setIsSubmitting(true);
-
-    const res = await api.sendJson(
-      "/api/tips",
-      requestBody,
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    // response.okではなくres.okを見る
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => null);
-
-      console.error("投稿失敗:", errorData);
-      throw new Error("ノウハウの投稿に失敗しました");
-    }
-
-    setPostOpen(false);
-    window.location.reload();
-  } catch (error) {
-    console.error("投稿エラー:", error);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    overflow: "hidden",
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 3,
+    wordBreak: "break-word",
+  }}
+>
+  {need.needDetail}
+</Typography>
