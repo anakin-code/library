@@ -91,3 +91,153 @@ const handleLogout = async (): Promise<void> => {
 };
 
 BAN時も同じようにCognitoから完全ログアウトさせたいなら、removeUser()ではなくsignoutRedirect()を使う方が近い。ただし、Cognito側で許可済みのサインアウトURLに window.location.origin を登録しておく必要がある。
+
+
+
+useApi.ts の403処理
+const checkAccountBanned = useCallback(
+  async (response: Response): Promise<Response> => {
+    if (response.status !== 403) {
+      return response;
+    }
+
+    let message = "このアカウントは利用停止されています";
+
+    try {
+      const errorData = (await response.clone().json()) as {
+        message?: string;
+      };
+
+      if (errorData.message) {
+        message = errorData.message;
+      }
+    } catch (error) {
+      console.error("403レスポンスの読み込みに失敗しました", error);
+    }
+
+    sessionStorage.setItem("authErrorMessage", message);
+
+    await auth.removeUser();
+
+    window.location.replace("/account-error");
+
+    return response;
+  },
+  [auth],
+);
+
+ここで、
+
+sessionStorage.setItem("authErrorMessage", message);
+
+でメッセージを保存して、
+
+window.location.replace("/account-error");
+
+で別ページへ移動する。
+
+2. エラー表示ページを作る
+
+たとえば AccountError.tsx。
+
+import { useEffect, useState } from "react";
+import { Alert, Box, Button, Typography } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+
+export default function AccountError() {
+  const navigate = useNavigate();
+
+  const [message, setMessage] = useState(
+    "このアカウントは利用できません",
+  );
+
+  useEffect(() => {
+    const storedMessage =
+      sessionStorage.getItem("authErrorMessage");
+
+    if (storedMessage) {
+      setMessage(storedMessage);
+      sessionStorage.removeItem("authErrorMessage");
+    }
+  }, []);
+
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        p: 3,
+      }}
+    >
+      <Box sx={{ width: "100%", maxWidth: 500 }}>
+        <Typography
+          variant="h5"
+          sx={{ mb: 2, textAlign: "center" }}
+        >
+          ログインできません
+        </Typography>
+
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {message}
+        </Alert>
+
+        <Button
+          fullWidth
+          variant="contained"
+          onClick={() => navigate("/", { replace: true })}
+        >
+          ログイン画面へ戻る
+        </Button>
+      </Box>
+    </Box>
+  );
+}
+3. ルーティングを追加
+
+App.tsxやルーター定義に追加。
+
+<Route
+  path="/account-error"
+  element={<AccountError />}
+/>
+
+大事なのは、/account-errorを認証必須ルートの外側に置くこと。
+
+悪い例はこれ。
+
+<Route element={<AuthenticatedRoute />}>
+  <Route path="/account-error" element={<AccountError />} />
+</Route>
+
+これだとremoveUser()後なので、認証判定に引っかかって表示できない可能性がある。
+
+こう置く。
+
+<Routes>
+  <Route path="/" element={<Login />} />
+
+  <Route
+    path="/account-error"
+    element={<AccountError />}
+  />
+
+  <Route element={<AuthenticatedRoute />}>
+    <Route path="/home" element={<Home />} />
+  </Route>
+</Routes>
+流れ
+403を受け取る
+↓
+レスポンスのmessageを取得
+↓
+sessionStorageに保存
+↓
+ログアウト
+↓
+/account-errorへ移動
+↓
+AccountErrorでmessageを表示
+
+今回はURLのstateより、ログアウトやリロードをまたいでも扱いやすいので sessionStorage が合っている。
