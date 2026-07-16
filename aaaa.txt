@@ -56,3 +56,38 @@ APIで垢BAN確認
 auth.signinRedirect()
 
 の中ではない。そこではまだアクセストークンがないので判定できない。Cognitoから戻った後、auth.isAuthenticatedを見てホームへ飛ばしている場所が修正箇所。
+
+
+
+
+今回の構成なら、この3つが参考になる。
+
+react-oidc-context 公式README
+useAuth()、signoutRedirect()、removeUser()を使ったログアウト処理の基本。
+https://github.com/authts/react-oidc-context
+oidc-client-ts 公式：UserManager
+signoutRedirect()やremoveUser()の正式なAPI仕様。react-oidc-contextは内部でこれを利用している。
+https://authts.github.io/oidc-client-ts/classes/UserManager.html
+AWS Cognito 公式：ログアウトエンドポイント
+Cognito側のブラウザセッションまで終了させる場合の /logout の仕様。
+https://docs.aws.amazon.com/cognito/latest/developerguide/logout-endpoint.html
+
+今回のコードで特に参考にするのは、次の違い。
+
+await auth.removeUser();
+
+これはクライアント内に保存されたユーザー情報を削除するだけ。
+
+Cognitoのログインセッションも含めてログアウトさせるなら、基本はこっち。
+
+await auth.signoutRedirect();
+
+たとえばログアウトボタンなら、
+
+const handleLogout = async (): Promise<void> => {
+  await auth.signoutRedirect({
+    post_logout_redirect_uri: window.location.origin,
+  });
+};
+
+BAN時も同じようにCognitoから完全ログアウトさせたいなら、removeUser()ではなくsignoutRedirect()を使う方が近い。ただし、Cognito側で許可済みのサインアウトURLに window.location.origin を登録しておく必要がある。
