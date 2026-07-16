@@ -1,17 +1,116 @@
-<Typography
-  sx={{
-    fontSize: 11.5,
-    color: "#4b4b4b",
-    lineHeight: 1.45,
-    textAlign: "left",
-    mb: 1,
+Cognitoでログイン
+↓
+クライアントがJWTを取得
+↓
+JWTをAuthorizationヘッダーに付けてサーバーへ
+↓
+Controllerで @AuthenticationPrincipal Jwt jwt
+↓
+userInfoService.getUserFromJwt(jwt)
+↓
+DBのUserを取得
 
-    overflow: "hidden",
-    display: "-webkit-box",
-    WebkitBoxOrient: "vertical",
-    WebkitLineClamp: 3,
-    wordBreak: "break-word",
-  }}
->
-  {need.needDetail}
-</Typography>
+なので、垢BAN判定を入れる場所は主に**UserInfoService#getUserFromJwt()**になる。
+
+例えば、User Entityに追加する。
+
+@Column(name = "ban_flg", nullable = false)
+private boolean banFlg = false;
+
+DBにも追加。
+
+ALTER TABLE users
+ADD COLUMN ban_flg BOOLEAN NOT NULL DEFAULT FALSE;
+
+そして、今使っているUserInfoServiceでユーザーを取得した直後に確認する。
+
+@Service
+@RequiredArgsConstructor
+public class UserInfoService {
+
+    private final UserRepository userRepository;
+
+    public User getUserFromJwt(Jwt jwt) {
+
+        String mailAddress = jwt.getClaimAsString("email");
+
+        User user = userRepository.findByMailAddress(mailAddress)
+                .orElseThrow(() ->
+                        new RuntimeException("ログインユーザーが見つかりません")
+                );
+
+        if (user.isBanFlg()) {
+            throw new AccountBannedException(
+                    "このアカウントは利用停止されています"
+            );
+        }
+
+        return user;
+    }
+}
+
+これなら、例えばControllerの今のコードはそのまま使える。
+
+@GetMapping
+public ResponseEntity<?> getNeeds(
+        @AuthenticationPrincipal Jwt jwt
+) {
+
+    User loginUser = userInfoService.getUserFromJwt(jwt);
+
+    return ResponseEntity.ok(
+            needService.getNeeds(loginUser.getUserId())
+    );
+}
+
+BAN済みなら、
+
+userInfoService.getUserFromJwt(jwt)
+
+の時点で例外になるので、その後のAPI処理は実行されない。
+
+例外クラス。
+
+public class AccountBannedException extends RuntimeException {
+
+    public AccountBannedException(String message) {
+        super(message);
+    }
+}
+
+例外ハンドラー。
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AccountBannedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountBannedException(
+            AccountBannedException e
+    ) {
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", HttpStatus.FORBIDDEN.value());
+        response.put("message", e.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(response);
+    }
+}
+
+返却結果はこう。
+
+{
+  "status": 403,
+  "message": "このアカウントは利用停止されています"
+}
+
+ただし、これだけだと正確には、Cognitoへのログイン自体は成功してJWTも発行されるが、SkippyのAPIを利用できないという状態になる。
+
+本当に「Cognitoのログイン画面でログイン自体を失敗させたい」なら、DBのbanFlgだけではなく、管理処理からCognitoのユーザーも無効化する必要がある。
+
+DBのbanFlg = true
+＋
+Cognitoユーザーを無効化
+
+ただ今回の既存コードに最小限で入れるなら、まずはUserInfoService#getUserFromJwt()で毎回BAN判定するのが合っている。これなら、すでにJWTを持っているユーザーも、BAN後は次のAPIアクセスから弾ける。
