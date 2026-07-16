@@ -5,7 +5,7 @@ import {
 } from "react-oidc-context";
 
 /**
- * 先頭が「/」のAPIパスだけを受け付けます。
+ * 先頭が「/」になっているAPIパスだけを受け付けます。
  *
  * 例：
  * "/api/needs"
@@ -14,22 +14,25 @@ import {
 type ApiPath = `/${string}`;
 
 /**
- * API通信に渡すオプションです。
+ * API通信時のオプションです。
  *
- * RequestInitに、Cognitoのアクセストークンを追加しています。
+ * RequestInitにアクセストークンを追加しています。
  */
 type ApiFetchOptions = RequestInit & {
   accessToken?: string;
 };
 
 /**
- * useApiを使用する画面側では、
- * accessTokenを直接渡さないため除外します。
+ * useApiの利用側ではaccessTokenを直接指定させないため、
+ * ApiFetchOptionsからaccessTokenを除外します。
  */
-type UseApiFetchOptions = Omit<ApiFetchOptions, "accessToken">;
+type UseApiFetchOptions = Omit<
+  ApiFetchOptions,
+  "accessToken"
+>;
 
 /**
- * サーバーから返されるエラーレスポンスです。
+ * サーバーから返されるエラーレスポンスの型です。
  */
 type ApiErrorResponse = {
   status?: number;
@@ -38,15 +41,15 @@ type ApiErrorResponse = {
 };
 
 /**
- * 環境変数に設定されたREST APIのホスト名です。
+ * REST APIのホストです。
  *
  * 例：
- * http://localhost:8080
+ * VITE_REST_HOST=http://localhost:8080
  */
 const restHost: string = import.meta.env.VITE_REST_HOST;
 
 /**
- * REST APIのURLを生成します。
+ * APIのURLを作成します。
  */
 function buildApiUrl(path: ApiPath): string {
   if (path.startsWith("//")) {
@@ -57,8 +60,10 @@ function buildApiUrl(path: ApiPath): string {
 }
 
 /**
- * ブラウザ標準のfetchをラップし、
- * Authorizationヘッダーにアクセストークンを設定します。
+ * ブラウザ標準のfetchをラップします。
+ *
+ * accessTokenが存在する場合は、
+ * Authorizationヘッダーを追加します。
  */
 function apiFetch(
   path: ApiPath,
@@ -71,7 +76,10 @@ function apiFetch(
   const headers = new Headers(initHeaders);
 
   if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
+    headers.set(
+      "Authorization",
+      `Bearer ${accessToken}`,
+    );
   }
 
   return fetch(buildApiUrl(path), {
@@ -90,7 +98,10 @@ function apiSendJson<TBody>(
 ): Promise<Response> {
   const headers = new Headers(options.headers);
 
-  headers.set("Content-Type", "application/json");
+  headers.set(
+    "Content-Type",
+    "application/json",
+  );
 
   return apiFetch(path, {
     ...options,
@@ -104,11 +115,8 @@ function apiSendJson<TBody>(
  * フロントエンドからREST APIへアクセスするための
  * カスタムフックです。
  *
- * Cognitoから取得したアクセストークンを、
- * Authorizationヘッダーに自動で設定します。
- *
- * また、サーバーからアカウント停止エラーが返された場合は、
- * ローカルの認証情報を削除してログイン前の画面に戻します。
+ * 認証済みユーザーのアクセストークンを
+ * Authorizationヘッダーへ自動的に設定します。
  */
 export function useApi(): {
   fetch: (
@@ -128,65 +136,78 @@ export function useApi(): {
   const removeUser = auth.removeUser;
 
   /**
-   * アカウント停止レスポンスを確認します。
+   * 403エラーを確認します。
    *
-   * 通常のレスポンスはそのまま返します。
-   * ACCOUNT_BANNEDの場合はログアウトさせます。
+   * 現在は動作確認のため、
+   * 403が返された場合はすべてアカウント停止として扱います。
    */
   const checkAccountBanned = useCallback(
-    async (response: Response): Promise<Response> => {
+    async (
+      response: Response,
+    ): Promise<Response> => {
       if (response.status !== 403) {
         return response;
       }
 
+      let message =
+        "このアカウントは利用停止されています";
+
       try {
         /*
-         * response.json()を直接実行すると、
-         * 呼び出し元でレスポンス本文を読めなくなるため、
-         * clone()したレスポンスを使用します。
+         * responseを直接json化すると、
+         * 呼び出し元で本文を再度読めなくなるため、
+         * cloneしたResponseを使用します。
          */
         const errorData =
           (await response.clone().json()) as ApiErrorResponse;
 
-        if (errorData.code !== "ACCOUNT_BANNED") {
-          return response;
+        if (
+          typeof errorData.message === "string" &&
+          errorData.message.length > 0
+        ) {
+          message = errorData.message;
         }
-
-        sessionStorage.setItem(
-          "loginErrorMessage",
-          errorData.message ??
-            "このアカウントは利用停止されています",
-        );
-
-        /*
-         * react-oidc-contextが保持している
-         * ローカルのログイン情報を削除します。
-         */
-        await removeUser();
-
-        /*
-         * 認証前の画面へ戻します。
-         *
-         * 「/」を開いた際に認証処理が動く現在の構成を想定しています。
-         */
-        window.location.replace("/");
-
-        return response;
       } catch (error) {
+        /*
+         * サーバーのレスポンスがJSONでなかった場合も、
+         * 403であればログアウト処理は続けます。
+         */
         console.error(
-          "アカウント停止レスポンスの解析に失敗しました。",
+          "403レスポンスの読み込みに失敗しました。",
           error,
         );
-
-        return response;
       }
+
+      /*
+       * ログアウト後に表示するメッセージを一時保存します。
+       */
+      sessionStorage.setItem(
+        "loginErrorMessage",
+        message,
+      );
+
+      /*
+       * react-oidc-contextが保持している
+       * ローカルのユーザー情報を削除します。
+       */
+      await removeUser();
+
+      /*
+       * ログイン前の画面へ戻します。
+       *
+       * プロジェクトのログイン画面が「/login」なら、
+       * "/"を"/login"に変更してください。
+       */
+      window.location.replace("/");
+
+      return response;
     },
     [removeUser],
   );
 
   /**
-   * ボディなし、またはRequestInitを直接指定して
-   * HTTPリクエストを送信します。
+   * GET、DELETEなど、
+   * JSONボディを自動生成しないリクエストで使用します。
    */
   const fetch = useCallback(
     async (
@@ -200,12 +221,15 @@ export function useApi(): {
 
       return checkAccountBanned(response);
     },
-    [accessToken, checkAccountBanned],
+    [
+      accessToken,
+      checkAccountBanned,
+    ],
   );
 
   /**
-   * JSON形式のボディ付きで
-   * HTTPリクエストを送信します。
+   * POST、PUT、PATCHなど、
+   * JSONボディを送信するリクエストで使用します。
    */
   const sendJson = useCallback(
     async <TBody>(
@@ -213,21 +237,28 @@ export function useApi(): {
       body: TBody,
       options: UseApiFetchOptions = {},
     ): Promise<Response> => {
-      const response = await apiSendJson(path, body, {
-        ...options,
-        accessToken,
-      });
+      const response = await apiSendJson(
+        path,
+        body,
+        {
+          ...options,
+          accessToken,
+        },
+      );
 
       return checkAccountBanned(response);
     },
-    [accessToken, checkAccountBanned],
+    [
+      accessToken,
+      checkAccountBanned,
+    ],
   );
 
   return {
-    /** ボディなしでHTTPリクエストを送信するときに利用します */
+    /** ボディなしでHTTPリクエストを送る場合に使用します */
     fetch,
 
-    /** ボディ付きでHTTPリクエストを送信するときに利用します */
+    /** JSONボディ付きでHTTPリクエストを送る場合に使用します */
     sendJson,
   };
 }
