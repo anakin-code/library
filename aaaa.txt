@@ -1,12 +1,138 @@
-useApi()の中に共通関数を追加
+import { useCallback } from "react";
+import {
+  type AuthContextProps,
+  useAuth,
+} from "react-oidc-context";
 
-この直後、
+/**
+ * 先頭が「/」のAPIパスだけを受け付けます。
+ *
+ * 例：
+ * "/api/needs"
+ * "/api/tips/1"
+ */
+type ApiPath = `/${string}`;
 
-export function useApi() {
+/**
+ * API通信に渡すオプションです。
+ *
+ * RequestInitに、Cognitoのアクセストークンを追加しています。
+ */
+type ApiFetchOptions = RequestInit & {
+  accessToken?: string;
+};
+
+/**
+ * useApiを使用する画面側では、
+ * accessTokenを直接渡さないため除外します。
+ */
+type UseApiFetchOptions = Omit<ApiFetchOptions, "accessToken">;
+
+/**
+ * サーバーから返されるエラーレスポンスです。
+ */
+type ApiErrorResponse = {
+  status?: number;
+  code?: string;
+  message?: string;
+};
+
+/**
+ * 環境変数に設定されたREST APIのホスト名です。
+ *
+ * 例：
+ * http://localhost:8080
+ */
+const restHost: string = import.meta.env.VITE_REST_HOST;
+
+/**
+ * REST APIのURLを生成します。
+ */
+function buildApiUrl(path: ApiPath): string {
+  if (path.startsWith("//")) {
+    throw new Error("API path must not start with //.");
+  }
+
+  return `${restHost}${path}`;
+}
+
+/**
+ * ブラウザ標準のfetchをラップし、
+ * Authorizationヘッダーにアクセストークンを設定します。
+ */
+function apiFetch(
+  path: ApiPath,
+  {
+    accessToken,
+    headers: initHeaders,
+    ...init
+  }: ApiFetchOptions = {},
+): Promise<Response> {
+  const headers = new Headers(initHeaders);
+
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  return fetch(buildApiUrl(path), {
+    ...init,
+    headers,
+  });
+}
+
+/**
+ * JSON形式のボディを送信します。
+ */
+function apiSendJson<TBody>(
+  path: ApiPath,
+  body: TBody,
+  options: ApiFetchOptions = {},
+): Promise<Response> {
+  const headers = new Headers(options.headers);
+
+  headers.set("Content-Type", "application/json");
+
+  return apiFetch(path, {
+    ...options,
+    method: options.method ?? "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * フロントエンドからREST APIへアクセスするための
+ * カスタムフックです。
+ *
+ * Cognitoから取得したアクセストークンを、
+ * Authorizationヘッダーに自動で設定します。
+ *
+ * また、サーバーからアカウント停止エラーが返された場合は、
+ * ローカルの認証情報を削除してログイン前の画面に戻します。
+ */
+export function useApi(): {
+  fetch: (
+    path: ApiPath,
+    options?: UseApiFetchOptions,
+  ) => Promise<Response>;
+
+  sendJson: <TBody>(
+    path: ApiPath,
+    body: TBody,
+    options?: UseApiFetchOptions,
+  ) => Promise<Response>;
+} {
   const auth: AuthContextProps = useAuth();
 
-に、次を追加する。
+  const accessToken = auth.user?.access_token;
+  const removeUser = auth.removeUser;
 
+  /**
+   * アカウント停止レスポンスを確認します。
+   *
+   * 通常のレスポンスはそのまま返します。
+   * ACCOUNT_BANNEDの場合はログアウトさせます。
+   */
   const checkAccountBanned = useCallback(
     async (response: Response): Promise<Response> => {
       if (response.status !== 403) {
@@ -14,10 +140,13 @@ export function useApi() {
       }
 
       try {
-        const errorData: {
-          code?: string;
-          message?: string;
-        } = await response.clone().json();
+        /*
+         * response.json()を直接実行すると、
+         * 呼び出し元でレスポンス本文を読めなくなるため、
+         * clone()したレスポンスを使用します。
+         */
+        const errorData =
+          (await response.clone().json()) as ApiErrorResponse;
 
         if (errorData.code !== "ACCOUNT_BANNED") {
           return response;
@@ -25,210 +154,80 @@ export function useApi() {
 
         sessionStorage.setItem(
           "loginErrorMessage",
-          errorData.message ?? "このアカウントは利用停止されています"
+          errorData.message ??
+            "このアカウントは利用停止されています",
         );
 
-        // react-oidc-contextのローカル認証情報を削除
-        await auth.removeUser();
+        /*
+         * react-oidc-contextが保持している
+         * ローカルのログイン情報を削除します。
+         */
+        await removeUser();
 
-        window.location.href = "/";
+        /*
+         * 認証前の画面へ戻します。
+         *
+         * 「/」を開いた際に認証処理が動く現在の構成を想定しています。
+         */
+        window.location.replace("/");
+
+        return response;
       } catch (error) {
-        console.error("アカウント停止情報の取得に失敗しました", error);
-      }
+        console.error(
+          "アカウント停止レスポンスの解析に失敗しました。",
+          error,
+        );
 
-      return response;
-    },
-    [auth]
-  );
-
-Cognitoログイン画面まで戻したい場合は、プロジェクトの既存ログアウト処理に合わせて、
-
-await auth.signoutRedirect();
-
-を使う形でもいい。ただし、すでにヘッダーなどにログアウト機能があるなら、そこで使っている処理と同じものに合わせる。
-
-2. fetchを修正
-
-今はこうなっている。
-
-const fetch = useCallback(
-  (path: ApiPath, options: UseApiFetchOptions = {}) => {
-    return apiFetch(path, {
-      ...options,
-      accessToken: auth.user?.access_token,
-    });
-  },
-  [auth.user?.access_token],
-);
-
-これを次に置き換える。
-
-const fetch = useCallback(
-  async (
-    path: ApiPath,
-    options: UseApiFetchOptions = {}
-  ): Promise<Response> => {
-    const response = await apiFetch(path, {
-      ...options,
-      accessToken: auth.user?.access_token,
-    });
-
-    return checkAccountBanned(response);
-  },
-  [auth.user?.access_token, checkAccountBanned],
-);
-
-変更点は、
-
-return apiFetch(...)
-
-を、
-
-const response = await apiFetch(...);
-
-return checkAccountBanned(response);
-
-にしたこと。
-
-3. sendJsonも修正
-
-今はこう。
-
-const sendJson = useCallback(
-  <TBody>(
-    path: ApiPath,
-    body: TBody,
-    options: UseApiFetchOptions = {}
-  ) => {
-    return apiSendJson(path, body, {
-      ...options,
-      accessToken: auth.user?.access_token,
-    });
-  },
-  [auth.user?.access_token],
-);
-
-これを次に置き換える。
-
-const sendJson = useCallback(
-  async <TBody>(
-    path: ApiPath,
-    body: TBody,
-    options: UseApiFetchOptions = {}
-  ): Promise<Response> => {
-    const response = await apiSendJson(path, body, {
-      ...options,
-      accessToken: auth.user?.access_token,
-    });
-
-    return checkAccountBanned(response);
-  },
-  [auth.user?.access_token, checkAccountBanned],
-);
-修正後のuseApi全体
-export function useApi() {
-  const auth: AuthContextProps = useAuth();
-
-  const checkAccountBanned = useCallback(
-    async (response: Response): Promise<Response> => {
-      if (response.status !== 403) {
         return response;
       }
-
-      try {
-        const errorData: {
-          code?: string;
-          message?: string;
-        } = await response.clone().json();
-
-        if (errorData.code !== "ACCOUNT_BANNED") {
-          return response;
-        }
-
-        sessionStorage.setItem(
-          "loginErrorMessage",
-          errorData.message ?? "このアカウントは利用停止されています"
-        );
-
-        await auth.removeUser();
-
-        window.location.href = "/";
-      } catch (error) {
-        console.error("アカウント停止情報の取得に失敗しました", error);
-      }
-
-      return response;
     },
-    [auth]
+    [removeUser],
   );
 
+  /**
+   * ボディなし、またはRequestInitを直接指定して
+   * HTTPリクエストを送信します。
+   */
   const fetch = useCallback(
     async (
       path: ApiPath,
-      options: UseApiFetchOptions = {}
+      options: UseApiFetchOptions = {},
     ): Promise<Response> => {
       const response = await apiFetch(path, {
         ...options,
-        accessToken: auth.user?.access_token,
+        accessToken,
       });
 
       return checkAccountBanned(response);
     },
-    [auth.user?.access_token, checkAccountBanned],
+    [accessToken, checkAccountBanned],
   );
 
+  /**
+   * JSON形式のボディ付きで
+   * HTTPリクエストを送信します。
+   */
   const sendJson = useCallback(
     async <TBody>(
       path: ApiPath,
       body: TBody,
-      options: UseApiFetchOptions = {}
+      options: UseApiFetchOptions = {},
     ): Promise<Response> => {
       const response = await apiSendJson(path, body, {
         ...options,
-        accessToken: auth.user?.access_token,
+        accessToken,
       });
 
       return checkAccountBanned(response);
     },
-    [auth.user?.access_token, checkAccountBanned],
+    [accessToken, checkAccountBanned],
   );
 
   return {
     /** ボディなしでHTTPリクエストを送信するときに利用します */
     fetch,
 
-    /** ボディつきでHTTPリクエストを送信するときに利用します */
+    /** ボディ付きでHTTPリクエストを送信するときに利用します */
     sendJson,
   };
 }
-大事な点
-
-apiSendJson()は内部で既に、
-
-return apiFetch(path, ...)
-
-を呼んでいる。ただ、apiFetchはuseApiの外にあるため、そこでは直接、
-
-auth.removeUser()
-
-を使えない。
-
-そのため今回は、
-
-apiFetch自体は今のまま
-useApiのfetchとsendJsonで返却結果を確認
-
-という修正でいい。
-
-また、サーバーから本当に次の形式が返る必要がある。
-
-{
-  "code": "ACCOUNT_BANNED",
-  "message": "このアカウントは利用停止されています"
-}
-
-サーバーがmessageしか返していないなら、今のクライアントの
-
-errorData.code !== "ACCOUNT_BANNED"
-
-では判定できない。そこはサーバー側のGlobalExceptionHandlerのレスポンス形式と揃える必要がある。
