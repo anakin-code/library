@@ -1,1 +1,58 @@
 
+useEffect(() => {
+  if (auth.isAuthenticated) {
+    navigate("/home");
+  }
+}, [auth.isAuthenticated]);
+
+ここを修正する。
+
+const { fetch: apiFetch } = useApi();
+const navigate = useNavigate();
+const auth = useAuth();
+
+useEffect(() => {
+  if (!auth.isAuthenticated) {
+    return;
+  }
+
+  const checkAccount = async (): Promise<void> => {
+    try {
+      const response = await apiFetch("/api/users/me");
+
+      if (!response.ok) {
+        return;
+      }
+
+      navigate("/home", { replace: true });
+    } catch (error) {
+      console.error("ログインユーザー確認に失敗しました", error);
+    }
+  };
+
+  void checkAccount();
+}, [
+  auth.isAuthenticated,
+  apiFetch,
+  navigate,
+]);
+
+つまり、今あるこれを消す。
+
+if (auth.isAuthenticated) {
+  navigate("/home");
+}
+
+そして、
+
+APIで垢BAN確認
+↓
+正常ならnavigate("/home")
+
+に変える。
+
+ログインボタンの、
+
+auth.signinRedirect()
+
+の中ではない。そこではまだアクセストークンがないので判定できない。Cognitoから戻った後、auth.isAuthenticatedを見てホームへ飛ばしている場所が修正箇所。
