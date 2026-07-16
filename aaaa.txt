@@ -1,116 +1,214 @@
-Cognitoでログイン
-↓
-クライアントがJWTを取得
-↓
-JWTをAuthorizationヘッダーに付けてサーバーへ
-↓
-Controllerで @AuthenticationPrincipal Jwt jwt
-↓
-userInfoService.getUserFromJwt(jwt)
-↓
-DBのUserを取得
+共通のapi.fetchで403を処理する
 
-なので、垢BAN判定を入れる場所は主に**UserInfoService#getUserFromJwt()**になる。
+今使っているapi.fetch(...)の中に、BAN時の処理を追加する。
 
-例えば、User Entityに追加する。
+import { signOut } from "aws-amplify/auth";
 
-@Column(name = "ban_flg", nullable = false)
-private boolean banFlg = false;
+export const apiFetch = async (
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> => {
+  const response = await fetch(input, init);
 
-DBにも追加。
+  if (response.status === 403) {
+    let message = "このアカウントは利用停止されています";
 
-ALTER TABLE users
-ADD COLUMN ban_flg BOOLEAN NOT NULL DEFAULT FALSE;
+    try {
+      const errorData = await response.clone().json();
 
-そして、今使っているUserInfoServiceでユーザーを取得した直後に確認する。
+      if (typeof errorData.message === "string") {
+        message = errorData.message;
+      }
+    } catch {
+      // JSONではない場合は標準メッセージを使用
+    }
 
-@Service
-@RequiredArgsConstructor
-public class UserInfoService {
+    if (message.includes("利用停止")) {
+      sessionStorage.setItem("loginErrorMessage", message);
 
-    private final UserRepository userRepository;
+      await signOut();
 
-    public User getUserFromJwt(Jwt jwt) {
+      window.location.href = "/login";
+    }
+  }
 
-        String mailAddress = jwt.getClaimAsString("email");
+  return response;
+};
 
-        User user = userRepository.findByMailAddress(mailAddress)
-                .orElseThrow(() ->
-                        new RuntimeException("ログインユーザーが見つかりません")
-                );
+重要なのはこれ。
 
-        if (user.isBanFlg()) {
-            throw new AccountBannedException(
-                    "このアカウントは利用停止されています"
-            );
+await signOut();
+window.location.href = "/login";
+
+BANされたユーザーが持っているCognitoのログイン状態を消して、ログイン画面に戻す。
+
+2. 既存のuseApiに入れる場合
+
+今のWEB層では、画面からこのように呼んでいたはず。
+
+const response = await api.fetch(requestUrl);
+
+そのため、Home.tsxやNeedList.tsxを全部変更するのではなく、useApiの中を変更する。
+
+イメージはこう。
+
+import { fetchAuthSession, signOut } from "aws-amplify/auth";
+
+export const useApi = () => {
+  const apiFetch = async (
+    url: string,
+    options: RequestInit = {}
+  ): Promise<Response> => {
+    const session = await fetchAuthSession();
+    const accessToken =
+      session.tokens?.accessToken?.toString();
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        ...options.headers,
+      },
+    });
+
+    if (response.status === 403) {
+      const clonedResponse = response.clone();
+
+      try {
+        const errorData = await clonedResponse.json();
+
+        if (
+          errorData.message ===
+          "このアカウントは利用停止されています"
+        ) {
+          sessionStorage.setItem(
+            "loginErrorMessage",
+            errorData.message
+          );
+
+          await signOut();
+
+          window.location.href = "/login";
         }
-
-        return user;
+      } catch (error) {
+        console.error("403レスポンスの解析に失敗しました", error);
+      }
     }
+
+    return response;
+  };
+
+  return {
+    fetch: apiFetch,
+  };
+};
+
+こうすれば、既存のコードはそのままでいい。
+
+const response = await api.fetch(requestUrl);
+
+一覧取得でも、詳細取得でも、投稿でも、コメントでも、BANユーザーなら共通処理でログアウトされる。
+
+3. ログイン画面でメッセージを表示する
+
+ログインページでsessionStorageのメッセージを読む。
+
+const [errorMessage, setErrorMessage] = useState("");
+
+useEffect(() => {
+  const message =
+    sessionStorage.getItem("loginErrorMessage");
+
+  if (message) {
+    setErrorMessage(message);
+    sessionStorage.removeItem("loginErrorMessage");
+  }
+}, []);
+
+MUIならこう表示する。
+
+{errorMessage && (
+  <Alert severity="error" sx={{ mb: 2 }}>
+    {errorMessage}
+  </Alert>
+)}
+
+これでBANされたユーザーがAPIを操作すると、ログイン画面に戻って、
+
+このアカウントは利用停止されています
+
+と表示される。
+
+4. 各画面にはBAN処理を書かない
+
+これは避けた方がいい。
+
+if (response.status === 403) {
+  await signOut();
+  navigate("/login");
 }
 
-これなら、例えばControllerの今のコードはそのまま使える。
+これをHome、NeedList、ContentDetail、CommentSectionなど全部に書くと、修正漏れが起きる。
 
-@GetMapping
-public ResponseEntity<?> getNeeds(
-        @AuthenticationPrincipal Jwt jwt
-) {
+今回なら、
 
-    User loginUser = userInfoService.getUserFromJwt(jwt);
+useApi
+または
+apiClient.ts
 
-    return ResponseEntity.ok(
-            needService.getNeeds(loginUser.getUserId())
-    );
-}
+の1か所だけ直す。
 
-BAN済みなら、
+5. 403全部をBAN扱いしない
 
-userInfoService.getUserFromJwt(jwt)
+403はBAN以外でも使われる可能性がある。
 
-の時点で例外になるので、その後のAPI処理は実行されない。
+例えば、
 
-例外クラス。
+他人の投稿を編集しようとした
+管理者権限がない
+削除権限がない
 
-public class AccountBannedException extends RuntimeException {
+でも403になる。
 
-    public AccountBannedException(String message) {
-        super(message);
-    }
-}
+だから、ステータスだけでなく、Serverから専用コードを返す方が安全。
 
-例外ハンドラー。
-
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(AccountBannedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccountBannedException(
-            AccountBannedException e
-    ) {
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", HttpStatus.FORBIDDEN.value());
-        response.put("message", e.getMessage());
-
-        return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(response);
-    }
-}
-
-返却結果はこう。
+Server側をこうする。
 
 {
   "status": 403,
+  "code": "ACCOUNT_BANNED",
   "message": "このアカウントは利用停止されています"
 }
 
-ただし、これだけだと正確には、Cognitoへのログイン自体は成功してJWTも発行されるが、SkippyのAPIを利用できないという状態になる。
+Client側はこう判定する。
 
-本当に「Cognitoのログイン画面でログイン自体を失敗させたい」なら、DBのbanFlgだけではなく、管理処理からCognitoのユーザーも無効化する必要がある。
+if (
+  response.status === 403 &&
+  errorData.code === "ACCOUNT_BANNED"
+) {
+  sessionStorage.setItem(
+    "loginErrorMessage",
+    errorData.message
+  );
 
-DBのbanFlg = true
-＋
-Cognitoユーザーを無効化
+  await signOut();
 
-ただ今回の既存コードに最小限で入れるなら、まずはUserInfoService#getUserFromJwt()で毎回BAN判定するのが合っている。これなら、すでにJWTを持っているユーザーも、BAN後は次のAPIアクセスから弾ける。
+  window.location.href = "/login";
+}
+
+文字列の一致よりACCOUNT_BANNEDで判定する方がいい。
+
+今回の修正場所
+Server
+UserにbanFlg追加
+UserInfoServiceでbanFlg確認
+ACCOUNT_BANNEDの403を返す
+
+Client
+useApiまたはapiClientの共通fetchを修正
+403 + ACCOUNT_BANNEDならCognito signOut
+/loginへ移動
+Login画面で利用停止メッセージ表示
+
+つまり、クライアント側の中心修正は**HomeやNeedListではなく、JWTを付けている共通のfetch部分**。
