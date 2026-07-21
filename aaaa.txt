@@ -1,1 +1,142 @@
 
+@startuml
+
+hide circle
+skinparam linetype ortho
+
+entity affiliated {
+    * affiliated_id : BIGINT <<PK>>
+    --
+    affiliated_name : VARCHAR(10) <<UK>>
+}
+
+entity rank {
+    * rank_id : BIGINT <<PK>>
+    --
+    rank_name : VARCHAR(10) <<UK>>
+}
+
+entity category {
+    * category_id : BIGINT <<PK>>
+    --
+    category_name : VARCHAR(30) <<UK>>
+    created_time : TIMESTAMP
+    updated_time : TIMESTAMP
+}
+
+entity frequency {
+    * frequency_id : BIGINT <<PK>>
+    --
+    frequency_name : VARCHAR(10) <<UK>>
+}
+
+entity users {
+    * user_id : BIGINT <<PK>>
+    --
+    user_name : VARCHAR(50)
+    self_introduction : VARCHAR(100)
+    admin_flg : BOOLEAN
+    mail_address : VARCHAR(50) <<UK>>
+    affiliated_id : BIGINT <<FK>>
+    rank_id : BIGINT <<FK>>
+    created_time : TIMESTAMP
+    updated_time : TIMESTAMP
+}
+
+entity needs {
+    * need_id : BIGINT <<PK>>
+    --
+    user_id : BIGINT <<FK>>
+    category_id : BIGINT <<FK>>
+    need_title : VARCHAR(50)
+    need_detail : VARCHAR(500)
+    created_time : TIMESTAMP
+    updated_time : TIMESTAMP
+    delete_flg : BOOLEAN
+}
+
+entity tips {
+    * tip_id : BIGINT <<PK>>
+    --
+    user_id : BIGINT <<FK>>
+    category_id : BIGINT <<FK>>
+    need_id : BIGINT <<FK, NULLABLE>>
+    tip_title : VARCHAR(50)
+    tip_detail : VARCHAR(500)
+    tip_url : VARCHAR(500)
+    created_time : TIMESTAMP
+    updated_time : TIMESTAMP
+    delete_flg : BOOLEAN
+}
+
+entity comments {
+    * comment_id : BIGINT <<PK>>
+    --
+    tip_id : BIGINT <<FK>>
+    user_id : BIGINT <<FK>>
+    comment_body : VARCHAR(250)
+    created_time : TIMESTAMP
+    is_looked : BOOLEAN
+    delete_flg : BOOLEAN
+}
+
+entity need_empathy {
+    * need_empathy_id : BIGINT <<PK>>
+    --
+    need_id : BIGINT <<FK>>
+    user_id : BIGINT <<FK>>
+    created_time : TIMESTAMP
+    is_looked_by_reactor : BOOLEAN
+    is_looked_by_poster : BOOLEAN
+    --
+    UNIQUE(need_id, user_id)
+}
+
+entity tip_interest {
+    * tip_interest_id : BIGINT <<PK>>
+    --
+    tip_id : BIGINT <<FK>>
+    user_id : BIGINT <<FK>>
+    created_time : TIMESTAMP
+    is_looked_by_reactor : BOOLEAN
+    is_looked_by_poster : BOOLEAN
+    is_looked_by_best : BOOLEAN
+    is_my_best : BOOLEAN
+    --
+    UNIQUE(tip_id, user_id)
+}
+
+entity notifications {
+    * notification_id : BIGINT <<PK>>
+    --
+    tip_interest_id : BIGINT <<FK>>
+    frequency_id : BIGINT <<FK>>
+    notification_week : INTEGER
+    notification_day : INTEGER
+    notification_time : TIME
+    is_active : BOOLEAN
+}
+
+affiliated ||--o{ users : "affiliated_id"
+rank ||--o{ users : "rank_id"
+
+users ||--o{ needs : "user_id"
+category ||--o{ needs : "category_id"
+
+users ||--o{ tips : "user_id"
+category ||--o{ tips : "category_id"
+needs |o--o{ tips : "need_id"
+
+tips ||--o{ comments : "tip_id"
+users ||--o{ comments : "user_id"
+
+needs ||--o{ need_empathy : "need_id"
+users ||--o{ need_empathy : "user_id"
+
+tips ||--o{ tip_interest : "tip_id"
+users ||--o{ tip_interest : "user_id"
+
+tip_interest ||--o{ notifications : "tip_interest_id"
+frequency ||--o{ notifications : "frequency_id"
+
+@enduml
