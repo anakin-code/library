@@ -1,1 +1,134 @@
+@startuml
 
+hide circle
+skinparam linetype ortho
+
+entity "ユーザー" as User {
+    ユーザー名
+    メールアドレス
+    自己紹介
+    管理者区分
+}
+
+entity "所属" as Affiliated {
+    所属名
+}
+
+entity "役職" as Rank {
+    役職名
+}
+
+entity "カテゴリ" as Category {
+    カテゴリ名
+}
+
+entity "お悩み" as Need {
+    タイトル
+    詳細
+    投稿日時
+    更新日時
+    削除状態
+}
+
+entity "ノウハウ" as Tip {
+    タイトル
+    詳細
+    関連URL
+    投稿日時
+    更新日時
+    削除状態
+}
+
+entity "コメント" as Comment {
+    コメント内容
+    投稿日時
+    既読状態
+    削除状態
+}
+
+entity "お悩み共感" as NeedEmpathy {
+    共感日時
+    共感者既読状態
+    投稿者既読状態
+}
+
+entity "ノウハウ興味" as TipInterest {
+    興味登録日時
+    登録者既読状態
+    投稿者既読状態
+    ベスト通知既読状態
+    ベストノウハウ状態
+}
+
+entity "通知" as Notification {
+    通知週
+    通知日
+    通知時刻
+    有効状態
+}
+
+entity "通知頻度" as Frequency {
+    通知頻度名
+}
+
+entity "お悩み編集履歴" as NeedEditHistory {
+    編集前のお悩み内容
+    編集日時
+}
+
+entity "ノウハウ編集履歴" as TipEditHistory {
+    編集前のノウハウ内容
+    編集前の関連URL
+    編集日時
+}
+
+entity "コメント編集履歴" as CommentEditHistory {
+    編集前のコメント内容
+    編集日時
+}
+
+entity "Slack通知設定" as SlackNotificationSetting {
+    通知頻度
+    通知時刻
+    曜日
+    日付
+    有効状態
+}
+
+entity "Slack連携情報" as SlackOAuth {
+    Slack識別情報
+    通知先チャンネル
+}
+
+Affiliated "1" -- "0..n" User : "所属する"
+Rank "1" -- "0..n" User : "役職を持つ"
+
+User "1" -- "0..n" Need : "投稿する"
+Category "1" -- "0..n" Need : "分類する"
+
+User "1" -- "0..n" Tip : "投稿する"
+Category "1" -- "0..n" Tip : "分類する"
+Need "0..1" -- "0..n" Tip : "関連する"
+
+User "1" -- "0..n" Comment : "投稿する"
+Tip "1" -- "0..n" Comment : "コメントされる"
+
+User "1" -- "0..n" NeedEmpathy : "共感する"
+Need "1" -- "0..n" NeedEmpathy : "共感される"
+
+User "1" -- "0..n" TipInterest : "興味を持つ"
+Tip "1" -- "0..n" TipInterest : "興味を持たれる"
+
+TipInterest "1" -- "0..n" Notification : "通知を設定する"
+Frequency "1" -- "0..n" Notification : "頻度を指定する"
+
+Need "1" -- "0..n" NeedEditHistory : "編集履歴を持つ"
+Tip "1" -- "0..n" TipEditHistory : "編集履歴を持つ"
+Comment "1" -- "0..n" CommentEditHistory : "編集履歴を持つ"
+
+User "1" -- "0..n" SlackNotificationSetting : "設定する"
+Tip "1" -- "0..n" SlackNotificationSetting : "通知対象となる"
+
+User "1" -- "0..n" SlackOAuth : "Slackと連携する"
+
+@enduml
