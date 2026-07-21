@@ -1,8 +1,11 @@
-
 @startuml
 
 hide circle
 skinparam linetype ortho
+
+' =========================================================
+' Master tables
+' =========================================================
 
 entity affiliated {
     * affiliated_id : BIGINT <<PK>>
@@ -30,6 +33,10 @@ entity frequency {
     frequency_name : VARCHAR(10) <<UK>>
 }
 
+' =========================================================
+' User
+' =========================================================
+
 entity users {
     * user_id : BIGINT <<PK>>
     --
@@ -43,6 +50,10 @@ entity users {
     updated_time : TIMESTAMP
 }
 
+' =========================================================
+' Need
+' =========================================================
+
 entity needs {
     * need_id : BIGINT <<PK>>
     --
@@ -54,6 +65,30 @@ entity needs {
     updated_time : TIMESTAMP
     delete_flg : BOOLEAN
 }
+
+entity need_edit_history {
+    * need_edit_history_id : BIGINT <<PK>>
+    --
+    need_id : BIGINT <<FK>>
+    need_detail : VARCHAR(500)
+    created_time : TIMESTAMP
+}
+
+entity need_empathy {
+    * need_empathy_id : BIGINT <<PK>>
+    --
+    need_id : BIGINT <<FK>>
+    user_id : BIGINT <<FK>>
+    created_time : TIMESTAMP
+    is_looked_by_reactor : BOOLEAN
+    is_looked_by_poster : BOOLEAN
+    --
+    UNIQUE(need_id, user_id)
+}
+
+' =========================================================
+' Tip
+' =========================================================
 
 entity tips {
     * tip_id : BIGINT <<PK>>
@@ -69,27 +104,13 @@ entity tips {
     delete_flg : BOOLEAN
 }
 
-entity comments {
-    * comment_id : BIGINT <<PK>>
+entity tip_edit_history {
+    * tip_edit_history_id : BIGINT <<PK>>
     --
     tip_id : BIGINT <<FK>>
-    user_id : BIGINT <<FK>>
-    comment_body : VARCHAR(250)
+    tip_detail : VARCHAR(500)
+    tip_url : VARCHAR(500) <<NULLABLE>>
     created_time : TIMESTAMP
-    is_looked : BOOLEAN
-    delete_flg : BOOLEAN
-}
-
-entity need_empathy {
-    * need_empathy_id : BIGINT <<PK>>
-    --
-    need_id : BIGINT <<FK>>
-    user_id : BIGINT <<FK>>
-    created_time : TIMESTAMP
-    is_looked_by_reactor : BOOLEAN
-    is_looked_by_poster : BOOLEAN
-    --
-    UNIQUE(need_id, user_id)
 }
 
 entity tip_interest {
@@ -106,6 +127,33 @@ entity tip_interest {
     UNIQUE(tip_id, user_id)
 }
 
+' =========================================================
+' Comment
+' =========================================================
+
+entity comments {
+    * comment_id : BIGINT <<PK>>
+    --
+    tip_id : BIGINT <<FK>>
+    user_id : BIGINT <<FK>>
+    comment_body : VARCHAR(250)
+    created_time : TIMESTAMP
+    is_looked : BOOLEAN
+    delete_flg : BOOLEAN
+}
+
+entity comment_edit_history {
+    * comment_edit_history_id : BIGINT <<PK>>
+    --
+    comment_id : BIGINT <<FK>>
+    comment_body : VARCHAR(250)
+    created_time : TIMESTAMP
+}
+
+' =========================================================
+' Notification
+' =========================================================
+
 entity notifications {
     * notification_id : BIGINT <<PK>>
     --
@@ -117,26 +165,67 @@ entity notifications {
     is_active : BOOLEAN
 }
 
-affiliated ||--o{ users : "affiliated_id"
-rank ||--o{ users : "rank_id"
+' =========================================================
+' Slack
+' =========================================================
 
-users ||--o{ needs : "user_id"
-category ||--o{ needs : "category_id"
+entity slack_notification_setting {
+    * slack_notification_setting_id : BIGINT <<PK>>
+    --
+    user_id : BIGINT <<FK>>
+    tip_id : BIGINT <<FK>>
+    frequency : VARCHAR(255)
+    notify_time : TIME <<NULLABLE>>
+    day_of_week : INTEGER <<NULLABLE>>
+    day_of_month : INTEGER <<NULLABLE>>
+    enabled : BOOLEAN
+    --
+    UNIQUE(user_id, tip_id)
+}
 
-users ||--o{ tips : "user_id"
-category ||--o{ tips : "category_id"
-needs |o--o{ tips : "need_id"
+entity slack {
+    * slack_table_id : BIGINT <<PK>>
+    --
+    slack_id : VARCHAR(255)
+    channel : VARCHAR(255)
+    user_id : BIGINT <<FK>>
+}
 
-tips ||--o{ comments : "tip_id"
-users ||--o{ comments : "user_id"
+' =========================================================
+' Relationships
+' =========================================================
 
-needs ||--o{ need_empathy : "need_id"
-users ||--o{ need_empathy : "user_id"
+affiliated ||--o{ users : affiliated_id
+rank ||--o{ users : rank_id
 
-tips ||--o{ tip_interest : "tip_id"
-users ||--o{ tip_interest : "user_id"
+users ||--o{ needs : user_id
+category ||--o{ needs : category_id
 
-tip_interest ||--o{ notifications : "tip_interest_id"
-frequency ||--o{ notifications : "frequency_id"
+needs ||--o{ need_edit_history : need_id
+
+needs ||--o{ need_empathy : need_id
+users ||--o{ need_empathy : user_id
+
+users ||--o{ tips : user_id
+category ||--o{ tips : category_id
+needs |o--o{ tips : need_id
+
+tips ||--o{ tip_edit_history : tip_id
+
+tips ||--o{ comments : tip_id
+users ||--o{ comments : user_id
+
+comments ||--o{ comment_edit_history : comment_id
+
+tips ||--o{ tip_interest : tip_id
+users ||--o{ tip_interest : user_id
+
+tip_interest ||--o{ notifications : tip_interest_id
+frequency ||--o{ notifications : frequency_id
+
+users ||--o{ slack_notification_setting : user_id
+tips ||--o{ slack_notification_setting : tip_id
+
+users ||--o{ slack : user_id
 
 @enduml
