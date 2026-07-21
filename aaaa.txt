@@ -3,229 +3,54 @@
 hide circle
 skinparam linetype ortho
 
-' =========================================================
-' Master tables
-' =========================================================
+entity ユーザー
+entity 所属
+entity 役職
+entity カテゴリ
+entity お悩み
+entity ノウハウ
+entity コメント
+entity お悩み共感
+entity ノウハウ興味
+entity 通知
+entity 通知頻度
 
-entity affiliated {
-    * affiliated_id : BIGINT <<PK>>
-    --
-    affiliated_name : VARCHAR(10) <<UK>>
-}
+entity お悩み編集履歴
+entity ノウハウ編集履歴
+entity コメント編集履歴
 
-entity rank {
-    * rank_id : BIGINT <<PK>>
-    --
-    rank_name : VARCHAR(10) <<UK>>
-}
+entity Slack通知設定
+entity Slack連携情報
 
-entity category {
-    * category_id : BIGINT <<PK>>
-    --
-    category_name : VARCHAR(30) <<UK>>
-    created_time : TIMESTAMP
-    updated_time : TIMESTAMP
-}
+所属 ||--o{ ユーザー : 所属する
+役職 ||--o{ ユーザー : 持つ
 
-entity frequency {
-    * frequency_id : BIGINT <<PK>>
-    --
-    frequency_name : VARCHAR(10) <<UK>>
-}
+ユーザー ||--o{ お悩み : 投稿する
+カテゴリ ||--o{ お悩み : 分類する
 
-' =========================================================
-' User
-' =========================================================
+ユーザー ||--o{ ノウハウ : 投稿する
+カテゴリ ||--o{ ノウハウ : 分類する
+お悩み o|--o{ ノウハウ : 解決策として持つ
 
-entity users {
-    * user_id : BIGINT <<PK>>
-    --
-    user_name : VARCHAR(50)
-    self_introduction : VARCHAR(100)
-    admin_flg : BOOLEAN
-    mail_address : VARCHAR(50) <<UK>>
-    affiliated_id : BIGINT <<FK>>
-    rank_id : BIGINT <<FK>>
-    created_time : TIMESTAMP
-    updated_time : TIMESTAMP
-}
+ユーザー ||--o{ コメント : 投稿する
+ノウハウ ||--o{ コメント : コメントされる
 
-' =========================================================
-' Need
-' =========================================================
+ユーザー ||--o{ お悩み共感 : 共感する
+お悩み ||--o{ お悩み共感 : 共感される
 
-entity needs {
-    * need_id : BIGINT <<PK>>
-    --
-    user_id : BIGINT <<FK>>
-    category_id : BIGINT <<FK>>
-    need_title : VARCHAR(50)
-    need_detail : VARCHAR(500)
-    created_time : TIMESTAMP
-    updated_time : TIMESTAMP
-    delete_flg : BOOLEAN
-}
+ユーザー ||--o{ ノウハウ興味 : 興味を持つ
+ノウハウ ||--o{ ノウハウ興味 : 興味を持たれる
 
-entity need_edit_history {
-    * need_edit_history_id : BIGINT <<PK>>
-    --
-    need_id : BIGINT <<FK>>
-    need_detail : VARCHAR(500)
-    created_time : TIMESTAMP
-}
+ノウハウ興味 ||--o{ 通知 : 通知を設定する
+通知頻度 ||--o{ 通知 : 頻度を指定する
 
-entity need_empathy {
-    * need_empathy_id : BIGINT <<PK>>
-    --
-    need_id : BIGINT <<FK>>
-    user_id : BIGINT <<FK>>
-    created_time : TIMESTAMP
-    is_looked_by_reactor : BOOLEAN
-    is_looked_by_poster : BOOLEAN
-    --
-    UNIQUE(need_id, user_id)
-}
+お悩み ||--o{ お悩み編集履歴 : 編集履歴を持つ
+ノウハウ ||--o{ ノウハウ編集履歴 : 編集履歴を持つ
+コメント ||--o{ コメント編集履歴 : 編集履歴を持つ
 
-' =========================================================
-' Tip
-' =========================================================
+ユーザー ||--o{ Slack通知設定 : 設定する
+ノウハウ ||--o{ Slack通知設定 : 通知対象となる
 
-entity tips {
-    * tip_id : BIGINT <<PK>>
-    --
-    user_id : BIGINT <<FK>>
-    category_id : BIGINT <<FK>>
-    need_id : BIGINT <<FK, NULLABLE>>
-    tip_title : VARCHAR(50)
-    tip_detail : VARCHAR(500)
-    tip_url : VARCHAR(500)
-    created_time : TIMESTAMP
-    updated_time : TIMESTAMP
-    delete_flg : BOOLEAN
-}
-
-entity tip_edit_history {
-    * tip_edit_history_id : BIGINT <<PK>>
-    --
-    tip_id : BIGINT <<FK>>
-    tip_detail : VARCHAR(500)
-    tip_url : VARCHAR(500) <<NULLABLE>>
-    created_time : TIMESTAMP
-}
-
-entity tip_interest {
-    * tip_interest_id : BIGINT <<PK>>
-    --
-    tip_id : BIGINT <<FK>>
-    user_id : BIGINT <<FK>>
-    created_time : TIMESTAMP
-    is_looked_by_reactor : BOOLEAN
-    is_looked_by_poster : BOOLEAN
-    is_looked_by_best : BOOLEAN
-    is_my_best : BOOLEAN
-    --
-    UNIQUE(tip_id, user_id)
-}
-
-' =========================================================
-' Comment
-' =========================================================
-
-entity comments {
-    * comment_id : BIGINT <<PK>>
-    --
-    tip_id : BIGINT <<FK>>
-    user_id : BIGINT <<FK>>
-    comment_body : VARCHAR(250)
-    created_time : TIMESTAMP
-    is_looked : BOOLEAN
-    delete_flg : BOOLEAN
-}
-
-entity comment_edit_history {
-    * comment_edit_history_id : BIGINT <<PK>>
-    --
-    comment_id : BIGINT <<FK>>
-    comment_body : VARCHAR(250)
-    created_time : TIMESTAMP
-}
-
-' =========================================================
-' Notification
-' =========================================================
-
-entity notifications {
-    * notification_id : BIGINT <<PK>>
-    --
-    tip_interest_id : BIGINT <<FK>>
-    frequency_id : BIGINT <<FK>>
-    notification_week : INTEGER
-    notification_day : INTEGER
-    notification_time : TIME
-    is_active : BOOLEAN
-}
-
-' =========================================================
-' Slack
-' =========================================================
-
-entity slack_notification_setting {
-    * slack_notification_setting_id : BIGINT <<PK>>
-    --
-    user_id : BIGINT <<FK>>
-    tip_id : BIGINT <<FK>>
-    frequency : VARCHAR(255)
-    notify_time : TIME <<NULLABLE>>
-    day_of_week : INTEGER <<NULLABLE>>
-    day_of_month : INTEGER <<NULLABLE>>
-    enabled : BOOLEAN
-    --
-    UNIQUE(user_id, tip_id)
-}
-
-entity slack {
-    * slack_table_id : BIGINT <<PK>>
-    --
-    slack_id : VARCHAR(255)
-    channel : VARCHAR(255)
-    user_id : BIGINT <<FK>>
-}
-
-' =========================================================
-' Relationships
-' =========================================================
-
-affiliated ||--o{ users : affiliated_id
-rank ||--o{ users : rank_id
-
-users ||--o{ needs : user_id
-category ||--o{ needs : category_id
-
-needs ||--o{ need_edit_history : need_id
-
-needs ||--o{ need_empathy : need_id
-users ||--o{ need_empathy : user_id
-
-users ||--o{ tips : user_id
-category ||--o{ tips : category_id
-needs |o--o{ tips : need_id
-
-tips ||--o{ tip_edit_history : tip_id
-
-tips ||--o{ comments : tip_id
-users ||--o{ comments : user_id
-
-comments ||--o{ comment_edit_history : comment_id
-
-tips ||--o{ tip_interest : tip_id
-users ||--o{ tip_interest : user_id
-
-tip_interest ||--o{ notifications : tip_interest_id
-frequency ||--o{ notifications : frequency_id
-
-users ||--o{ slack_notification_setting : user_id
-tips ||--o{ slack_notification_setting : tip_id
-
-users ||--o{ slack : user_id
+ユーザー ||--o{ Slack連携情報 : 連携する
 
 @enduml
