@@ -1,1 +1,60 @@
+@Query(
+        value = """
+                SELECT n
+                FROM Need n
+                JOIN NeedEmpathy myEmpathy ON myEmpathy.need = n
+                LEFT JOIN NeedEmpathy ne ON ne.need = n
+                WHERE n.deleteFlg = false
+                  AND myEmpathy.user.userId = :userId
+                  AND (
+                        :keyword IS NULL
+                        OR :keyword = ''
+                        OR LOWER(n.needTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                        OR LOWER(n.needDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                        OR LOWER(n.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                  )
+                  AND (:affiliatedId IS NULL OR n.user.affiliated.affiliatedId = :affiliatedId)
+                  AND (:rankId IS NULL OR n.user.rank.rankId = :rankId)
+                  AND (:categoryId IS NULL OR n.category.categoryId = :categoryId)
+                GROUP BY n
+                ORDER BY
+                  CASE WHEN :orderBy = 'empathy' THEN COUNT(DISTINCT ne) END DESC,
+                  n.createdTime DESC
+                """,
+        countQuery = """
+                SELECT COUNT(DISTINCT n)
+                FROM Need n
+                JOIN NeedEmpathy myEmpathy ON myEmpathy.need = n
+                WHERE n.deleteFlg = false
+                  AND myEmpathy.user.userId = :userId
+                  AND (
+                        :keyword IS NULL
+                        OR :keyword = ''
+                        OR LOWER(n.needTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                        OR LOWER(n.needDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                        OR LOWER(n.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                  )
+                  AND (:affiliatedId IS NULL OR n.user.affiliated.affiliatedId = :affiliatedId)
+                  AND (:rankId IS NULL OR n.user.rank.rankId = :rankId)
+                  AND (:categoryId IS NULL OR n.category.categoryId = :categoryId)
+                """
+)
+Page<Need> searchEmpathizedNeeds(
+        @Param("userId") Long userId,
+        @Param("keyword") String keyword,
+        @Param("affiliatedId") Long affiliatedId,
+        @Param("rankId") Long rankId,
+        @Param("categoryId") Long categoryId,
+        @Param("orderBy") String orderBy,
+        Pageable pageable
+);
+
+
+ここで追加した一番大事な部分はこれ。
+
+JOIN NeedEmpathy myEmpathy ON myEmpathy.need = n
+
+と、
+
+AND myEmpathy.user.userId = :userId
 
