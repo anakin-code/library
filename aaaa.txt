@@ -1,60 +1,141 @@
-@Query(
-        value = """
-                SELECT n
-                FROM Need n
-                JOIN NeedEmpathy myEmpathy ON myEmpathy.need = n
-                LEFT JOIN NeedEmpathy ne ON ne.need = n
-                WHERE n.deleteFlg = false
-                  AND myEmpathy.user.userId = :userId
-                  AND (
-                        :keyword IS NULL
-                        OR :keyword = ''
-                        OR LOWER(n.needTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                        OR LOWER(n.needDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                        OR LOWER(n.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                  )
-                  AND (:affiliatedId IS NULL OR n.user.affiliated.affiliatedId = :affiliatedId)
-                  AND (:rankId IS NULL OR n.user.rank.rankId = :rankId)
-                  AND (:categoryId IS NULL OR n.category.categoryId = :categoryId)
-                GROUP BY n
-                ORDER BY
-                  CASE WHEN :orderBy = 'empathy' THEN COUNT(DISTINCT ne) END DESC,
-                  n.createdTime DESC
-                """,
-        countQuery = """
-                SELECT COUNT(DISTINCT n)
-                FROM Need n
-                JOIN NeedEmpathy myEmpathy ON myEmpathy.need = n
-                WHERE n.deleteFlg = false
-                  AND myEmpathy.user.userId = :userId
-                  AND (
-                        :keyword IS NULL
-                        OR :keyword = ''
-                        OR LOWER(n.needTitle) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                        OR LOWER(n.needDetail) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                        OR LOWER(n.user.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                  )
-                  AND (:affiliatedId IS NULL OR n.user.affiliated.affiliatedId = :affiliatedId)
-                  AND (:rankId IS NULL OR n.user.rank.rankId = :rankId)
-                  AND (:categoryId IS NULL OR n.category.categoryId = :categoryId)
-                """
-)
-Page<Need> searchEmpathizedNeeds(
-        @Param("userId") Long userId,
-        @Param("keyword") String keyword,
-        @Param("affiliatedId") Long affiliatedId,
-        @Param("rankId") Long rankId,
-        @Param("categoryId") Long categoryId,
-        @Param("orderBy") String orderBy,
-        Pageable pageable
-);
+Ⅰ．よかったこと
+1件目
 
+Stance／Basic Skillsとの紐づき
 
-ここで追加した一番大事な部分はこれ。
+素直さ：―
+気が利く：○
+図々しさ：―
+やり遂げる：○
+独自のStance：―
+Bizコミュニケーション：―
+段取り：―
+キャッチアップ：○
 
-JOIN NeedEmpathy myEmpathy ON myEmpathy.need = n
+事象
+自分の担当タスクを進めながら、他メンバーが困っていた機能修正やエラー調査についても、状況を確認して支援した。
 
-と、
+言動／思考／感情
+自分のタスクだけを終わらせるのではなく、チーム全体の進捗を意識して声をかけた。相手のコードやエラー内容を確認し、原因と修正方法を一緒に整理した。
 
-AND myEmpathy.user.userId = :userId
+教訓
+自分の作業に余裕がある段階で周囲の状況を確認すると、問題が大きくなる前に支援できる。今後も、自分の進捗だけでなくチーム全体の進捗を定期的に確認する。
+
+2件目
+
+Stance／Basic Skillsとの紐づき
+
+素直さ：―
+気が利く：―
+図々しさ：―
+やり遂げる：○
+独自のStance：―
+Bizコミュニケーション：―
+段取り：○
+キャッチアップ：―
+
+事象
+テストや機能作成について、作業内容を細分化し、各作業に必要な時間を見積もったうえでタスクを進めた。
+
+言動／思考／感情
+必要な作業を洗い出し、それぞれの所要時間に加えてバッファを設定した。予定と実績を比較しながら進めたことで、おおむね計画どおりに完了できた。
+
+教訓
+作業前にタスクを細かく分解すると、進捗や遅れを把握しやすくなる。今後も、着手前に作業内容・完了条件・所要時間を整理する。
+
+3件目
+
+Stance／Basic Skillsとの紐づき
+
+素直さ：○
+気が利く：―
+図々しさ：―
+やり遂げる：○
+独自のStance：―
+Bizコミュニケーション：―
+段取り：―
+キャッチアップ：○
+
+事象
+実装中に発見した不具合について、原因を調査し、修正後に動作確認まで行った。
+
+言動／思考／感情
+当初想定していた箇所以外にも原因がある可能性を考え、処理の流れや関連コードを確認した。修正するだけで終わらせず、同様の条件でも問題が起きないかを確認した。
+
+教訓
+不具合の表面的な箇所だけでなく、データや処理の流れを追うことが重要である。修正時には、原因・影響範囲・確認結果をセットで整理する。
+
+Ⅱ．よくなかったこと
+1件目
+
+Stance／Basic Skillsとの紐づき
+
+素直さ：―
+気が利く：―
+図々しさ：―
+やり遂げる：―
+独自のStance：―
+Bizコミュニケーション：―
+段取り：―
+キャッチアップ：○
+
+事象
+AWSへのデプロイ時に、build・push・merge・deployの関係を十分に理解しないまま作業を進め、手順を何度も確認することになった。
+
+言動／思考／感情
+目の前のエラーを解消することを優先し、各コマンドの目的や、どのコードがデプロイ対象になるのかを整理できていなかった。そのため、同じような確認や修正が繰り返し発生した。
+
+教訓
+手順だけを覚えるのではなく、「何をどこへ反映しているのか」を理解する必要がある。次回は作業前に、ブランチ・build成果物・デプロイ先の関係を図にして確認する。
+
+2件目
+
+Stance／Basic Skillsとの紐づき
+
+素直さ：―
+気が利く：―
+図々しさ：―
+やり遂げる：○
+独自のStance：―
+Bizコミュニケーション：―
+段取り：○
+キャッチアップ：―
+
+事象
+プロジェクト終盤までコンセプトの修正や追加機能の実装が残り、終了直前にバグ修正やAWSへのデプロイを行う状態になった。
+
+言動／思考／感情
+必要な機能を順番に実装することを優先し、発表日から逆算して、いつまでにコンセプトや主要機能を確定させるべきかを十分に設定できていなかった。
+
+教訓
+プロジェクトでは、実装開始時点だけでなく、発表・テスト・デプロイに必要な期間を含めて逆算する必要がある。発表の1週間前までに、コンセプト、KPI・KGI、必要機能を確定させる。
+
+3件目
+
+Stance／Basic Skillsとの紐づき
+
+素直さ：―
+気が利く：―
+図々しさ：○
+やり遂げる：―
+独自のStance：―
+Bizコミュニケーション：○
+段取り：○
+キャッチアップ：―
+
+事象
+作業の割り振りや進行について疑問がある場面で、全体のタスクのつながりや優先順位を十分に確認しないまま、自分の担当作業を進めた。
+
+言動／思考／感情
+自分が抱えていたタスクの対応を優先し、割り振り後の進行確認に十分参加できなかった。その結果、後からタスクの順番変更や追加対応が発生した。
+
+教訓
+自分の担当外であっても、後続作業に影響する部分については確認する必要がある。タスク割り振り時には、依存関係・担当者・期限・完了条件まで確認し、疑問点はその場で発言する。
+
+Ⅲ．次週の行動目標設定
+対象のStance／B.S.	具体的なアクション
+段取り	毎朝、当日のタスクを30分〜2時間程度の単位に分解し、完了条件・優先順位・想定時間を記載する。終業前に予定と実績を比較し、差が出た原因を記録する。
+図々しさ／Bizコミュニケーション	タスクの割り振りや手順に疑問がある場合は、自分の中だけで判断せず、その場で「目的・期限・前後の依存関係」を確認する。少なくとも1日1回はチーム全体の進捗を確認する。
+キャッチアップ	AWSやGitなど理解が曖昧な作業は、実行前に処理の流れを図または箇条書きにする。質問する際は「試したこと・結果・自分の仮説」を整理してから相談する。
+
 
